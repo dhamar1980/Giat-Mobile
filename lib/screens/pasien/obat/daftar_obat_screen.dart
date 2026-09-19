@@ -7,7 +7,12 @@ import 'tambah_obat_screen.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DaftarObatScreen extends StatefulWidget {
-  const DaftarObatScreen({super.key});
+  final bool isEmbedded;
+
+  const DaftarObatScreen({
+    super.key,
+    this.isEmbedded = false,
+  });
 
   @override
   State<DaftarObatScreen> createState() => _DaftarObatScreenState();
@@ -69,34 +74,85 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6FAF7),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _darkGreen, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Jadwal & Stok Obat',
-          style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.receipt_long_rounded, color: _darkGreen),
-            tooltip: 'Tebus Resep ke Apotek',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Membuka layanan tebus resep apotek GIAT...')),
-              );
-            },
-          ),
-        ],
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _darkGreen, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Text(
+                'Jadwal & Stok Obat',
+                style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.receipt_long_rounded, color: _darkGreen),
+                  tooltip: 'Tebus Resep ke Apotek',
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Membuka layanan tebus resep apotek GIAT...')),
+                    );
+                  },
+                ),
+              ],
+            ),
       body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         padding: const EdgeInsets.only(bottom: 80),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.isEmbedded) ...[
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  widget.isEmbedded ? (MediaQuery.of(context).padding.top + 72) : 20,
+                  20,
+                  4,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Jadwal & Stok Obat',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.receipt_long_rounded, color: _darkGreen, size: 22),
+                        tooltip: 'Tebus Resep ke Apotek',
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Membuka layanan tebus resep apotek GIAT...')),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             // Calendar Day Strip
             Container(
               color: Colors.white,

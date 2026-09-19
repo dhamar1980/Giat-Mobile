@@ -13,10 +13,12 @@ import '../obat/daftar_obat_screen.dart';
 
 class DokterListScreen extends StatefulWidget {
   final String userName;
+  final bool isEmbedded;
 
   const DokterListScreen({
     super.key,
     this.userName = 'Pasien',
+    this.isEmbedded = false,
   });
 
   @override
@@ -130,6 +132,59 @@ class _DokterListScreenState extends State<DokterListScreen> {
       return matchesCategory && matchesSearch;
     }).toList();
 
+    final content = SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Top Header Section (Green Arc + Bubbles) ──
+          _buildHeaderSection(),
+
+          const SizedBox(height: 16),
+
+          // ── Search Bar ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildSearchBar(),
+          ),
+
+          const SizedBox(height: 14),
+
+          // ── Filter Chips ──
+          _buildFilterChips(),
+
+          const SizedBox(height: 20),
+
+          // ── Section 1: Konsultasi Saya ──
+          _buildKonsultasiSayaSection(),
+
+          const SizedBox(height: 22),
+
+          // ── Section 2: Dokter Online ──
+          _buildDokterOnlineSection(filteredDoctors),
+        ],
+      ),
+    );
+
+    if (widget.isEmbedded) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _KonsultasiTopographyPainter(),
+            ),
+          ),
+          Positioned.fill(
+            child: content,
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       backgroundColor: _bgColor,
       bottomNavigationBar: _buildBottomNavigationBar(context),
@@ -145,42 +200,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
           SafeArea(
             child: Column(
               children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ── Top Header Section (Green Arc + Bubbles) ──
-                        _buildHeaderSection(),
-
-                        const SizedBox(height: 16),
-
-                        // ── Search Bar ──
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildSearchBar(),
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        // ── Filter Chips ──
-                        _buildFilterChips(),
-
-                        const SizedBox(height: 20),
-
-                        // ── Section 1: Konsultasi Saya ──
-                        _buildKonsultasiSayaSection(),
-
-                        const SizedBox(height: 22),
-
-                        // ── Section 2: Dokter Online ──
-                        _buildDokterOnlineSection(filteredDoctors),
-                      ],
-                    ),
-                  ),
-                ),
+                Expanded(child: content),
               ],
             ),
           ),
@@ -222,87 +242,93 @@ class _DokterListScreenState extends State<DokterListScreen> {
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              widget.isEmbedded ? (MediaQuery.of(context).padding.top + 72) : 16,
+              20,
+              24,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Action Row (Notification & Profile)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            children: [
-                              IconButton(
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(4),
-                                icon: const Icon(
-                                  Icons.notifications_none_rounded,
-                                  size: 22,
-                                  color: Color(0xFF1F2937),
+                // Top Action Row (Notification & Profile) - hidden in embedded mode
+                if (!widget.isEmbedded) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              children: [
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(4),
+                                  icon: const Icon(
+                                    Icons.notifications_none_rounded,
+                                    size: 22,
+                                    color: Color(0xFF1F2937),
+                                  ),
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                                    );
+                                  },
                                 ),
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Tidak ada notifikasi baru.')),
-                                  );
-                                },
-                              ),
-                              Positioned(
-                                right: 6,
-                                top: 6,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.redAccent,
-                                    shape: BoxShape.circle,
+                                Positioned(
+                                  right: 6,
+                                  top: 6,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.redAccent,
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProfilePasienScreen(userName: widget.userName),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF044E2F),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                              ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ProfilePasienScreen(userName: widget.userName),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF044E2F),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // Chat Bubble Left (Bright Green)
                 Align(

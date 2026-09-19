@@ -10,7 +10,12 @@ import '../pantau/pantau_dashboard_screen.dart';
 import '../obat/daftar_obat_screen.dart';
 
 class PragiHomeView extends StatefulWidget {
-  const PragiHomeView({super.key});
+  final bool isEmbedded;
+
+  const PragiHomeView({
+    super.key,
+    this.isEmbedded = false,
+  });
 
   @override
   State<PragiHomeView> createState() => _PragiHomeViewState();
@@ -32,32 +37,20 @@ class _PragiHomeViewState extends State<PragiHomeView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FF),
-      bottomNavigationBar: _buildBottomNavigationBar(context),
-      body: Stack(
-        children: [
-          // Background Topography
-          Positioned.fill(
-            child: CustomPaint(
-              painter: PragiTopographyPainter(),
-            ),
-          ),
+    final bodyContent = ValueListenableBuilder<List<PragiScreeningResult>>(
+      valueListenable: PragiService().historyNotifier,
+      builder: (context, history, _) {
+        final latest = history.isNotEmpty ? history.first : null;
+        final pastHistory = history.length > 1 ? history.sublist(1) : <PragiScreeningResult>[];
 
-          SafeArea(
-            child: ValueListenableBuilder<List<PragiScreeningResult>>(
-              valueListenable: PragiService().historyNotifier,
-              builder: (context, history, _) {
-                final latest = history.isNotEmpty ? history.first : null;
-                final pastHistory = history.length > 1 ? history.sublist(1) : <PragiScreeningResult>[];
-
-                return Column(
+        return Column(
+          children: [
+            if (!widget.isEmbedded)
+              // Top App Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
                   children: [
-                    // Top App Header
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      child: Row(
-                        children: [
                           const Spacer(),
                           // Notification Bell
                           Container(
@@ -107,8 +100,15 @@ class _PragiHomeViewState extends State<PragiHomeView> {
                     // Scrollable Main Content
                     Expanded(
                       child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          widget.isEmbedded ? (MediaQuery.of(context).padding.top + 72) : 4,
+                          20,
+                          24,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -293,7 +293,36 @@ class _PragiHomeViewState extends State<PragiHomeView> {
                   ],
                 );
               },
+            );
+
+    if (widget.isEmbedded) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: PragiTopographyPainter(),
             ),
+          ),
+          Positioned.fill(
+            child: bodyContent,
+          ),
+        ],
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F9FF),
+      bottomNavigationBar: _buildBottomNavigationBar(context),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: PragiTopographyPainter(),
+            ),
+          ),
+          SafeArea(
+            child: bodyContent,
           ),
         ],
       ),

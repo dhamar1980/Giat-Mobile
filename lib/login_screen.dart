@@ -2,8 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'master_layout.dart';
 import 'register_screen.dart';
-import 'pasien_home_screen.dart';
 import 'dokter_home_screen.dart';
 import 'apoteker_home_screen.dart';
 import 'forgot_password_screen.dart';
@@ -138,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen>
     } else if (role == 'apoteker') {
       targetScreen = ApotekerHomeScreen(apotekerName: name);
     } else {
-      targetScreen = PasienHomeScreen(userName: name);
+      targetScreen = MasterLayout(userName: name);
     }
 
     Navigator.of(context).push(

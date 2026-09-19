@@ -7,7 +7,12 @@ import 'catat_kesehatan_screen.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class PantauDashboardScreen extends StatefulWidget {
-  const PantauDashboardScreen({super.key});
+  final bool isEmbedded;
+
+  const PantauDashboardScreen({
+    super.key,
+    this.isEmbedded = false,
+  });
 
   @override
   State<PantauDashboardScreen> createState() => _PantauDashboardScreenState();
@@ -16,40 +21,87 @@ class PantauDashboardScreen extends StatefulWidget {
 class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
   static const _darkGreen = Color(0xFF065A37);
   static const _buttonGreen = Color(0xFF044E2F);
-  static const _accentGreen = Color(0xFF22C55E);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6FAF7),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _darkGreen, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Pantau Kesehatan Ginjal',
-          style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history_rounded, color: _darkGreen),
-            tooltip: 'Riwayat Catatan',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Membuka riwayat lengkap rekam medis...')),
-              );
-            },
-          ),
-        ],
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _darkGreen, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Text(
+                'Pantau Kesehatan Ginjal',
+                style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.history_rounded, color: _darkGreen),
+                  tooltip: 'Riwayat Catatan',
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Membuka riwayat lengkap rekam medis...')),
+                    );
+                  },
+                ),
+              ],
+            ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          widget.isEmbedded ? (MediaQuery.of(context).padding.top + 72) : 20,
+          20,
+          24,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.isEmbedded) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Pantau Kesehatan',
+                    style: GoogleFonts.inter(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.history_rounded, color: _darkGreen, size: 22),
+                      tooltip: 'Riwayat Catatan',
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Membuka riwayat lengkap rekam medis...')),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
             // Status Stadium Ginjal Banner
             Container(
               padding: const EdgeInsets.all(18),

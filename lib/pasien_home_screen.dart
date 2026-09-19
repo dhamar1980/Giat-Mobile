@@ -16,10 +16,12 @@ import 'screens/pasien/edukasi/edukasi_detail_screen.dart';
 
 class PasienHomeScreen extends StatefulWidget {
   final String userName;
+  final bool isEmbedded;
 
   const PasienHomeScreen({
     super.key,
     this.userName = 'Pasien',
+    this.isEmbedded = false,
   });
 
   @override
@@ -74,6 +76,52 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
       statusBarIconBrightness: Brightness.dark,
     ));
 
+    final content = SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      padding: const EdgeInsets.only(bottom: 28),
+      child: FadeTransition(
+        opacity: _fadeAnim,
+        child: SlideTransition(
+          position: _slideAnim,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Top Header Section with Green Arc & Chat Bubbles ──
+              _buildHeaderSection(),
+
+              const SizedBox(height: 20),
+
+              // ── Section 1: Pengingat Hari Ini ──
+              _buildReminderSection(),
+
+              const SizedBox(height: 24),
+
+              // ── Section 2: Edukasi Untukmu ──
+              _buildEducationSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (widget.isEmbedded) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _HomeTopographyPainter(),
+            ),
+          ),
+          Positioned.fill(
+            child: content,
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       backgroundColor: _bgColor,
       body: Stack(
@@ -88,35 +136,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
           SafeArea(
             child: Column(
               children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: FadeTransition(
-                      opacity: _fadeAnim,
-                      child: SlideTransition(
-                        position: _slideAnim,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ── Top Header Section with Green Arc & Chat Bubbles ──
-                            _buildHeaderSection(),
-
-                            const SizedBox(height: 20),
-
-                            // ── Section 1: Pengingat Hari Ini ──
-                            _buildReminderSection(),
-
-                            const SizedBox(height: 24),
-
-                            // ── Section 2: Edukasi Untukmu ──
-                            _buildEducationSection(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                Expanded(child: content),
 
                 // ── Bottom Navigation Bar ──
                 _buildBottomNavigationBar(),
@@ -157,83 +177,89 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              widget.isEmbedded ? (MediaQuery.of(context).padding.top + 72) : 12,
+              20,
+              28,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Action Pill (Bell & Profile)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            children: [
-                              IconButton(
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(4),
-                                icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF1F2937)),
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Tidak ada notifikasi baru.')),
-                                  );
-                                },
-                              ),
-                              Positioned(
-                                right: 6,
-                                top: 6,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.redAccent,
-                                    shape: BoxShape.circle,
+                // Top Action Pill (Bell & Profile) - hidden in embedded MasterLayout mode
+                if (!widget.isEmbedded) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              children: [
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(4),
+                                  icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF1F2937)),
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                                    );
+                                  },
+                                ),
+                                Positioned(
+                                  right: 6,
+                                  top: 6,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.redAccent,
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProfilePasienScreen(userName: widget.userName),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF044E2F),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                              ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ProfilePasienScreen(userName: widget.userName),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF044E2F),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // Chat Bubble Left (Green bright)
                 Align(
