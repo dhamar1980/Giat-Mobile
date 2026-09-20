@@ -37,14 +37,10 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
 
   // Colors based on Figma design
   static const _darkGreen = Color(0xFF065A37);
-  static const _bubbleGreen = Color(0xFF22C55E);
-  static const _bubbleDarkGreen = Color(0xFF044E2F);
+  static const _chatBubbleGreen = Color(0xFF006D37);
+  static const _chatBubbleCheckBlue = Color(0xFF34A0FF);
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
-
-  // Reminder checklist state
-  bool _obatTaken = false;
-  bool _kontrolDone = false;
 
   @override
   void initState() {
@@ -214,8 +210,11 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                                   padding: const EdgeInsets.all(4),
                                   icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF1F2937)),
                                   onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const ReminderListScreen(),
+                                      ),
                                     );
                                   },
                                 ),
@@ -261,25 +260,34 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                   const SizedBox(height: 12),
                 ],
 
-                // Chat Bubble Left (Green bright)
+                // Chat Bubble Left (Figma Node 771:5908 - Theme 1)
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 290),
+                    constraints: const BoxConstraints(maxWidth: 300),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: _bubbleGreen,
+                      color: Colors.white,
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(4),
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(2),
+                      ),
+                      border: Border.all(
+                        color: _chatBubbleGreen,
+                        width: 1.0,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
+                          color: _chatBubbleGreen.withValues(alpha: 0.18),
                           blurRadius: 8,
-                          offset: const Offset(0, 3),
+                          offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
@@ -287,15 +295,15 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Selamat Datang Kembali,\n${widget.userName} 👋',
+                          'Selamat Datang Kembali,\n${widget.userName} 👋🏻',
                           style: GoogleFonts.inter(
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                            height: 1.3,
+                            color: _chatBubbleGreen,
+                            height: 1.35,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 5),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -304,12 +312,13 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                             Text(
                               '12.00',
                               style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w400,
+                                color: _chatBubbleGreen.withValues(alpha: 0.65),
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Icon(Icons.done_all_rounded, size: 14, color: Color(0xFF67E8F9)),
+                            const Icon(Icons.done_all_rounded, size: 15, color: _chatBubbleCheckBlue),
                           ],
                         ),
                       ],
@@ -319,25 +328,34 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
 
                 const SizedBox(height: 14),
 
-                // Chat Bubble Right (Dark Green)
+                // Chat Bubble Right (Figma Node 771:5917 - Theme 2)
                 Align(
                   alignment: Alignment.centerRight,
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 310),
+                    constraints: const BoxConstraints(maxWidth: 315),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: _bubbleDarkGreen,
+                      color: Colors.white,
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(18),
-                        bottomRight: Radius.circular(4),
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(2),
+                      ),
+                      border: Border.all(
+                        color: _chatBubbleGreen,
+                        width: 1.0,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 10,
+                          color: _chatBubbleGreen.withValues(alpha: 0.18),
+                          blurRadius: 8,
                           offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
@@ -347,13 +365,13 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                         Text(
                           'Rawat ginjal hari ini demi masa depan. Langkah kecilmu menjaga ginjal tetap sehat. ✨✨',
                           style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                            color: _chatBubbleGreen,
                             height: 1.4,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 5),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -362,12 +380,13 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                             Text(
                               '12.00',
                               style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w400,
+                                color: _chatBubbleGreen.withValues(alpha: 0.65),
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Icon(Icons.done_all_rounded, size: 14, color: Color(0xFF67E8F9)),
+                            const Icon(Icons.done_all_rounded, size: 15, color: _chatBubbleCheckBlue),
                           ],
                         ),
                       ],
@@ -436,13 +455,11 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
             iconBg: const Color(0xFF065A37),
             title: 'Minum Obat',
             time: '08:00 WIB',
-            isCompleted: _obatTaken,
-            onToggle: () {
-              setState(() => _obatTaken = !_obatTaken);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(_obatTaken ? 'Obat telah diminum ✅' : 'Status obat dibatalkan'),
-                  duration: const Duration(seconds: 1),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ReminderListScreen(),
                 ),
               );
             },
@@ -456,9 +473,13 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
             iconBg: const Color(0xFF065A37),
             title: 'Kontrol Kesehatan',
             time: 'Besok, 10:00 WIB',
-            isCompleted: _kontrolDone,
-            onToggle: () {
-              setState(() => _kontrolDone = !_kontrolDone);
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ReminderListScreen(),
+                ),
+              );
             },
           ),
         ],
@@ -471,91 +492,74 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
     required Color iconBg,
     required String title,
     required String time,
-    required bool isCompleted,
-    required VoidCallback onToggle,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _cardBorderColor, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: CustomPaint(painter: _SubtleCardOverlayPainter()),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _cardBorderColor, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 24),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        time,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: const Color(0xFF64748B),
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: onToggle,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 28,
-                    height: 28,
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CustomPaint(painter: _SubtleCardOverlayPainter()),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isCompleted ? _bubbleGreen : const Color(0xFF044E2F),
-                        width: 2,
-                      ),
-                      color: isCompleted ? _bubbleGreen : Colors.transparent,
+                      color: iconBg,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: isCompleted
-                        ? const Icon(Icons.check, size: 18, color: Colors.white)
-                        : const Icon(Icons.check, size: 18, color: Color(0xFF044E2F)),
+                    child: Icon(icon, color: Colors.white, size: 24),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          time,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: const Color(0xFF64748B),
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

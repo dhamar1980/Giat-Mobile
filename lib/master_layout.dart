@@ -8,6 +8,7 @@ import 'screens/pasien/pragi/pragi_home_view.dart';
 import 'screens/pasien/pantau/pantau_dashboard_screen.dart';
 import 'screens/pasien/obat/daftar_obat_screen.dart';
 import 'screens/pasien/profile/profile_pasien_screen.dart';
+import 'screens/pasien/reminder/reminder_list_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER LAYOUT GIAT (Persistent TopBar, Content Switcher, & Navbar)
@@ -165,16 +166,26 @@ class _MasterLayoutState extends State<MasterLayout> {
                 // 1. Notifikasi (Lonceng di sisi kiri)
                 Stack(
                   children: [
-                    IconButton(
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.all(4),
-                      icon: const Icon(
-                        Icons.notifications_none_rounded,
-                        size: 22,
-                        color: Color(0xFF1F2937),
+                    GestureDetector(
+                      onLongPress: _showNotificationsModal,
+                      child: IconButton(
+                        constraints: const BoxConstraints(),
+                        padding: const EdgeInsets.all(4),
+                        icon: const Icon(
+                          Icons.notifications_none_rounded,
+                          size: 22,
+                          color: Color(0xFF1F2937),
+                        ),
+                        tooltip: 'Reminder',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ReminderListScreen(),
+                            ),
+                          );
+                        },
                       ),
-                      tooltip: 'Notifikasi',
-                      onPressed: _showNotificationsModal,
                     ),
                     if (hasUnread)
                       Positioned(

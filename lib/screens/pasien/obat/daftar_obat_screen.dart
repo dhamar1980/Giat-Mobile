@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import 'resep_dokter_screen.dart';
 import 'pembelian_obat_screen.dart';
+import 'lacak_obat_screen.dart';
+import 'riwayat_obat_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN OBAT & RESEP PASIEN (Figma Screen: Tab Obat Pasien)
@@ -117,7 +119,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
           IconButton(
             icon: const Icon(Icons.history_rounded, color: _darkGreen),
             tooltip: 'Riwayat Pesanan',
-            onPressed: () => _showRiwayatPesananModal(context),
+            onPressed: () => _openRiwayatScreen(context),
           ),
         ],
       ),
@@ -874,7 +876,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
               ),
             ),
             GestureDetector(
-              onTap: () => _showRiwayatPesananModal(context),
+              onTap: () => _openRiwayatScreen(context),
               behavior: HitTestBehavior.opaque,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1123,7 +1125,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => _showLacakObatModal(context),
+                            onTap: () => _openLacakObatScreen(context),
                             behavior: HitTestBehavior.opaque,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1155,6 +1157,31 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _openLacakObatScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LacakObatScreen(
+          userName: widget.userName,
+          orderId: '#G-9021',
+          estimasiTiba: 'Hari ini, 15:30 WIB',
+          status: 'Sedang Diproses',
+        ),
+      ),
+    );
+  }
+
+  void _openRiwayatScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RiwayatObatScreen(
+          userName: widget.userName,
+        ),
+      ),
     );
   }
 

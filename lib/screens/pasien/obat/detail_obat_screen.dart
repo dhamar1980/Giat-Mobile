@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'keranjang_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -277,7 +278,7 @@ class _DetailObatScreenState extends State<DetailObatScreen> {
 
         // Action Pill (Cart with Badge & Avatar)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(30),
@@ -293,39 +294,57 @@ class _DetailObatScreenState extends State<DetailObatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Cart Button with Yellow Badge
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: _darkGreen,
-                      shape: BoxShape.circle,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => KeranjangScreen(userName: widget.userName),
                     ),
-                    child: const Icon(Icons.shopping_cart_outlined, size: 18, color: Colors.white),
-                  ),
-                  if (_cartCount > 0)
-                    Positioned(
-                      top: -4,
-                      right: -4,
-                      child: Container(
-                        padding: const EdgeInsets.all(3.5),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFBBF24),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$_cartCount',
-                          style: GoogleFonts.inter(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w900,
-                            color: const Color(0xFF0F172A),
+                  );
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                      icon: const Icon(
+                        Icons.shopping_cart_outlined,
+                        size: 22,
+                        color: Color(0xFF1F2937),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => KeranjangScreen(userName: widget.userName),
+                          ),
+                        );
+                      },
+                    ),
+                    if (_cartCount > 0)
+                      Positioned(
+                        top: -1,
+                        right: -1,
+                        child: Container(
+                          padding: const EdgeInsets.all(3.5),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFBBF24),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$_cartCount',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFF0F172A),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(width: 8),
               // Profile Avatar

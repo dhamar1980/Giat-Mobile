@@ -266,24 +266,38 @@ class _PembayaranTransferBankScreenState extends State<PembayaranTransferBankScr
           ),
         ),
 
-        // Pill User Avatar & Notifikasi
+        // Action Pill (Bell & Profile Avatar)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _cardBorderColor),
+            borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(4),
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  size: 22,
+                  color: Color(0xFF1F2937),
+                ),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -293,29 +307,15 @@ class _PembayaranTransferBankScreenState extends State<PembayaranTransferBankScr
                     ),
                   );
                 },
-                child: const CircleAvatar(
-                  radius: 13,
-                  backgroundColor: Color(0xFFE2E8F0),
-                  child: Icon(Icons.person, size: 16, color: Color(0xFF64748B)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Stack(
-                children: [
-                  const Icon(Icons.notifications_none_rounded, size: 20, color: Color(0xFF0F172A)),
-                  Positioned(
-                    right: 1,
-                    top: 1,
-                    child: Container(
-                      width: 6.5,
-                      height: 6.5,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF10B981),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF044E2F),
+                    shape: BoxShape.circle,
                   ),
-                ],
+                  child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                ),
               ),
             ],
           ),

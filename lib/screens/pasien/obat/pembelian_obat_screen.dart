@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'detail_obat_screen.dart';
 import 'checkout_resep_screen.dart';
+import 'keranjang_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,7 +296,7 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
 
         // Action Pill (Cart with Badge & Avatar)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(30),
@@ -312,23 +313,24 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
             children: [
               // Cart Button with Yellow Badge
               GestureDetector(
-                onTap: () => _openCartCheckout(context),
+                onTap: () => _openCart(context),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: _darkGreen,
-                        shape: BoxShape.circle,
+                    IconButton(
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                      icon: const Icon(
+                        Icons.shopping_cart_outlined,
+                        size: 22,
+                        color: Color(0xFF1F2937),
                       ),
-                      child: const Icon(Icons.shopping_cart_outlined, size: 18, color: Colors.white),
+                      onPressed: () => _openCart(context),
                     ),
                     if (_cartCount > 0)
                       Positioned(
-                        top: -4,
-                        right: -4,
+                        top: -1,
+                        right: -1,
                         child: Container(
                           padding: const EdgeInsets.all(3.5),
                           decoration: const BoxDecoration(
@@ -674,7 +676,7 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
         width: double.infinity,
         height: 48,
         child: ElevatedButton(
-          onPressed: () => _openCartCheckout(context),
+          onPressed: () => _openCart(context),
           style: ElevatedButton.styleFrom(
             backgroundColor: _darkGreen,
             elevation: 0,
@@ -774,14 +776,16 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
     );
   }
 
-  void _openCartCheckout(BuildContext context) {
+  void _openCart(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CheckoutResepScreen(userName: widget.userName),
+        builder: (_) => KeranjangScreen(userName: widget.userName),
       ),
     );
   }
+
+  void _openCartCheckout(BuildContext context) => _openCart(context);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
