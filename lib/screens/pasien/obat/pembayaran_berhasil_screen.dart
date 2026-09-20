@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'pembayaran_model.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../master_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PEMBAYARAN BERHASIL (Figma Nodes: 977:9343 & 977:9794)
@@ -25,9 +26,15 @@ class PembayaranBerhasilScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bgColor,
-      body: Stack(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleKembaliKeObat(context);
+      },
+      child: Scaffold(
+        backgroundColor: _bgColor,
+        body: Stack(
         children: [
           // Background Topography Curves
           Positioned.fill(
@@ -89,8 +96,9 @@ class PembayaranBerhasilScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ───────────────────────────────────────────────────────────────────────────
   // TOP BAR
@@ -101,7 +109,7 @@ class PembayaranBerhasilScreen extends StatelessWidget {
       children: [
         // Back Pill
         GestureDetector(
-          onTap: () => Navigator.pop(context),
+          onTap: () => _handleKembaliKeObat(context),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
@@ -706,10 +714,7 @@ class PembayaranBerhasilScreen extends StatelessWidget {
         width: double.infinity,
         height: 48,
         child: ElevatedButton(
-          onPressed: () {
-            // Pop until first route or root
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          },
+          onPressed: () => _handleKembaliKeObat(context),
           style: ElevatedButton.styleFrom(
             backgroundColor: _darkGreen,
             elevation: 0,
@@ -727,6 +732,19 @@ class PembayaranBerhasilScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _handleKembaliKeObat(BuildContext context) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MasterLayout(
+          userName: userName,
+          initialIndex: 4, // Tab 4: Jadwal & Stok Obat (DaftarObatScreen)
+        ),
+      ),
+      (route) => route.isFirst,
     );
   }
 

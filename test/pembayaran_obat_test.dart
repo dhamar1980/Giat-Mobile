@@ -87,5 +87,12 @@ void main() {
     expect(find.text('Pesanan Dibuat'), findsOneWidget);
     expect(find.text('Menunggu Verifikasi Apoteker'), findsOneWidget);
     expect(find.text('Kembali ke Obat'), findsOneWidget);
+
+    // Tap Kembali ke Obat button
+    await tester.tap(find.text('Kembali ke Obat'));
+    await tester.pumpAndSettle();
+
+    // Verify it navigates to MasterLayout displaying the Obat tab
+    expect(find.byType(PembayaranBerhasilScreen), findsNothing);
   });
 }

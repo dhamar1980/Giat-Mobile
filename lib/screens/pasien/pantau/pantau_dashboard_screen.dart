@@ -394,15 +394,17 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          'Pantau Kesehatan yuk..',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: _bubbleDarkGreen,
+                        Flexible(
+                          child: Text(
+                            'Pantau Kesehatan yuk..',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _bubbleDarkGreen,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 8),
                         const Icon(
                           Icons.done_all_rounded,
                           size: 16,
