@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'login_screen.dart';
+import 'widgets/giat_auth_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WELCOME / ONBOARDING SCREEN
@@ -77,6 +78,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
+
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
@@ -87,9 +90,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       backgroundColor: _bg,
       body: Stack(
         children: [
-          // ── Subtle topographic wave lines (same as reference) ──────────
-          Positioned.fill(
-            child: CustomPaint(painter: _TopoBgPainter()),
+          // ── Background Gelombang Atas & Bawah (Tengah Kosong) Sesuai Figma ──
+          Positioned(
+            top: 0,
+            left: 0,
+            width: screenSize.width,
+            height: screenSize.height,
+            child: GiatAuthBackground(
+              screenSize: screenSize,
+              showBottomWaves: true,
+              baseColor: const Color(0xFFF7F9FF),
+            ),
           ),
 
           SafeArea(
@@ -500,72 +511,4 @@ class _LeftBubblePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter _) => false;
-}
-
-// Subtle topographic wave background matching #F7F9FF design
-class _TopoBgPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final rect = Offset.zero & size;
-
-    // Solid background
-    canvas.drawRect(rect, Paint()..color = const Color(0xFFF7F9FF));
-
-    // Very subtle radial glow top-left (mint tint)
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-0.85, -0.75),
-          radius: 0.85,
-          colors: [
-            const Color(0xFF27A868).withValues(alpha: 0.07),
-            const Color(0xFF27A868).withValues(alpha: 0.0),
-          ],
-        ).createShader(rect),
-    );
-
-    // Topographic contour lines
-    final linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round;
-
-    final contours = [
-      _Contour(0, h * 0.10, w * 0.30, h * 0.02, w * 0.70, h * 0.05, h * 0.12, 0.16),
-      _Contour(0, h * 0.16, w * 0.28, h * 0.08, w * 0.68, h * 0.12, h * 0.19, 0.18),
-      _Contour(0, h * 0.23, w * 0.25, h * 0.15, w * 0.65, h * 0.19, h * 0.26, 0.18),
-      _Contour(0, h * 0.30, w * 0.22, h * 0.22, w * 0.62, h * 0.26, h * 0.34, 0.15),
-      _Contour(0, h * 0.38, w * 0.20, h * 0.30, w * 0.60, h * 0.34, h * 0.42, 0.13),
-      _Contour(0, h * 0.47, w * 0.25, h * 0.38, w * 0.70, h * 0.44, h * 0.50, 0.11),
-      _Contour(0, h * 0.57, w * 0.30, h * 0.49, w * 0.75, h * 0.53, h * 0.60, 0.11),
-      _Contour(0, h * 0.67, w * 0.35, h * 0.60, w * 0.75, h * 0.64, h * 0.72, 0.14),
-      _Contour(0, h * 0.76, w * 0.32, h * 0.68, w * 0.72, h * 0.73, h * 0.80, 0.16),
-      _Contour(0, h * 0.84, w * 0.28, h * 0.77, w * 0.68, h * 0.81, h * 0.88, 0.18),
-      _Contour(0, h * 0.92, w * 0.25, h * 0.85, w * 0.65, h * 0.89, h * 0.96, 0.20),
-      _Contour(0, h * 1.00, w * 0.22, h * 0.93, w * 0.62, h * 0.97, h * 1.04, 0.22),
-    ];
-
-    for (final c in contours) {
-      linePaint.color =
-          const Color(0xFF27A868).withValues(alpha: c.opacity);
-      canvas.drawPath(
-        Path()
-          ..moveTo(-20, c.yStart)
-          ..cubicTo(c.cp1x, c.cp1y, c.cp2x, c.cp2y, w + 20, c.yEnd),
-        linePaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter _) => false;
-}
-
-class _Contour {
-  final double yStart, cp1x, cp1y, cp2x, cp2y, yEnd, opacity;
-  const _Contour(this.yStart, this.cp1x, this.cp1y, this.cp2x, this.cp2y,
-      this.yEnd, double unused, this.opacity);
 }

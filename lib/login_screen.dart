@@ -7,6 +7,7 @@ import 'register_screen.dart';
 import 'dokter_home_screen.dart';
 import 'apoteker_home_screen.dart';
 import 'forgot_password_screen.dart';
+import 'widgets/giat_auth_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Demo credentials — untuk simulasi login
@@ -185,6 +186,8 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
+
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
@@ -195,10 +198,15 @@ class _LoginScreenState extends State<LoginScreen>
       backgroundColor: const Color(0xFFF6FAF7),
       body: Stack(
         children: [
-          // ── Background Topography + Glow ──
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _LoginTopographyPainter(),
+          // ── Background Topography + Glow (Tetap Diam Saat Keyboard Terbuka) ──
+          Positioned(
+            top: 0,
+            left: 0,
+            width: screenSize.width,
+            height: screenSize.height,
+            child: GiatAuthBackground(
+              screenSize: screenSize,
+              showBottomWaves: false,
             ),
           ),
 
@@ -207,33 +215,36 @@ class _LoginScreenState extends State<LoginScreen>
             bottom: false,
             child: LayoutBuilder(
               builder: (context, constraints) {
+                // Ensure card fills available vertical space on tall screens,
+                // but never squishes below 460px when keyboard appears!
+                const topEstimatedHeight = 290.0;
+                final cardMinHeight = (constraints.maxHeight - topEstimatedHeight).clamp(460.0, double.infinity);
+
                 return SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minHeight: constraints.maxHeight,
                     ),
-                    child: IntrinsicHeight(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // ── Top Header Section (Logo + Chat Bubbles) ──
-                          _buildTopSection(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // ── Top Header Section (Logo + Chat Bubbles) ──
+                        _buildTopSection(),
 
-                          const SizedBox(height: 18),
+                        const SizedBox(height: 18),
 
-                          // ── Bottom Green Form Card ──
-                          Expanded(
-                            child: SlideTransition(
-                              position: _cardSlide,
-                              child: FadeTransition(
-                                opacity: _fadeAnim,
-                                child: _buildBottomCard(),
-                              ),
-                            ),
+                        // ── Bottom Green Form Card ──
+                        SlideTransition(
+                          position: _cardSlide,
+                          child: FadeTransition(
+                            opacity: _fadeAnim,
+                            child: _buildBottomCard(minHeight: cardMinHeight),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -307,39 +318,41 @@ class _LoginScreenState extends State<LoginScreen>
   // ───────────────────────────────────────────────────────────────────────────
   // BOTTOM SECTION: GREEN FORM CARD
   // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildBottomCard() {
+  Widget _buildBottomCard({double minHeight = 0}) {
+    final screenSize = MediaQuery.sizeOf(context);
+
     return ClipRRect(
       borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(34),
-        topRight: Radius.circular(34),
+        topLeft: Radius.circular(50),
+        topRight: Radius.circular(50),
       ),
-      child: Stack(
-        children: [
-          // Green Card Background Gradient + subtle wavy contour lines
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFF22B062),
-                    Color(0xFF15964F),
-                    Color(0xFF07663A),
-                  ],
+      child: Container(
+        constraints: BoxConstraints(minHeight: minHeight),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF22B062),
+              Color(0xFF16964F),
+              Color(0xFF09522C),
+            ],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Subtle topographic wave contours at the bottom of the card only
+            Positioned.fill(
+              child: CustomPaint(
+                painter: GiatCardBottomWavePainter(
+                  screenHeight: screenSize.height,
                 ),
               ),
             ),
-          ),
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _CardTopographyOverlayPainter(),
-            ),
-          ),
 
-          // Form Content
-          Padding(
-            padding: const EdgeInsets.fromLTRB(22, 28, 22, 34),
+            // Form Content
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 28, 22, 34),
             child: Form(
               key: _formKey,
               child: Column(
@@ -587,6 +600,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -1006,122 +1020,6 @@ class _GoogleLogoPainter extends CustomPainter {
       Radius.circular(strokeW * 0.2),
     );
     canvas.drawRRect(barRect, barPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BACKGROUND TOPOGRAPHY PAINTER (TOP & FULL SCREEN)
-// ─────────────────────────────────────────────────────────────────────────────
-class _LoginTopographyPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final rect = Offset.zero & size;
-
-    // Base background color
-    canvas.drawRect(rect, Paint()..color = const Color(0xFFF6FAF7));
-
-    // Radial Mint Glow at top-right
-    final glowPaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(0.9, -0.85),
-        radius: 0.95,
-        colors: [
-          const Color(0xFF6EE7B7).withValues(alpha: 0.32),
-          const Color(0xFFA7F3D0).withValues(alpha: 0.18),
-          const Color(0xFFF6FAF7).withValues(alpha: 0.0),
-        ],
-        stops: const [0.0, 0.45, 1.0],
-      ).createShader(rect);
-    canvas.drawRect(rect, glowPaint);
-
-    // Topographic organic lines
-    final linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
-      ..strokeCap = StrokeCap.round;
-
-    final lineConfigs = [
-      [h * -0.02, h * 0.08, 0.22],
-      [h * 0.03, h * 0.14, 0.24],
-      [h * 0.08, h * 0.20, 0.22],
-      [h * 0.14, h * 0.27, 0.20],
-      [h * 0.21, h * 0.35, 0.18],
-      [h * 0.28, h * 0.43, 0.16],
-      [h * 0.36, h * 0.52, 0.15],
-      [h * 0.45, h * 0.62, 0.16],
-      [h * 0.55, h * 0.72, 0.18],
-      [h * 0.65, h * 0.82, 0.20],
-      [h * 0.75, h * 0.92, 0.22],
-      [h * 0.85, h * 1.02, 0.24],
-    ];
-
-    for (final cfg in lineConfigs) {
-      linePaint.color = const Color(0xFF10B981).withValues(alpha: cfg[2]);
-      final startY = cfg[0];
-      final endY = cfg[1];
-
-      final path = Path()
-        ..moveTo(-30, startY)
-        ..cubicTo(
-          w * 0.25,
-          startY + (endY - startY) * 0.25 + 15,
-          w * 0.72,
-          startY + (endY - startY) * 0.75 - 15,
-          w + 30,
-          endY,
-        );
-
-      canvas.drawPath(path, linePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CARD TOPOGRAPHY OVERLAY PAINTER (SUBTLE WAVES ON GREEN CARD)
-// ─────────────────────────────────────────────────────────────────────────────
-class _CardTopographyOverlayPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
-      ..strokeCap = StrokeCap.round;
-
-    final waveOffsets = [
-      0.08, 0.18, 0.28, 0.40, 0.52, 0.65, 0.78, 0.90, 1.02
-    ];
-
-    for (int i = 0; i < waveOffsets.length; i++) {
-      final yFactor = waveOffsets[i];
-      linePaint.color = Colors.white.withValues(alpha: 0.08 + (i % 3) * 0.03);
-
-      final startY = h * yFactor;
-      final endY = h * (yFactor + 0.12);
-
-      final path = Path()
-        ..moveTo(-20, startY)
-        ..cubicTo(
-          w * 0.3,
-          startY + 20,
-          w * 0.7,
-          endY - 20,
-          w + 20,
-          endY,
-        );
-
-      canvas.drawPath(path, linePaint);
-    }
   }
 
   @override

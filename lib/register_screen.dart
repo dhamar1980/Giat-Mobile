@@ -1,7 +1,11 @@
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'widgets/giat_auth_background.dart';
+import 'syarat_ketentuan_screen.dart';
+import 'kebijakan_privasi_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -233,6 +237,8 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
+
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
@@ -250,10 +256,15 @@ class _RegisterScreenState extends State<RegisterScreen>
         backgroundColor: const Color(0xFFF6FAF7),
         body: Stack(
           children: [
-            // ── Background Topography + Glow ──
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _RegisterTopographyPainter(),
+            // ── Background Topography + Glow (Tetap Diam Saat Keyboard Terbuka) ──
+            Positioned(
+              top: 0,
+              left: 0,
+              width: screenSize.width,
+              height: screenSize.height,
+              child: GiatAuthBackground(
+                screenSize: screenSize,
+                showBottomWaves: false,
               ),
             ),
 
@@ -400,23 +411,23 @@ class _RegisterScreenState extends State<RegisterScreen>
   // BOTTOM CARD WITH MULTI-STEP FORM
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildBottomCard() {
+    final screenSize = MediaQuery.sizeOf(context);
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        color: Color(0xFF1EAE62),
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF22C55E),
-            Color(0xFF16A34A),
-            Color(0xFF065A37),
+            Color(0xFF22B062),
+            Color(0xFF16964F),
+            Color(0xFF09522C),
           ],
-          stops: [0.0, 0.45, 1.0],
         ),
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(38),
-          topRight: Radius.circular(38),
+          topLeft: Radius.circular(50),
+          topRight: Radius.circular(50),
         ),
         boxShadow: [
           BoxShadow(
@@ -428,15 +439,17 @@ class _RegisterScreenState extends State<RegisterScreen>
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(38),
-          topRight: Radius.circular(38),
+          topLeft: Radius.circular(50),
+          topRight: Radius.circular(50),
         ),
         child: Stack(
           children: [
-            // Overlay contour lines
+            // Subtle topographic wave contours at the bottom of the card only
             Positioned.fill(
               child: CustomPaint(
-                painter: _RegisterCardTopographyOverlayPainter(),
+                painter: GiatCardBottomWavePainter(
+                  screenHeight: screenSize.height,
+                ),
               ),
             ),
 
@@ -890,6 +903,14 @@ class _RegisterScreenState extends State<RegisterScreen>
                               decoration: TextDecoration.underline,
                               color: Colors.white,
                             ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const SyaratKetentuanScreen(),
+                                  ),
+                                );
+                              },
                           ),
                           const TextSpan(text: ' dan '),
                           TextSpan(
@@ -899,6 +920,14 @@ class _RegisterScreenState extends State<RegisterScreen>
                               decoration: TextDecoration.underline,
                               color: Colors.white,
                             ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const KebijakanPrivasiScreen(),
+                                  ),
+                                );
+                              },
                           ),
                           const TextSpan(text: ' GIAT.'),
                         ],
@@ -1365,110 +1394,6 @@ class _RegisterLeftBubbleShapePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _RegisterTopographyPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final rect = Offset.zero & size;
-
-    canvas.drawRect(rect, Paint()..color = const Color(0xFFF6FAF7));
-
-    final glowPaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(0.9, -0.85),
-        radius: 0.95,
-        colors: [
-          const Color(0xFF6EE7B7).withValues(alpha: 0.32),
-          const Color(0xFFA7F3D0).withValues(alpha: 0.18),
-          const Color(0xFFF6FAF7).withValues(alpha: 0.0),
-        ],
-        stops: const [0.0, 0.45, 1.0],
-      ).createShader(rect);
-    canvas.drawRect(rect, glowPaint);
-
-    final linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
-      ..strokeCap = StrokeCap.round;
-
-    final lineConfigs = [
-      [h * -0.02, h * 0.08, 0.22],
-      [h * 0.03, h * 0.14, 0.24],
-      [h * 0.08, h * 0.20, 0.22],
-      [h * 0.14, h * 0.27, 0.20],
-      [h * 0.21, h * 0.35, 0.18],
-      [h * 0.28, h * 0.43, 0.16],
-      [h * 0.36, h * 0.52, 0.15],
-      [h * 0.45, h * 0.62, 0.16],
-      [h * 0.55, h * 0.72, 0.18],
-    ];
-
-    for (final cfg in lineConfigs) {
-      linePaint.color = const Color(0xFF10B981).withValues(alpha: cfg[2]);
-      final startY = cfg[0];
-      final endY = cfg[1];
-
-      final path = Path()
-        ..moveTo(-30, startY)
-        ..cubicTo(
-          w * 0.25,
-          startY + (endY - startY) * 0.25 + 15,
-          w * 0.72,
-          startY + (endY - startY) * 0.75 - 15,
-          w + 30,
-          endY,
-        );
-
-      canvas.drawPath(path, linePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _RegisterCardTopographyOverlayPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
-      ..strokeCap = StrokeCap.round;
-
-    final waveOffsets = [
-      0.06, 0.16, 0.26, 0.38, 0.50, 0.62, 0.74, 0.86, 0.98
-    ];
-
-    for (int i = 0; i < waveOffsets.length; i++) {
-      final yFactor = waveOffsets[i];
-      linePaint.color = Colors.white.withValues(alpha: 0.08 + (i % 3) * 0.03);
-
-      final startY = h * yFactor;
-      final endY = h * (yFactor + 0.12);
-
-      final path = Path()
-        ..moveTo(-20, startY)
-        ..cubicTo(
-          w * 0.3,
-          startY + 20,
-          w * 0.7,
-          endY - 20,
-          w + 20,
-          endY,
-        );
-
-      canvas.drawPath(path, linePaint);
-    }
   }
 
   @override

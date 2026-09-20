@@ -1,24 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'verification_code_screen.dart';
+import 'login_screen.dart';
 import 'widgets/giat_auth_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LUPA KATA SANDI SCREEN (Figma Node: 1018-5399)
+// RESET PASSWORD SCREEN (Figma Node: 1018:5551)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+class ResetPasswordScreen extends StatefulWidget {
+  final String email;
+
+  const ResetPasswordScreen({
+    super.key,
+    required this.email,
+  });
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
+class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     with SingleTickerProviderStateMixin {
-  final _emailCtrl = TextEditingController();
+  final _newPassCtrl = TextEditingController();
+  final _confirmPassCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  bool _obscureNewPass = true;
+  bool _obscureConfirmPass = true;
   bool _isLoading = false;
 
   late final AnimationController _animCtrl;
@@ -27,12 +36,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   late final Animation<Offset> _bubble2Slide;
   late final Animation<Offset> _cardSlide;
 
-  // Colors based on Figma design
+  // Colors
   static const _darkGreen = Color(0xFF065A37);
   static const _bubbleGreen = Color(0xFF22C55E);
   static const _bubbleDarkGreen = Color(0xFF065A37);
   static const _buttonDarkGreen = Color(0xFF044E2F);
-  static const _linkMintGreen = Color(0xFF34D399);
 
   @override
   void initState() {
@@ -74,46 +82,92 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   @override
   void dispose() {
     _animCtrl.dispose();
-    _emailCtrl.dispose();
+    _newPassCtrl.dispose();
+    _confirmPassCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _handleSendOtp() async {
+  Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
-
-    // Logika 1: Kirimkan kode verifikasi ke email sesuai yang diinputkan user
-    await Future.delayed(const Duration(milliseconds: 650));
+    await Future.delayed(const Duration(milliseconds: 750));
     if (!mounted) return;
-
     setState(() => _isLoading = false);
-    final email = _emailCtrl.text.trim();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.mark_email_read_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Kode verifikasi telah dikirimkan ke $email',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF16964F),
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Kata Sandi Berhasil Diubah! 🎉',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: _darkGreen,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Kata sandi akun Anda telah berhasil diperbarui. Silakan masuk kembali menggunakan kata sandi baru Anda.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13.5,
+                color: const Color(0xFF4B5563),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _buttonDarkGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
+                child: Text(
+                  'Masuk Sekarang',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ],
         ),
-        backgroundColor: _darkGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-
-    // Logika 2: Langsung membuka halaman kode verifikasi
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VerificationCodeScreen(email: email),
       ),
     );
   }
@@ -149,9 +203,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             child: LayoutBuilder(
               builder: (context, constraints) {
                 // Ensure card stretches down to bottom when space permits,
-                // but never squishes below 290px when keyboard appears!
+                // but never squishes below 360px when keyboard appears!
                 const topEstimatedHeight = 310.0;
-                final cardMinHeight = (constraints.maxHeight - topEstimatedHeight).clamp(290.0, double.infinity);
+                final cardMinHeight = (constraints.maxHeight - topEstimatedHeight)
+                    .clamp(360.0, double.infinity);
 
                 return SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
@@ -198,7 +253,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // TOP BAR (Figma Node 1018:5399)
+  // TOP BAR (Figma Node 1018:5551)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildTopBar() {
     return Padding(
@@ -296,7 +351,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // CHAT BUBBLES SECTION (Figma Node 1018:5399)
+  // CHAT BUBBLES SECTION (Figma Node 1018:5551)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildChatBubblesSection() {
     return Padding(
@@ -333,7 +388,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Jangan khawatir. Masukkan email yang terdaftar untuk mendapatkan kode verifikasi.',
+                        'Buat kata sandi baru yang aman namun tetap mudah Anda ingat. Pastikan kata sandi terdiri dari kombinasi huruf, angka, dan karakter khusus.',
                         style: GoogleFonts.inter(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w500,
@@ -353,7 +408,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                             ),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.done_all_rounded, size: 14, color: Color(0xFF67E8F9)),
+                          const Icon(Icons.done_all_rounded,
+                              size: 14, color: Color(0xFF67E8F9)),
                         ],
                       ),
                     ],
@@ -391,7 +447,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     ],
                   ),
                   child: Text(
-                    'Lupa Kata Sandi?',
+                    'Buat password baru anda',
                     style: GoogleFonts.inter(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
@@ -408,7 +464,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // BOTTOM FORM CARD (Figma Node 1018:5399)
+  // BOTTOM FORM CARD (Figma Node 1018:5551)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildBottomCard({double minHeight = 0}) {
     final screenSize = MediaQuery.sizeOf(context);
@@ -448,8 +504,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Label: Kata Sandi Baru
                     Text(
-                      'Email',
+                      'Kata Sandi Baru',
                       style: GoogleFonts.inter(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
@@ -459,15 +516,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     const SizedBox(height: 8),
 
                     TextFormField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _newPassCtrl,
+                      obscureText: _obscureNewPass,
                       style: GoogleFonts.inter(
                         fontSize: 14.5,
                         color: const Color(0xFF1E293B),
                         fontWeight: FontWeight.w500,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Masukkan email',
+                        hintText: 'Masukkan kata sandi baru',
                         hintStyle: GoogleFonts.inter(
                           fontSize: 14,
                           color: const Color(0xFF94A3B8),
@@ -475,11 +532,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                         ),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                        suffixIcon: const Icon(
-                          Icons.email_outlined,
-                          color: Color(0xFF64748B),
-                          size: 22,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 15),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureNewPass
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: const Color(0xFF64748B),
+                            size: 22,
+                          ),
+                          onPressed: () =>
+                              setState(() => _obscureNewPass = !_obscureNewPass),
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -488,15 +552,77 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Email tidak boleh kosong';
+                          return 'Kata sandi baru tidak boleh kosong';
+                        }
+                        if (v.trim().length < 6) {
+                          return 'Kata sandi minimal 6 karakter';
                         }
                         return null;
                       },
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
 
-                    // Button Kirim Kode Verifikasi
+                    // Label: Konfirmasi Kata Sandi Baru
+                    Text(
+                      'Konfirmasi Kata Sandi Baru',
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    TextFormField(
+                      controller: _confirmPassCtrl,
+                      obscureText: _obscureConfirmPass,
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        color: const Color(0xFF1E293B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Konfirmasi kata sandi baru Anda',
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: const Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w400,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 15),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirmPass
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: const Color(0xFF64748B),
+                            size: 22,
+                          ),
+                          onPressed: () => setState(
+                              () => _obscureConfirmPass = !_obscureConfirmPass),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Konfirmasi kata sandi tidak boleh kosong';
+                        }
+                        if (v.trim() != _newPassCtrl.text.trim()) {
+                          return 'Konfirmasi kata sandi tidak cocok';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // Button Konfirmasi Password Baru
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -509,7 +635,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        onPressed: _isLoading ? null : _handleSendOtp,
+                        onPressed: _isLoading ? null : _handleResetPassword,
                         child: _isLoading
                             ? const SizedBox(
                                 width: 22,
@@ -520,42 +646,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                 ),
                               )
                             : Text(
-                                'Kirim Kode Verifikasi',
+                                'Konfirmasi Password Baru',
                                 style: GoogleFonts.inter(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Masuk Sekarang
-                    Center(
-                      child: GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: RichText(
-                          text: TextSpan(
-                            text: 'Sudah ingat kata sandi? ',
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontWeight: FontWeight.w400,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: 'Masuk sekarang',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13.5,
-                                  color: _linkMintGreen,
-                                  fontWeight: FontWeight.w700,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ],

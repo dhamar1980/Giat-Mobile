@@ -110,7 +110,8 @@ class _MasterLayoutState extends State<MasterLayout> {
                 ),
 
                 // Tab 3: Pantau Kesehatan Ginjal
-                const PantauDashboardScreen(
+                PantauDashboardScreen(
+                  userName: widget.userName,
                   isEmbedded: true,
                 ),
 

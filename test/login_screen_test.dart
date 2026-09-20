@@ -32,7 +32,7 @@ void main() {
 
     // Verify Form Fields & Labels
     expect(find.text('Email'), findsOneWidget);
-    expect(find.text('Masukkan email'), findsOneWidget);
+    expect(find.text('Masukkan email atau username'), findsOneWidget);
     expect(find.text('Kata Sandi'), findsOneWidget);
     expect(find.text('Masukkan kata sandi'), findsOneWidget);
     expect(find.text('Lupa kata sandi?'), findsOneWidget);

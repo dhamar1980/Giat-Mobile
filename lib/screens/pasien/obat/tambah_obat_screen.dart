@@ -19,7 +19,6 @@ class _TambahObatScreenState extends State<TambahObatScreen> {
 
   String _frequency = '1x Sehari';
   String _mealRule = 'Sesudah Makan';
-  String _time = '08:00 WIB';
 
   static const _darkGreen = Color(0xFF065A37);
   static const _buttonGreen = Color(0xFF044E2F);

@@ -1,33 +1,46 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'verification_code_screen.dart';
+import 'reset_password_screen.dart';
 import 'widgets/giat_auth_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LUPA KATA SANDI SCREEN (Figma Node: 1018-5399)
+// VERIFICATION CODE SCREEN (Figma Node: 1018:5472)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+class VerificationCodeScreen extends StatefulWidget {
+  final String email;
+
+  const VerificationCodeScreen({
+    super.key,
+    required this.email,
+  });
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  State<VerificationCodeScreen> createState() => _VerificationCodeScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
+class _VerificationCodeScreenState extends State<VerificationCodeScreen>
     with SingleTickerProviderStateMixin {
-  final _emailCtrl = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  bool _isLoading = false;
-
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _bubble1Slide;
   late final Animation<Offset> _bubble2Slide;
   late final Animation<Offset> _cardSlide;
 
-  // Colors based on Figma design
+  // 4 OTP Controllers and FocusNodes
+  final List<TextEditingController> _otpControllers =
+      List.generate(4, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+
+  // Resend Timer
+  Timer? _resendTimer;
+  int _countdownSeconds = 20;
+  bool _canResend = false;
+  bool _isLoading = false;
+
+  // Colors
   static const _darkGreen = Color(0xFF065A37);
   static const _bubbleGreen = Color(0xFF22C55E);
   static const _bubbleDarkGreen = Color(0xFF065A37);
@@ -69,51 +82,81 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     ));
 
     _animCtrl.forward();
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    setState(() {
+      _countdownSeconds = 20;
+      _canResend = false;
+    });
+    _resendTimer?.cancel();
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_countdownSeconds > 1) {
+        setState(() => _countdownSeconds--);
+      } else {
+        timer.cancel();
+        setState(() {
+          _countdownSeconds = 0;
+          _canResend = true;
+        });
+      }
+    });
+  }
+
+  void _handleResendCode() {
+    if (!_canResend) return;
+    _startCountdown();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Kode baru telah dikirimkan ke ${widget.email}'),
+        backgroundColor: _darkGreen,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
   void dispose() {
     _animCtrl.dispose();
-    _emailCtrl.dispose();
+    _resendTimer?.cancel();
+    for (final c in _otpControllers) {
+      c.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _handleSendOtp() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+  String get _enteredOtp =>
+      _otpControllers.map((c) => c.text.trim()).join();
 
-    // Logika 1: Kirimkan kode verifikasi ke email sesuai yang diinputkan user
+  Future<void> _handleVerifyOtp() async {
+    final otp = _enteredOtp;
+    if (otp.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Silakan lengkapi 4 digit kode verifikasi'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 650));
     if (!mounted) return;
-
     setState(() => _isLoading = false);
-    final email = _emailCtrl.text.trim();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.mark_email_read_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Kode verifikasi telah dikirimkan ke $email',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: _darkGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-
-    // Logika 2: Langsung membuka halaman kode verifikasi
+    // Navigasi ke Buat Password Baru
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => VerificationCodeScreen(email: email),
+        builder: (_) => ResetPasswordScreen(email: widget.email),
       ),
     );
   }
@@ -149,9 +192,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             child: LayoutBuilder(
               builder: (context, constraints) {
                 // Ensure card stretches down to bottom when space permits,
-                // but never squishes below 290px when keyboard appears!
+                // but never squishes below 320px when keyboard appears!
                 const topEstimatedHeight = 310.0;
-                final cardMinHeight = (constraints.maxHeight - topEstimatedHeight).clamp(290.0, double.infinity);
+                final cardMinHeight = (constraints.maxHeight - topEstimatedHeight)
+                    .clamp(320.0, double.infinity);
 
                 return SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
@@ -198,7 +242,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // TOP BAR (Figma Node 1018:5399)
+  // TOP BAR (Figma Node 1018:5472)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildTopBar() {
     return Padding(
@@ -296,7 +340,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // CHAT BUBBLES SECTION (Figma Node 1018:5399)
+  // CHAT BUBBLES SECTION (Figma Node 1018:5472)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildChatBubblesSection() {
     return Padding(
@@ -333,7 +377,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Jangan khawatir. Masukkan email yang terdaftar untuk mendapatkan kode verifikasi.',
+                        'Silakan masukkan kode verifikasi yang telah kami kirimkan ke alamat email Anda. Mohon periksa kotak masuk (inbox) atau folder spam/junk Anda.',
                         style: GoogleFonts.inter(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w500,
@@ -353,7 +397,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                             ),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.done_all_rounded, size: 14, color: Color(0xFF67E8F9)),
+                          const Icon(Icons.done_all_rounded,
+                              size: 14, color: Color(0xFF67E8F9)),
                         ],
                       ),
                     ],
@@ -391,7 +436,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     ],
                   ),
                   child: Text(
-                    'Lupa Kata Sandi?',
+                    'Masukan Kode Verifikasi',
                     style: GoogleFonts.inter(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
@@ -408,7 +453,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // BOTTOM FORM CARD (Figma Node 1018:5399)
+  // BOTTOM FORM CARD (Figma Node 1018:5472)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildBottomCard({double minHeight = 0}) {
     final screenSize = MediaQuery.sizeOf(context);
@@ -441,128 +486,198 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(22, 28, 22, 34),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Email',
-                      style: GoogleFonts.inter(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+              padding: const EdgeInsets.fromLTRB(22, 30, 22, 36),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Text Info 1
+                  Text(
+                    'Kode sudah dikirimkan, cek email anda sekarang',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
                     ),
-                    const SizedBox(height: 8),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
 
-                    TextFormField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
+                  // Text Info 2: Email Destination
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      text: 'Kode dikirimkan ke email: ',
                       style: GoogleFonts.inter(
-                        fontSize: 14.5,
-                        color: const Color(0xFF1E293B),
-                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withValues(alpha: 0.95),
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'Masukkan email',
-                        hintStyle: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: const Color(0xFF94A3B8),
-                          fontWeight: FontWeight.w400,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                        suffixIcon: const Icon(
-                          Icons.email_outlined,
-                          color: Color(0xFF64748B),
-                          size: 22,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Email tidak boleh kosong';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Button Kirim Kode Verifikasi
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _buttonDarkGreen,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                      children: [
+                        TextSpan(
+                          text: widget.email,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
                         ),
-                        onPressed: _isLoading ? null : _handleSendOtp,
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                'Kirim Kode Verifikasi',
-                                style: GoogleFonts.inter(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // Resend Timer
+                  Center(
+                    child: RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        text: 'Kirim ulang kode dalam ',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                        children: [
+                          if (!_canResend)
+                            TextSpan(
+                              text: '0:${_countdownSeconds.toString().padLeft(2, '0')}',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            )
+                          else
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.middle,
+                              child: GestureDetector(
+                                onTap: _handleResendCode,
+                                child: Text(
+                                  'Kirim Sekarang',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: _linkMintGreen,
+                                    decoration: TextDecoration.underline,
+                                  ),
                                 ),
                               ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Masuk Sekarang
-                    Center(
-                      child: GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: RichText(
-                          text: TextSpan(
-                            text: 'Sudah ingat kata sandi? ',
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontWeight: FontWeight.w400,
                             ),
-                            children: [
-                              TextSpan(
-                                text: 'Masuk sekarang',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13.5,
-                                  color: _linkMintGreen,
-                                  fontWeight: FontWeight.w700,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── 4 OTP Input Boxes ──
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(4, (index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: _buildOtpBox(index),
+                      );
+                    }),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Button Selanjutnya
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _buttonDarkGreen,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: _isLoading ? null : _handleVerifyOtp,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'Selanjutnya',
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // OTP SINGLE BOX (Figma Node 1018:5540)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildOtpBox(int index) {
+    return Container(
+      width: 58,
+      height: 64,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Center(
+        child: TextFormField(
+          controller: _otpControllers[index],
+          focusNode: _focusNodes[index],
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          maxLength: 1,
+          style: GoogleFonts.inter(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: _darkGreen,
+          ),
+          decoration: const InputDecoration(
+            counterText: '',
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+          ),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+          ],
+          onChanged: (value) {
+            if (value.isNotEmpty) {
+              if (index < 3) {
+                _focusNodes[index + 1].requestFocus();
+              } else {
+                _focusNodes[index].unfocus();
+              }
+            } else {
+              if (index > 0) {
+                _focusNodes[index - 1].requestFocus();
+              }
+            }
+          },
         ),
       ),
     );
