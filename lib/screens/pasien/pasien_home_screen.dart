@@ -661,8 +661,6 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
               article: {
                 'title': title,
                 'category': category,
-                'readTime': '4 mnt baca',
-                'author': 'Tim Dokter GIAT',
                 'date': '15 Sept 2026',
                 'image': imagePath,
                 'content': 'Menjaga kesehatan ginjal membutuhkan pemantauan rutin, pembatasan garam dapur, dan kontrol tekanan darah serta fungsi penyaringan ginjal.',

@@ -68,7 +68,7 @@ class EdukasiDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Badge & Read Time
+                  // Badge & Date
                   Row(
                     children: [
                       Container(
@@ -78,23 +78,31 @@ class EdukasiDetailScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          article['category'],
+                          article['category'] ?? 'Edukasi',
                           style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: _darkGreen),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '•  ${article['readTime']}',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                      ),
+                      if (article['date'] != null) ...[
+                        const SizedBox(width: 10),
+                        Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF64748B)),
+                            const SizedBox(width: 5),
+                            Text(
+                              article['date'],
+                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
                   // Title
                   Text(
-                    article['title'],
+                    article['title'] ?? '',
                     style: GoogleFonts.inter(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
@@ -103,38 +111,7 @@ class EdukasiDetailScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 12),
-
-                  // Author & Date
-                  Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFDCFCE7),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.person_rounded, size: 20, color: _darkGreen),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            article['author'],
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
-                          ),
-                          Text(
-                            article['date'],
-                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   const Divider(color: Color(0xFFF1F5F9)),
                   const SizedBox(height: 16),
 
@@ -149,39 +126,6 @@ class EdukasiDetailScreen extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 24),
-
-                  // Tips Box
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFBBF7D0)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.lightbulb_outline_rounded, color: _darkGreen, size: 24),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Pesan PRAGI untuk Anda:',
-                                style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: _darkGreen),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Selalu diskusikan perubahan pola makan atau asupan suplemen dengan Dokter Anda sebelum memulainya.',
-                                style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF166534), height: 1.4),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
