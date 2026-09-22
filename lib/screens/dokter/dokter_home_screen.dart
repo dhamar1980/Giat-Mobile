@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'models/dokter_models.dart';
+import 'notifikasi/dokter_notifikasi_screen.dart';
+import 'konsultasi/dokter_konsultasi_screen.dart';
+import 'konsultasi/dokter_room_chat_screen.dart';
+import 'pasien/dokter_pasien_screen.dart';
+import 'jadwal/dokter_jadwal_screen.dart';
+import 'profile/dokter_profile_screen.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DOKTER HOME SCREEN (Figma Node: 1008-17556)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,11 +46,11 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     super.initState();
     _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
     );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.08),
+      begin: const Offset(0, 0.05),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
 
@@ -93,6 +101,18 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     );
   }
 
+  void _navigateToChat(String patientId) {
+    final patient = DokterMockData.patients.firstWhere(
+      (p) => p.id == patientId,
+      orElse: () => DokterMockData.patients.first,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DokterRoomChatScreen(patient: patient),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -102,60 +122,63 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: Stack(
+      body: IndexedStack(
+        index: _selectedIndex,
         children: [
-          // Background Topography
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _DokterTopographyPainter(),
-            ),
-          ),
-
-          SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: FadeTransition(
-                      opacity: _fadeAnim,
-                      child: SlideTransition(
-                        position: _slideAnim,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ── Top Header Section with Chat Bubbles ──
-                            _buildHeaderSection(),
-
-                            const SizedBox(height: 22),
-
-                            // ── Section 1: Ringkasan Aktivitas / Konsultasi Aktif ──
-                            _buildActiveConsultationSection(),
-
-                            const SizedBox(height: 22),
-
-                            // ── Section 2: Permintaan Konsultasi ──
-                            _buildPendingConsultationSection(),
-
-                            const SizedBox(height: 22),
-
-                            // ── Section 3: Jadwal Hari Ini ──
-                            _buildTodayScheduleSection(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // ── Bottom Navigation Bar ──
-                _buildBottomNavigationBar(),
-              ],
-            ),
+          _buildHomeTab(),
+          const DokterKonsultasiScreen(),
+          const DokterPasienScreen(),
+          const DokterJadwalScreen(),
+          DokterProfileScreen(
+            doctorName: widget.doctorName,
+            onLogout: () => Navigator.of(context).pop(),
           ),
         ],
       ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildHomeTab() {
+    return Stack(
+      children: [
+        // Background Topography
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _DokterTopographyPainter(),
+          ),
+        ),
+
+        SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 24),
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: SlideTransition(
+                position: _slideAnim,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Header Section with Chat Bubbles (Figma Node 1008:17556) ──
+                    _buildHeaderSection(),
+
+                    const SizedBox(height: 24),
+
+                    // ── Section 1: Pesan Terbaru (Figma Node 1008:17556) ──
+                    _buildRecentMessagesSection(),
+
+                    const SizedBox(height: 24),
+
+                    // ── Section 2: Jadwal Hari Ini (Figma Node 1008:17556) ──
+                    _buildTodayScheduleTimelineSection(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -217,14 +240,16 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                             padding: const EdgeInsets.all(4),
                             icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF1F2937)),
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
                               );
                             },
                           ),
                           const SizedBox(width: 8),
                           GestureDetector(
-                            onTap: _handleLogout,
+                            onTap: () {
+                              setState(() => _selectedIndex = 4);
+                            },
                             child: Container(
                               width: 32,
                               height: 32,
@@ -243,11 +268,11 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
 
                 const SizedBox(height: 12),
 
-                // Chat Bubble Left (Green bright)
+                // Chat Bubble Left (Selamat Datang Kembali)
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 290),
+                    constraints: const BoxConstraints(maxWidth: 300),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: _bubbleGreen,
@@ -269,7 +294,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Selamat Datang Kembali,\n${widget.doctorName} 👋',
+                          'Selamat Datang Kembali,\n${widget.doctorName} 👋🏻',
                           style: GoogleFonts.inter(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -301,7 +326,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
 
                 const SizedBox(height: 14),
 
-                // Chat Bubble Right (Dark Green)
+                // Chat Bubble Right (Berikut ringkasan aktivitas...)
                 Align(
                   alignment: Alignment.centerRight,
                   child: Container(
@@ -365,307 +390,152 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // SECTION 1: RINGKASAN AKTIVITAS / KONSULTASI BERIKUTNYA
+  // SECTION 1: PESAN TERBARU (Figma Node 1008:17556)
   // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildActiveConsultationSection() {
+  Widget _buildRecentMessagesSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Berikut Ringkasan aktivitas Anda hari ini.',
+            'Pesan Terbaru',
             style: GoogleFonts.inter(
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF111827),
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _cardBorderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Badges
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Konsultasi Berikutnya',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF065A37),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Aktif',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
 
-                // Patient Name
-                Text(
-                  'Budi Santoso',
-                  style: GoogleFonts.inter(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
+          // Message Card 1: Budi Santoso (BS)
+          _buildMessageItem(
+            initials: 'BS',
+            name: 'Budi Santoso',
+            message: '“Dok, saya sudah mengirim hasil lab”',
+            time: '2 menit',
+            patientId: 'p-1',
+          ),
 
-                // Description
-                Text(
-                  'Follow-up CKD Stage 3, Review hasil lab terbaru.',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: const Color(0xFF475569),
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-                // Time
-                Row(
-                  children: [
-                    const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF64748B)),
-                    const SizedBox(width: 5),
-                    Text(
-                      '14:00 WIB',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Button Mulai Chat
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _buttonDarkGreen,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Membuka ruang chat konsultasi dengan Budi Santoso...'),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      'Mulai Chat',
-                      style: GoogleFonts.inter(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          // Message Card 2: Siti Wijaya (SW)
+          _buildMessageItem(
+            initials: 'SW',
+            name: 'Siti Wijaya',
+            message: '“Obat sudah diminum sesuai jadwal.”',
+            time: '5 menit',
+            patientId: 'p-2',
           ),
         ],
       ),
     );
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // SECTION 2: PERMINTAAN KONSULTASI
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildPendingConsultationSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Permintaan Konsultasi',
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF111827),
+  Widget _buildMessageItem({
+    required String initials,
+    required String name,
+    required String message,
+    required String time,
+    required String patientId,
+  }) {
+    return GestureDetector(
+      onTap: () => _navigateToChat(patientId),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _cardBorderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _cardBorderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Badges
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAB308),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Permintaan Konsultasi',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF78350F),
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Menunggu',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF92400E),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Patient Name
-                Text(
-                  'Siti Aminah',
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0F2FE),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Text(
+                  initials,
                   style: GoogleFonts.inter(
-                    fontSize: 16.5,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
+                    color: const Color(0xFF0369A1),
+                    fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 4),
-
-                // Description
-                Text(
-                  'Konsultasi Ginjal Baru',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: const Color(0xFF475569),
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Time
-                Row(
-                  children: [
-                    const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF64748B)),
-                    const SizedBox(width: 5),
-                    Text(
-                      '14:00 WIB',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Button Lihat Permintaan
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _buttonDarkGreen,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Membuka detail permintaan konsultasi Siti Aminah...'),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      'Lihat Permintaan',
-                      style: GoogleFonts.inter(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          time,
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      color: const Color(0xFF475569),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // SECTION 3: JADWAL HARI INI
+  // SECTION 2: JADWAL HARI INI (Figma Node 1008:17556)
   // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildTodayScheduleSection() {
+  Widget _buildTodayScheduleTimelineSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -674,59 +544,165 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Jadwal Hari ini',
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF111827),
+              Expanded(
+                child: Text(
+                  'Jadwal Hari ini',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF111827),
+                  ),
                 ),
               ),
-              Text(
-                '3 Jadwal',
-                style: GoogleFonts.inter(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: _darkGreen,
+              GestureDetector(
+                onTap: () => setState(() => _selectedIndex = 3),
+                child: Row(
+                  children: [
+                    Text(
+                      'Lihat Semua Jadwal',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: _darkGreen,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_circle_right_outlined, color: _darkGreen, size: 16),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
+
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: _cardBorderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: Row(
+            child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.event_note_rounded, color: _darkGreen, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Praktek RS Medika Utama',
-                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                // Item 1: Budi Santoso
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Container(
+                          width: 2,
+                          height: 38,
+                          color: const Color(0xFFE2E8F0),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Budi Santoso',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          Text(
+                            'Konsultasi',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        '16:00 - 19:00 WIB',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '14:00 - 14:30',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF475569),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+
+                // Item 2: Ahmad Hidayat
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFCBD5E1),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ahmad Hidayat',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          Text(
+                            'Konsultasi',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '15:00 - 15:30',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF475569),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -775,14 +751,6 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     return GestureDetector(
       onTap: () {
         setState(() => _selectedIndex = index);
-        if (index != 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Menu $label dibuka'),
-              duration: const Duration(milliseconds: 800),
-            ),
-          );
-        }
       },
       behavior: HitTestBehavior.opaque,
       child: Column(
@@ -820,14 +788,10 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   }
 
   Widget _buildCenterPasienButton() {
+    final isSelected = _selectedIndex == 2;
     return GestureDetector(
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Membuka Daftar Pasien Dokter...'),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        setState(() => _selectedIndex = 2);
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -855,8 +819,8 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
             'Pasien',
             style: GoogleFonts.inter(
               fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF64748B),
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+              color: isSelected ? _darkGreen : const Color(0xFF64748B),
             ),
           ),
         ],

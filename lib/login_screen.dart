@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'master_layout.dart';
 import 'register_screen.dart';
-import 'dokter_home_screen.dart';
-import 'apoteker_home_screen.dart';
+import 'screens/dokter/dokter_home_screen.dart';
+import 'screens/apotek/apoteker_home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'widgets/giat_auth_background.dart';
 

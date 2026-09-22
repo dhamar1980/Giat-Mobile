@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'screens/pasien/pragi/pragi_home_view.dart';
-import 'screens/pasien/konsultasi/dokter_list_screen.dart';
-import 'screens/pasien/pantau/pantau_dashboard_screen.dart';
-import 'screens/pasien/obat/daftar_obat_screen.dart';
-import 'screens/pasien/reminder/reminder_list_screen.dart';
-import 'screens/pasien/profile/profile_pasien_screen.dart';
-import 'screens/pasien/edukasi/edukasi_list_screen.dart';
-import 'screens/pasien/edukasi/edukasi_detail_screen.dart';
+import 'pragi/pragi_home_view.dart';
+import 'konsultasi/dokter_list_screen.dart';
+import 'pantau/pantau_dashboard_screen.dart';
+import 'obat/daftar_obat_screen.dart';
+import 'reminder/reminder_list_screen.dart';
+import 'profile/profile_pasien_screen.dart';
+import 'edukasi/edukasi_list_screen.dart';
+import 'edukasi/edukasi_detail_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PASIEN HOME SCREEN (Figma Node: 771-5845)

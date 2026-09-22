@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'pasien_home_screen.dart';
+import 'screens/pasien/pasien_home_screen.dart';
 import 'screens/pasien/konsultasi/dokter_list_screen.dart';
 import 'screens/pasien/pragi/pragi_home_view.dart';
 import 'screens/pasien/pantau/pantau_dashboard_screen.dart';
