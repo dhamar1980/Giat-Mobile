@@ -5,16 +5,9 @@ import 'package:giat/screens/dokter/notifikasi/dokter_notifikasi_screen.dart';
 import 'package:giat/screens/dokter/konsultasi/dokter_konsultasi_screen.dart';
 import 'package:giat/screens/dokter/konsultasi/dokter_room_chat_screen.dart';
 import 'package:giat/screens/dokter/konsultasi/dokter_video_call_screen.dart';
-import 'package:giat/screens/dokter/pasien/dokter_pasien_screen.dart';
 import 'package:giat/screens/dokter/pasien/dokter_detail_pasien_screen.dart';
 import 'package:giat/screens/dokter/jadwal/dokter_jadwal_screen.dart';
 import 'package:giat/screens/dokter/profile/dokter_profile_screen.dart';
-import 'package:giat/screens/dokter/profile/dokter_informasi_profile_screen.dart';
-import 'package:giat/screens/dokter/profile/dokter_pengaturan_notifikasi_screen.dart';
-import 'package:giat/screens/dokter/profile/dokter_keamanan_akun_screen.dart';
-import 'package:giat/screens/dokter/profile/dokter_ganti_kata_sandi_screen.dart';
-import 'package:giat/screens/dokter/profile/dokter_riwayat_perangkat_screen.dart';
-import 'package:giat/screens/dokter/resep/dokter_review_resep_sheet.dart';
 import 'package:giat/screens/dokter/models/dokter_models.dart';
 
 void main() {
