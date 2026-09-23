@@ -10,6 +10,7 @@ import 'pasien/dokter_pasien_screen.dart';
 import 'jadwal/dokter_jadwal_screen.dart';
 import 'profile/dokter_profile_screen.dart';
 import 'resep/dokter_review_resep_sheet.dart';
+import '../../login_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOKTER HOME SCREEN (Figma Node: 1008-17556)
@@ -96,7 +97,10 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.of(context).pop();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
             },
             child: Text('Keluar', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
           ),

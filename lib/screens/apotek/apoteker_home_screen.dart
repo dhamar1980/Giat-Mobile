@@ -8,6 +8,7 @@ import 'pesanan/apotek_pesanan_screen.dart';
 import 'resep/apotek_resep_screen.dart';
 import 'obat/apotek_obat_screen.dart';
 import 'profile/apotek_profile_screen.dart';
+import '../../login_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // APOTEKER HOME SCREEN (Figma Node: 1100-18253)
@@ -95,7 +96,10 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.of(context).pop();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
             },
             child: Text('Keluar', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../syarat_ketentuan_screen.dart';
 import '../../../kebijakan_privasi_screen.dart';
+import '../../../login_screen.dart';
 import 'kata_sandi_keamanan_screen.dart';
 import 'edit_informasi_pribadi_screen.dart';
 
@@ -442,7 +443,10 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
             },
             child: Text(
               'Keluar',
