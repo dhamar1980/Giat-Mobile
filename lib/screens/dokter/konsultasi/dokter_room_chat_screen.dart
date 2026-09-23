@@ -142,22 +142,6 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                 // ── Custom Header / App Bar ──
                 _buildHeaderBar(p),
 
-                // ── Quick Topic Chips ──
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  color: Colors.white.withValues(alpha: 0.9),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      children: [
-                        _buildQuickChip('Konsultasi Hasil Lab'),
-                        const SizedBox(width: 8),
-                        _buildQuickChip('Keluhan Gejala Baru'),
-                      ],
-                    ),
-                  ),
-                ),
 
                 // ── Message List ──
                 Expanded(
@@ -394,33 +378,6 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
     );
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // QUICK TOPIC CHIP
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildQuickChip(String text) {
-    return GestureDetector(
-      onTap: () {
-        _textCtrl.text = text;
-        _sendMessage();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Text(
-          text,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF475569),
-          ),
-        ),
-      ),
-    );
-  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // DOCTOR MESSAGE BUBBLE (Right Aligned - Hijau Tua Sesuai Pasien Chat Sisi Kanan)
@@ -668,7 +625,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    'Terkirim ke Rekam Medis & Pasien',
+                    'Terkirim ke Pasien di Menu Resep Dokter',
                     style: GoogleFonts.inter(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,

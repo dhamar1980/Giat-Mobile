@@ -59,7 +59,7 @@ void main() {
     // Tap Profil tab
     await tester.tap(find.text('Profil'));
     await tester.pumpAndSettle();
-    expect(find.text('Profil Dokter'), findsOneWidget);
+    expect(find.text('Profil Dokter'), findsWidgets);
   });
 
   testWidgets('DokterHomeScreen renders Ringkasan Aktivitas below Jadwal and scrolls to it', (tester) async {
@@ -148,7 +148,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    final patient = DokterMockData.patients.first;
+    final patient = DokterMockData.patients.firstWhere((p) => p.name == 'Budi Santoso');
     await tester.pumpWidget(
       MaterialApp(
         home: DokterRoomChatScreen(patient: patient),
@@ -158,8 +158,6 @@ void main() {
 
     expect(find.text('Budi Santoso'), findsOneWidget);
     expect(find.text('Online Sekarang'), findsOneWidget);
-    expect(find.text('Konsultasi Hasil Lab'), findsOneWidget);
-    expect(find.text('Keluhan Gejala Baru'), findsOneWidget);
 
     // Verify (+) button exists
     expect(find.byIcon(Icons.add_rounded), findsOneWidget);
@@ -171,7 +169,37 @@ void main() {
     expect(find.text('Buat Resep'), findsOneWidget);
     expect(find.text('Daftar Obat'), findsOneWidget);
     expect(find.text('Candesartan 8mg'), findsOneWidget);
+    expect(find.text('Furosemide 40mg'), findsOneWidget);
+    expect(find.text('Tambah Obat'), findsOneWidget);
     expect(find.text('Terbitkan Resep'), findsOneWidget);
+
+    // Tap "Tambah Obat" to open Tambah Obat screen
+    await tester.tap(find.text('Tambah Obat'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detail Obat'), findsOneWidget);
+    expect(find.text('Cari Obat....'), findsOneWidget);
+    expect(find.text('Dosis'), findsOneWidget);
+    expect(find.text('Jumlah'), findsOneWidget);
+    expect(find.text('Frekuensi'), findsOneWidget);
+    expect(find.text('Durasi'), findsOneWidget);
+    expect(find.text('Cara Penggunaan'), findsOneWidget);
+
+    // Tap "Kembali" to return to Buat Resep screen
+    await tester.tap(find.text('Kembali'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Buat Resep'), findsOneWidget);
+
+    // Tap "Terbitkan Resep" (scroll into view first)
+    await tester.ensureVisible(find.text('Terbitkan Resep'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Terbitkan Resep'));
+    await tester.pumpAndSettle();
+
+    // Verify returning to room chat and prescription message posted
+    expect(find.text('Resep Digital Diterbitkan'), findsOneWidget);
+    expect(find.text('Terkirim ke Pasien di Menu Resep Dokter'), findsOneWidget);
   });
 
   testWidgets('DokterVideoCallScreen renders call controls', (tester) async {
@@ -193,12 +221,12 @@ void main() {
     expect(find.byIcon(Icons.videocam_rounded), findsOneWidget);
   });
 
-  testWidgets('DokterDetailPasienScreen renders patient details and metrics', (tester) async {
+  testWidgets('DokterDetailPasienScreen renders patient details, metrics, and opens Buat Resep', (tester) async {
     tester.view.physicalSize = const Size(450, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    final patient = DokterMockData.patients[1]; // Siti Wijaya
+    final patient = DokterMockData.patients.firstWhere((p) => p.name == 'Siti Wijaya');
     await tester.pumpWidget(
       MaterialApp(
         home: DokterDetailPasienScreen(patient: patient),
@@ -209,6 +237,7 @@ void main() {
     expect(find.text('Detail Pasien'), findsOneWidget);
     expect(find.text('Siti Wijaya'), findsOneWidget);
     expect(find.text('Mulai Konsultasi'), findsOneWidget);
+    expect(find.text('Buat Resep'), findsOneWidget);
     expect(find.text('Pantau Kondisi Pasien Terakhir'), findsOneWidget);
     expect(find.text('Berat Badan'), findsOneWidget);
     expect(find.text('48'), findsOneWidget);
@@ -216,6 +245,17 @@ void main() {
     expect(find.text('1.6'), findsOneWidget);
     expect(find.text('Kurang Baik'), findsOneWidget);
     expect(find.text('Mudah Lelah'), findsOneWidget);
+    expect(find.text('Obat Saat Ini'), findsOneWidget);
+
+    // Tap Buat Resep from Detail Pasien screen
+    await tester.tap(find.text('Buat Resep'));
+    await tester.pumpAndSettle();
+
+    // Verify Buat Resep screen is opened
+    expect(find.text('Daftar Obat'), findsOneWidget);
+    expect(find.text('Candesartan 8mg'), findsOneWidget);
+    expect(find.text('Tambah Obat'), findsOneWidget);
+    expect(find.text('Terbitkan Resep'), findsOneWidget);
   });
 
   testWidgets('DokterJadwalScreen renders daily counters and timeline', (tester) async {
@@ -233,10 +273,42 @@ void main() {
     expect(find.text('Jadwal Pasien'), findsOneWidget);
     expect(find.text('Jumlah Konsultasi Hari Ini'), findsOneWidget);
     expect(find.text('04'), findsOneWidget);
+    expect(find.text('Selesai'), findsNWidgets(2)); // counter + badge
+    expect(find.text('Berlangsung'), findsOneWidget);
+    expect(find.text('Mendatang'), findsNWidgets(2)); // counter + badge
     expect(find.text('Senin, 01 Agu'), findsOneWidget);
     expect(find.text('Siti Wijaya'), findsOneWidget);
     expect(find.text('Siti Rahmawati'), findsOneWidget);
     expect(find.text('Andi Wijaya'), findsOneWidget);
+    expect(find.text('Mulai Chat'), findsOneWidget);
+    expect(find.text('Detail'), findsOneWidget);
+    expect(find.text('Lihat Detail'), findsNWidgets(2));
+
+    // Test tap Mulai Chat navigates to DokterRoomChatScreen
+    await tester.tap(find.text('Mulai Chat'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ketik pesan...'), findsOneWidget);
+    expect(find.text('Online Sekarang'), findsOneWidget);
+
+    // Pop back to schedule
+    final navigatorState = tester.state<NavigatorState>(find.byType(Navigator));
+    navigatorState.pop();
+    await tester.pumpAndSettle();
+
+    // Test tap Detail on Siti Rahmawati navigates to DokterDetailPasienScreen
+    await tester.tap(find.text('Detail'));
+    await tester.pumpAndSettle();
+    expect(find.text('Detail Pasien'), findsOneWidget);
+    expect(find.text('Siti Rahmawati'), findsWidgets);
+
+    navigatorState.pop();
+    await tester.pumpAndSettle();
+
+    // Test tap Lihat Detail on Siti Wijaya
+    await tester.tap(find.text('Lihat Detail').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Detail Pasien'), findsOneWidget);
+    expect(find.text('Siti Wijaya'), findsWidgets);
   });
 
   testWidgets('DokterProfileScreen and sub-screens render accurately', (tester) async {
@@ -248,23 +320,99 @@ void main() {
       const MaterialApp(
         home: DokterProfileScreen(
           doctorName: 'Dr. Andi Pratama',
-          specialty: 'Spesialis Penyakit Dalam / Ginjal',
+          specialty: 'Spesialis Penyakti Dalam / Ginjal',
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Profil Dokter'), findsOneWidget);
-    expect(find.text('Dr. Andi Pratama'), findsOneWidget);
-    expect(find.text('Informasi Profil'), findsOneWidget);
+    expect(find.text('Profil Dokter'), findsWidgets);
+    expect(find.text('Dr. Andi Pratama'), findsWidgets);
+    expect(find.text('Profile Dokter'), findsOneWidget);
     expect(find.text('Notifikasi'), findsOneWidget);
-    expect(find.text('Keamanan Akun'), findsOneWidget);
+    expect(find.text('Keamanan'), findsOneWidget);
     expect(find.text('Keluar'), findsOneWidget);
 
-    // Tap Keamanan Akun
-    await tester.tap(find.text('Keamanan Akun'));
+    // 1. Test Navigasi ke Detail Profile Dokter & Modal Ganti Foto Profil (Tombol Edit Kuning)
+    await tester.tap(find.text('Profile Dokter'));
     await tester.pumpAndSettle();
+
+    expect(find.text('Kembali'), findsOneWidget);
+    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('Informasi Profesional'), findsOneWidget);
+    expect(find.text('Spesialisasi'), findsOneWidget);
+    expect(find.text('No. STR'), findsOneWidget);
+    expect(find.text('No. SIP'), findsOneWidget);
+    expect(find.text('Institusi'), findsOneWidget);
+    expect(find.text('RS Medika Utama'), findsOneWidget);
+    expect(find.text('Praktik'), findsOneWidget);
+    expect(find.text('Alamat Praktik'), findsOneWidget);
+    expect(find.text('Jl. Sehat No. 12, Jember'), findsOneWidget);
+    expect(find.text('Jadwal Praktik'), findsOneWidget);
+
+    // Tap Tombol Edit Kuning untuk memicu modal ganti foto profil
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ganti Foto Profil'), findsOneWidget);
+    expect(find.text('Ambil Foto dari Kamera'), findsOneWidget);
+    expect(find.text('Pilih dari Galeri Foto'), findsOneWidget);
+    expect(find.text('Pilihan Avatar Dokter'), findsOneWidget);
+    expect(find.text('Hapus Foto Profil'), findsOneWidget);
+
+    // Pilih dari Kamera
+    await tester.tap(find.text('Ambil Foto dari Kamera'));
+    await tester.pumpAndSettle();
+
+    // Kembali ke Halaman Utama Profil Dokter
+    await tester.tap(find.text('Kembali'));
+    await tester.pumpAndSettle();
+
+    // 2. Test Navigasi ke Pengaturan Notifikasi Dokter
+    await tester.tap(find.text('Notifikasi'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Konsultasi Baru'), findsOneWidget);
+    expect(find.text('Pengingat Jadwal'), findsOneWidget);
+    expect(find.text('Update Sistem'), findsOneWidget);
+
+    // Kembali
+    await tester.tap(find.text('Kembali'));
+    await tester.pumpAndSettle();
+
+    // 3. Test Navigasi ke Keamanan Akun
+    await tester.tap(find.text('Keamanan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Keamanan Akun'), findsOneWidget);
     expect(find.text('Ubah Kata Sandi'), findsOneWidget);
     expect(find.text('Sesi Aktif'), findsOneWidget);
+
+    // 4. Test Navigasi ke Form Ganti Kata Sandi (Screenshot Terbaru)
+    await tester.tap(find.text('Ubah Kata Sandi'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Perbarui Kata Sandi'), findsWidgets);
+    expect(find.text('Ganti Kata Sandi'), findsOneWidget);
+    expect(find.text('Kata Sandi Saat Ini'), findsOneWidget);
+    expect(find.text('Kata Sandi Baru'), findsOneWidget);
+    expect(find.text('Konfirmasi Kata Sandi Baru'), findsOneWidget);
+    expect(find.text('Kata sandi minimal 8 karakter.'), findsOneWidget);
+
+    // Kembali ke Keamanan Akun
+    await tester.tap(find.text('Kembali'));
+    await tester.pumpAndSettle();
+
+    // 5. Test Navigasi ke Riwayat Perangkat (Sesi Aktif)
+    await tester.tap(find.text('Sesi Aktif'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Riwayat Perangkat'), findsOneWidget);
+    expect(find.text('Perangkat Ini'), findsOneWidget);
+    expect(find.text('Smartphoone Android'), findsOneWidget);
+    expect(find.text('Sesi Lainnya'), findsOneWidget);
+    expect(find.text('Iphone 18'), findsOneWidget);
+    expect(find.text('Keluarkan Perangkat'), findsWidgets);
   });
 }
+

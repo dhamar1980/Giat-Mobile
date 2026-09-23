@@ -134,9 +134,15 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
         index: _selectedIndex,
         children: [
           _buildHomeTab(),
-          const DokterKonsultasiScreen(),
-          const DokterPasienScreen(),
-          const DokterJadwalScreen(),
+          DokterKonsultasiScreen(
+            onProfileTap: () => setState(() => _selectedIndex = 4),
+          ),
+          DokterPasienScreen(
+            onProfileTap: () => setState(() => _selectedIndex = 4),
+          ),
+          DokterJadwalScreen(
+            onProfileTap: () => setState(() => _selectedIndex = 4),
+          ),
           DokterProfileScreen(
             doctorName: widget.doctorName,
             onLogout: () => Navigator.of(context).pop(),

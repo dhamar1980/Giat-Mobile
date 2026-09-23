@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
+import '../notifikasi/dokter_notifikasi_screen.dart';
+import '../profile/dokter_profile_screen.dart';
 import 'dokter_detail_pasien_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DAFTAR PASIEN DOKTER (Figma Node: 1008-18310)
+// DAFTAR PASIEN DOKTER (Sesuai Desain Figma: Node 1008-18310)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DokterPasienScreen extends StatefulWidget {
-  const DokterPasienScreen({super.key});
+  final VoidCallback? onProfileTap;
+
+  const DokterPasienScreen({
+    super.key,
+    this.onProfileTap,
+  });
 
   @override
   State<DokterPasienScreen> createState() => _DokterPasienScreenState();
@@ -16,7 +23,7 @@ class DokterPasienScreen extends StatefulWidget {
 
 class _DokterPasienScreenState extends State<DokterPasienScreen> {
   static const _darkGreen = Color(0xFF065A37);
-  static const _bgColor = Color(0xFFF8FAF9);
+  static const _bgColor = Color(0xFFF7FBF8);
   static const _border = Color(0xFFE2E8F0);
 
   final TextEditingController _searchCtrl = TextEditingController();
@@ -51,77 +58,196 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'Daftar Pasien',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
+      body: Stack(
+        children: [
+          // ── Topography Wave Background ──
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _PasienTopographyPainter(),
+            ),
           ),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFF1F5F9), height: 1),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Search Bar Container
-            Container(
-              padding: const EdgeInsets.all(20),
-              color: Colors.white,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: TextField(
-                  controller: _searchCtrl,
-                  onChanged: (val) => setState(() => _searchQuery = val),
-                  decoration: InputDecoration(
-                    hintText: 'Cari Pasien...',
-                    hintStyle: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 22),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+
+          SafeArea(
+            child: Column(
+              children: [
+                // ── Top Bar: Bell Notification & Doctor Profile Capsule ──
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _buildNotificationProfileCapsule(),
+                    ],
                   ),
                 ),
-              ),
-            ),
 
-            // Patient Cards List
-            Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Tidak ada pasien ditemukan.',
-                        style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+                const SizedBox(height: 2),
+
+                // ── Title Badge: "Daftar Pasien" ──
+                _buildTitlePill('Daftar Pasien'),
+
+                const SizedBox(height: 16),
+
+                // ── Search Bar (Pill Shaped) ──
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                        width: 1.2,
                       ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(20),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final p = filtered[index];
-                        return _buildPatientListItem(p);
-                      },
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF0F172A),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Cari Pasien...',
+                        hintStyle: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
+                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF334155), size: 22),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // ── Patient Cards List ──
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Tidak ada pasien ditemukan.',
+                            style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final p = filtered[index];
+                            return _buildPatientListItem(p, index);
+                          },
+                        ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationProfileCapsule() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              size: 22,
+              color: Color(0xFF1F2937),
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              if (widget.onProfileTap != null) {
+                widget.onProfileTap!();
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DokterProfileScreen(
+                      doctorName: 'Dr. Andi Pratama',
+                      onLogout: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                );
+              }
+            },
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                color: Color(0xFF044E2F),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTitlePill(String title) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      decoration: BoxDecoration(
+        color: _darkGreen,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: _darkGreen.withValues(alpha: 0.35),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Text(
+        title,
+        style: GoogleFonts.inter(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
       ),
     );
   }
 
-  Widget _buildPatientListItem(DokterPatient p) {
+  Widget _buildPatientListItem(DokterPatient p, int index) {
+    final avatarBg = p.avatarBgColor ??
+        (index % 2 == 0 ? _darkGreen : const Color(0xFFD0E6ED));
+    final avatarTextColor = p.avatarTextColor ??
+        (index % 2 == 0 ? Colors.white : const Color(0xFF1E293B));
+
     return GestureDetector(
       onTap: () => _openPatientDetail(p),
       child: Container(
@@ -132,7 +258,7 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
           border: Border.all(color: _border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -141,19 +267,19 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
         child: Row(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 54,
+              height: 54,
               decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(14),
+                color: avatarBg,
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Center(
                 child: Text(
                   p.initials,
                   style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _darkGreen,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: avatarTextColor,
                   ),
                 ),
               ),
@@ -166,26 +292,58 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
                   Text(
                     p.name,
                     style: GoogleFonts.inter(
-                      fontSize: 15,
+                      fontSize: 15.5,
                       fontWeight: FontWeight.w700,
                       color: const Color(0xFF0F172A),
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     '${p.age} Tahun  •  ${p.gender}',
                     style: GoogleFonts.inter(
                       fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
                       color: const Color(0xFF64748B),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF94A3B8)),
           ],
         ),
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOPOGRAPHY PAINTER UNTUK SCREEN PASIEN
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PasienTopographyPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF10B981).withValues(alpha: 0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+
+    for (int i = 0; i < 12; i++) {
+      final path = Path();
+      final yOffset = 10.0 + (i * 85);
+      path.moveTo(0, yOffset);
+      path.cubicTo(
+        size.width * 0.35,
+        yOffset - 35,
+        size.width * 0.65,
+        yOffset + 45,
+        size.width,
+        yOffset - 15,
+      );
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

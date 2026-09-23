@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA DOKTER (Berdasarkan Desain & Alur Figma GIAT)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,6 +17,8 @@ class DokterPatient {
   final String complaint;
   final String complaintDetail;
   final List<DokterPrescriptionItem> currentMedicines;
+  final Color? avatarBgColor;
+  final Color? avatarTextColor;
 
   const DokterPatient({
     required this.id,
@@ -29,6 +33,8 @@ class DokterPatient {
     required this.complaint,
     required this.complaintDetail,
     required this.currentMedicines,
+    this.avatarBgColor,
+    this.avatarTextColor,
   });
 }
 
@@ -188,20 +194,6 @@ class DokterMockData {
 
   static final List<DokterPatient> patients = [
     DokterPatient(
-      id: 'p-1',
-      name: 'Budi Santoso',
-      initials: 'BS',
-      age: 42,
-      gender: 'Laki-laki',
-      address: 'Jalan Merpati 45 Madiun',
-      weightKg: 65,
-      heightM: 1.70,
-      condition: 'Perlu Pengawasan',
-      complaint: 'Follow-up CKD Stage 3',
-      complaintDetail: 'Pasien mengeluhkan mudah lelah dan ingin konsultasi mengenai hasil pemeriksaan lab ginjal terbaru.',
-      currentMedicines: initialPrescriptions,
-    ),
-    DokterPatient(
       id: 'p-2',
       name: 'Siti Wijaya',
       initials: 'SW',
@@ -212,13 +204,15 @@ class DokterMockData {
       heightM: 1.60,
       condition: 'Kurang Baik',
       complaint: 'Mudah Lelah',
-      complaintDetail: 'Keluhan Pasien kepada dokter: badan terasa lemas sejak 3 hari terakhir, nafsu makan berkurang, dan ada bengkak ringan di pergelangan kaki.',
+      complaintDetail: 'Keluhan Pasien kepada dokter....',
+      avatarBgColor: const Color(0xFF065A37),
+      avatarTextColor: Colors.white,
       currentMedicines: [
         const DokterPrescriptionItem(
           id: 'rx-sw-1',
           medicineName: 'Candesartan 8mg',
           dose: '8mg',
-          frequency: '1 x 1',
+          frequency: '1x1',
           quantity: '10 Tablet',
           duration: '10 hari',
           usageTime: 'Sesudah Makan',
@@ -227,7 +221,7 @@ class DokterMockData {
           id: 'rx-sw-2',
           medicineName: 'Furosemide 40mg',
           dose: '40mg',
-          frequency: '1 x 1',
+          frequency: '1x1',
           quantity: '5 Tablet',
           duration: '5 hari',
           usageTime: 'Pagi hari, Sesudah Makan',
@@ -246,7 +240,23 @@ class DokterMockData {
       condition: 'Stabil',
       complaint: 'Kontrol Rutin',
       complaintDetail: 'Pemeriksaan rutin tekanan darah dan fungsi ginjal bulanan.',
+      avatarBgColor: Color(0xFFD0E6ED),
+      avatarTextColor: Color(0xFF1E293B),
       currentMedicines: [],
+    ),
+    DokterPatient(
+      id: 'p-1',
+      name: 'Budi Santoso',
+      initials: 'BS',
+      age: 42,
+      gender: 'Laki-laki',
+      address: 'Jalan Merpati 45 Madiun',
+      weightKg: 65,
+      heightM: 1.70,
+      condition: 'Perlu Pengawasan',
+      complaint: 'Follow-up CKD Stage 3',
+      complaintDetail: 'Pasien mengeluhkan mudah lelah dan ingin konsultasi mengenai hasil pemeriksaan lab ginjal terbaru.',
+      currentMedicines: initialPrescriptions,
     ),
     const DokterPatient(
       id: 'p-4',
@@ -274,6 +284,48 @@ class DokterMockData {
       condition: 'Membaik',
       complaint: 'Pasca Rawat Inap',
       complaintDetail: 'Kondisi ureum dan kreatinin menunjukkan tren perbaikan signifikan.',
+      currentMedicines: [],
+    ),
+    const DokterPatient(
+      id: 'p-6',
+      name: 'Siti Rahmawati',
+      initials: 'SR',
+      age: 36,
+      gender: 'Perempuan',
+      address: 'Jl. Kaliurang KM 5 No. 14 Sleman',
+      weightKg: 54,
+      heightM: 1.59,
+      condition: 'Dalam Pengobatan',
+      complaint: 'Kontrol Hipertensi & Ginjal',
+      complaintDetail: 'Pasien mengeluhkan pusing ringan di pagi hari dan ingin mengevaluasi keteraturan konsumsi obat hipertensi.',
+      avatarBgColor: Color(0xFF065A37),
+      avatarTextColor: Colors.white,
+      currentMedicines: [
+        DokterPrescriptionItem(
+          id: 'rx-sr-1',
+          medicineName: 'Amlodipine 5mg',
+          dose: '5mg',
+          frequency: '1x1',
+          quantity: '10 Tablet',
+          duration: '10 hari',
+          usageTime: 'Malam hari, Sesudah Makan',
+        ),
+      ],
+    ),
+    const DokterPatient(
+      id: 'p-7',
+      name: 'Andi Wijaya',
+      initials: 'AW',
+      age: 40,
+      gender: 'Laki-laki',
+      address: 'Jl. Sudirman No. 42 Jember',
+      weightKg: 68,
+      heightM: 1.71,
+      condition: 'Stabil',
+      complaint: 'Konsultasi Hasil Lab',
+      complaintDetail: 'Pasien ingin berkonsultasi mengenai hasil uji kreatinin darah dan estimasi LFG yang baru keluar.',
+      avatarBgColor: Color(0xFFD0E6ED),
+      avatarTextColor: Color(0xFF1E293B),
       currentMedicines: [],
     ),
   ];
@@ -338,14 +390,14 @@ class DokterMockData {
       time: '10:00',
       patientName: 'Siti Rahmawati',
       status: 'Aktif',
-      patientId: 'p-2',
+      patientId: 'p-6',
     ),
     const DokterScheduleItem(
       id: 'sch-3',
       time: '11:00',
       patientName: 'Andi Wijaya',
       status: 'Mendatang',
-      patientId: 'p-1',
+      patientId: 'p-7',
     ),
   ];
 
@@ -393,3 +445,102 @@ class DokterMockData {
     ),
   ];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE PROFIL DOKTER (Reaktif untuk Foto Profil & Informasi Dokter)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class DokterProfileState extends ChangeNotifier {
+  static final DokterProfileState instance = DokterProfileState._internal();
+  factory DokterProfileState() => instance;
+  DokterProfileState._internal();
+
+  String doctorName = 'Dr. Andi Pratama';
+  String specialty = 'Spesialis Penyakti Dalam / Ginjal';
+  String avatarType = 'asset'; // 'asset', 'network', 'default'
+  String avatarPath = 'assets/images/dokter_apoteker.jpg';
+
+  String strNumber = '1234567890123456';
+  String sipNumber = 'SIP/123/456/2023';
+  String institution = 'RS Medika Utama';
+  String practiceAddress = 'Jl. Sehat No. 12, Jember';
+  String practiceSchedule = 'Senin - Jumat, 09:00 - 17:00';
+
+  final List<Map<String, String>> presetAvatars = [
+    {
+      'name': 'Dr. Andi (Klinik)',
+      'path': 'assets/images/dokter_apoteker.jpg',
+      'type': 'asset',
+    },
+    {
+      'name': 'Dr. Andi (Medis)',
+      'path': 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
+      'type': 'network',
+    },
+    {
+      'name': 'Dr. Siti',
+      'path': 'https://images.unsplash.com/photo-1594824813629-87a70197d19a?auto=format&fit=crop&q=80&w=300',
+      'type': 'network',
+    },
+    {
+      'name': 'Dr. Budi',
+      'path': 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=300',
+      'type': 'network',
+    },
+    {
+      'name': 'Dr. Anisa',
+      'path': 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+      'type': 'network',
+    },
+  ];
+
+  void updateAvatar({required String type, required String path}) {
+    avatarType = type;
+    avatarPath = path;
+    notifyListeners();
+  }
+
+  void resetAvatar() {
+    avatarType = 'default';
+    avatarPath = '';
+    notifyListeners();
+  }
+
+  Widget buildAvatarWidget({double size = 96, double iconSize = 48}) {
+    if (avatarType == 'default') {
+      return Container(
+        width: size,
+        height: size,
+        color: const Color(0xFFDCFCE7),
+        child: Icon(Icons.person_rounded, size: iconSize, color: const Color(0xFF065A37)),
+      );
+    } else if (avatarType == 'network') {
+      return Image.network(
+        avatarPath,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => Container(
+          width: size,
+          height: size,
+          color: const Color(0xFFDCFCE7),
+          child: Icon(Icons.person_rounded, size: iconSize, color: const Color(0xFF065A37)),
+        ),
+      );
+    } else {
+      return Image.asset(
+        avatarPath,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => Container(
+          width: size,
+          height: size,
+          color: const Color(0xFFDCFCE7),
+          child: Icon(Icons.person_rounded, size: iconSize, color: const Color(0xFF065A37)),
+        ),
+      );
+    }
+  }
+}
+

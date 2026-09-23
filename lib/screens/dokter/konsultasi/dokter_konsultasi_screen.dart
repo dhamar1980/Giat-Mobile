@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
+import '../profile/dokter_profile_screen.dart';
 import 'dokter_room_chat_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9,7 +10,12 @@ import 'dokter_room_chat_screen.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DokterKonsultasiScreen extends StatefulWidget {
-  const DokterKonsultasiScreen({super.key});
+  final VoidCallback? onProfileTap;
+
+  const DokterKonsultasiScreen({
+    super.key,
+    this.onProfileTap,
+  });
 
   @override
   State<DokterKonsultasiScreen> createState() => _DokterKonsultasiScreenState();
@@ -101,85 +107,13 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // ── Top Header Bar: Notification & Profile Icons (Right aligned) ──
+                // ── Top Header Bar: Notification & Profile Capsule ──
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      const Spacer(),
-                      // Notification Bell Button
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DokterNotifikasiScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              const Icon(
-                                Icons.notifications_none_rounded,
-                                size: 22,
-                                color: Color(0xFF0F172A),
-                              ),
-                              Positioned(
-                                top: 9,
-                                right: 9,
-                                child: Container(
-                                  width: 7,
-                                  height: 7,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFDC2626),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      // Profile Avatar Circle
-                      GestureDetector(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Menu profil dokter')),
-                          );
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                            color: _darkGreen,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.person_outline_rounded,
-                              size: 22,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
+                      _buildNotificationProfileCapsule(),
                     ],
                   ),
                 ),
@@ -527,6 +461,68 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
                   ],
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationProfileCapsule() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              size: 22,
+              color: Color(0xFF1F2937),
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              if (widget.onProfileTap != null) {
+                widget.onProfileTap!();
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DokterProfileScreen(
+                      doctorName: 'Dr. Andi Pratama',
+                      onLogout: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                );
+              }
+            },
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                color: Color(0xFF044E2F),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
             ),
           ),
         ],

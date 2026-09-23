@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
+import '../notifikasi/dokter_notifikasi_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FORM TAMBAH OBAT / RESEP BARU (Figma Node: 1620-7165 & 1008-19232)
+// FORM TAMBAH / EDIT OBAT RESEP (Sesuai Desain Tambah Obat)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DokterTambahObatScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class DokterTambahObatScreen extends StatefulWidget {
 
 class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
   static const _darkGreen = Color(0xFF065A37);
-  static const _bgColor = Color(0xFFF8FAF9);
+  static const _bgColor = Color(0xFFF7FBF8);
   static const _border = Color(0xFFE2E8F0);
 
   final _formKey = GlobalKey<FormState>();
@@ -34,13 +35,14 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
   late final TextEditingController _durasiCtrl;
   late final TextEditingController _instruksiCtrl;
 
-  String _selectedCaraPenggunaan = 'Sesudah Makan';
+  String? _selectedCaraPenggunaan;
   final List<String> _caraPenggunaanOptions = [
     'Sesudah Makan',
     'Sebelum Makan',
     'Bersama Makan',
     'Pagi hari, Sesudah Makan',
     'Malam hari sebelum tidur',
+    'Pagi dan Malam hari',
   ];
 
   final List<String> _suggestedMedicines = [
@@ -81,6 +83,32 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
     super.dispose();
   }
 
+  void _onMedicineSelected(String name) {
+    _namaObatCtrl.text = name;
+
+    // Auto-fill sensible defaults for known medicines if empty
+    if (name.contains('Candesartan 8mg')) {
+      if (_dosisCtrl.text.isEmpty) _dosisCtrl.text = '8mg';
+      if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '10 Tablet';
+      if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
+      if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '10 hari';
+      _selectedCaraPenggunaan ??= 'Sesudah Makan';
+    } else if (name.contains('Furosemide 40mg')) {
+      if (_dosisCtrl.text.isEmpty) _dosisCtrl.text = '40mg';
+      if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '5 Tablet';
+      if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
+      if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '5 hari';
+      _selectedCaraPenggunaan ??= 'Pagi hari, Sesudah Makan';
+    } else if (name.contains('Amlodipine 5mg')) {
+      if (_dosisCtrl.text.isEmpty) _dosisCtrl.text = '5mg';
+      if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '10 Tablet';
+      if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
+      if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '10 hari';
+      _selectedCaraPenggunaan ??= 'Sesudah Makan';
+    }
+    setState(() {});
+  }
+
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
@@ -91,7 +119,7 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
       frequency: _frekuensiCtrl.text.trim(),
       quantity: _jumlahCtrl.text.trim(),
       duration: _durasiCtrl.text.trim(),
-      usageTime: _selectedCaraPenggunaan,
+      usageTime: _selectedCaraPenggunaan ?? 'Sesudah Makan',
       specialNotes: _instruksiCtrl.text.trim().isEmpty ? null : _instruksiCtrl.text.trim(),
     );
 
@@ -100,234 +128,435 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = widget.patient;
+
     return Scaffold(
       backgroundColor: _bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          widget.initialItem != null ? 'Edit Obat' : 'Tambah Obat',
-          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFF1F5F9), height: 1),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
+      body: Stack(
+        children: [
+          // ── Topography Background ──
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _TambahObatTopographyPainter(),
+            ),
+          ),
+
+          SafeArea(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Patient Info Card ──
-                _buildPatientInfoCard(),
+                // ── Top Navigation Bar: Back & (Bell + Avatar) ──
+                _buildTopNavigationBar(),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 6),
 
-                Text(
-                  'Detail Obat',
-                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
-                ),
-                const SizedBox(height: 12),
+                // ── Screen Title Badge: "Tambah Obat" ──
+                _buildTitlePill(widget.initialItem != null ? 'Edit Obat' : 'Tambah Obat'),
 
-                // Nama Obat / Cari Obat
-                _buildLabel('Cari / Nama Obat'),
-                Autocomplete<String>(
-                  initialValue: TextEditingValue(text: _namaObatCtrl.text),
-                  optionsBuilder: (textEditingValue) {
-                    if (textEditingValue.text.isEmpty) {
-                      return _suggestedMedicines;
-                    }
-                    return _suggestedMedicines.where(
-                      (item) => item.toLowerCase().contains(textEditingValue.text.toLowerCase()),
-                    );
-                  },
-                  onSelected: (String selection) {
-                    _namaObatCtrl.text = selection;
-                  },
-                  fieldViewBuilder: (context, fieldTextEditingController, fieldFocusNode, onFieldSubmitted) {
-                    fieldTextEditingController.addListener(() {
-                      _namaObatCtrl.text = fieldTextEditingController.text;
-                    });
-                    return TextFormField(
-                      controller: fieldTextEditingController,
-                      focusNode: fieldFocusNode,
-                      decoration: _inputDecoration(hint: 'Cari Obat....', prefixIcon: Icons.search_rounded),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama obat wajib diisi' : null,
-                    );
-                  },
-                ),
+                const SizedBox(height: 14),
 
-                const SizedBox(height: 16),
-
-                // Grid 2x2 for Dosis, Frekuensi, Jumlah, Durasi
-                Row(
-                  children: [
-                    Expanded(
+                // ── Scrollable Body ──
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Form(
+                      key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Dosis'),
-                          TextFormField(
-                            controller: _dosisCtrl,
-                            decoration: _inputDecoration(hint: 'e.g. 500mg'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+                          // ── Patient Info Card ──
+                          _buildPatientHeaderCard(p),
+
+                          const SizedBox(height: 20),
+
+                          // ── Section Title: Detail Obat ──
+                          Text(
+                            'Detail Obat',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                            ),
                           ),
+
+                          const SizedBox(height: 12),
+
+                          // ── Search Field: Cari Obat.... ──
+                          Autocomplete<String>(
+                            initialValue: TextEditingValue(text: _namaObatCtrl.text),
+                            optionsBuilder: (textEditingValue) {
+                              if (textEditingValue.text.isEmpty) {
+                                return _suggestedMedicines;
+                              }
+                              return _suggestedMedicines.where(
+                                (item) => item.toLowerCase().contains(textEditingValue.text.toLowerCase()),
+                              );
+                            },
+                            onSelected: (String selection) {
+                              _onMedicineSelected(selection);
+                            },
+                            fieldViewBuilder: (context, fieldTextEditingController, fieldFocusNode, onFieldSubmitted) {
+                              fieldTextEditingController.addListener(() {
+                                _namaObatCtrl.text = fieldTextEditingController.text;
+                              });
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(28),
+                                  border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.02),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: TextFormField(
+                                  controller: fieldTextEditingController,
+                                  focusNode: fieldFocusNode,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari Obat....',
+                                    hintStyle: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                    prefixIcon: const Icon(
+                                      Icons.search_rounded,
+                                      color: Color(0xFF334155),
+                                      size: 20,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  ),
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama obat wajib diisi' : null,
+                                ),
+                              );
+                            },
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── 2x2 Grid for Dosis & Jumlah, Frekuensi & Durasi ──
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildFieldLabel('Dosis'),
+                                    _buildFormTextField(
+                                      controller: _dosisCtrl,
+                                      hint: 'e.g. 500mg',
+                                      validatorMsg: 'Dosis wajib diisi',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildFieldLabel('Jumlah'),
+                                    _buildFormTextField(
+                                      controller: _jumlahCtrl,
+                                      hint: 'e.g. 10 Tablet',
+                                      validatorMsg: 'Jumlah wajib diisi',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildFieldLabel('Frekuensi'),
+                                    _buildFormTextField(
+                                      controller: _frekuensiCtrl,
+                                      hint: 'e.g. 3 x 1',
+                                      validatorMsg: 'Frekuensi wajib diisi',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildFieldLabel('Durasi'),
+                                    _buildFormTextField(
+                                      controller: _durasiCtrl,
+                                      hint: 'e.g. 5 hari',
+                                      validatorMsg: 'Durasi wajib diisi',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // ── Cara Penggunaan Dropdown ──
+                          _buildFieldLabel('Cara Penggunaan'),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF334155)),
+                                hint: Text(
+                                  'Pilih Cara penggunaan...',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13.5,
+                                    color: const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                value: _selectedCaraPenggunaan,
+                                items: _caraPenggunaanOptions.map((e) {
+                                  return DropdownMenuItem<String>(
+                                    value: e,
+                                    child: Text(
+                                      e,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _selectedCaraPenggunaan = val);
+                                },
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // ── Instruksi Khusus (Opsional) ──
+                          _buildFieldLabel('Instruksi Khusus (Opsional)'),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                            ),
+                            child: TextFormField(
+                              controller: _instruksiCtrl,
+                              maxLines: 3,
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                color: const Color(0xFF0F172A),
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Tambahkan catatan khusus untuk pasien...',
+                                hintStyle: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: const Color(0xFF94A3B8),
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.all(12),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // ── Tombol Tambah Obat (Solid Dark Green) ──
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _darkGreen,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                              onPressed: _save,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.add, color: Colors.white, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    widget.initialItem != null ? 'Simpan Perubahan' : 'Tambah Obat',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLabel('Frekuensi'),
-                          TextFormField(
-                            controller: _frekuensiCtrl,
-                            decoration: _inputDecoration(hint: 'e.g. 3 x 1'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLabel('Jumlah'),
-                          TextFormField(
-                            controller: _jumlahCtrl,
-                            decoration: _inputDecoration(hint: 'e.g. 10 Tablet'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLabel('Durasi'),
-                          TextFormField(
-                            controller: _durasiCtrl,
-                            decoration: _inputDecoration(hint: 'e.g. 5 hari'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Cara Penggunaan Dropdown
-                _buildLabel('Cara Penggunaan'),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _border),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: _selectedCaraPenggunaan,
-                      items: _caraPenggunaanOptions.map((e) {
-                        return DropdownMenuItem<String>(
-                          value: e,
-                          child: Text(e, style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF0F172A))),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedCaraPenggunaan = val);
-                      },
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Instruksi Khusus (Opsional)
-                _buildLabel('Instruksi Khusus (Opsional)'),
-                TextFormField(
-                  controller: _instruksiCtrl,
-                  maxLines: 3,
-                  decoration: _inputDecoration(hint: 'Tambahkan catatan khusus untuk pasien...'),
-                ),
-
-                const SizedBox(height: 28),
-
-                // Submit Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _darkGreen,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      elevation: 0,
-                    ),
-                    onPressed: _save,
-                    child: Text(
-                      widget.initialItem != null ? 'Simpan Perubahan' : 'Tambah Obat',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopNavigationBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Left: Tombol Kembali Berbentuk Pill
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.arrow_back, size: 16, color: Color(0xFF0F172A)),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Kembali',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Right: Bell Notification & User Profile Avatar Capsule
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(Icons.notifications_none_rounded, size: 20, color: Color(0xFF334155)),
+                      Positioned(
+                        right: 1,
+                        top: 1,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEF4444),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      color: _darkGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.person, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTitlePill(String title) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+      decoration: BoxDecoration(
+        color: _darkGreen,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: _darkGreen.withValues(alpha: 0.35),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Text(
+        title,
+        style: GoogleFonts.inter(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
       ),
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        text,
-        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration({required String hint, IconData? prefixIcon}) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF94A3B8)),
-      filled: true,
-      fillColor: Colors.white,
-      prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: const Color(0xFF64748B), size: 20) : null,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _darkGreen, width: 1.5)),
-    );
-  }
-
-  Widget _buildPatientInfoCard() {
-    final p = widget.patient;
+  Widget _buildPatientHeaderCard(DokterPatient p) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -335,23 +564,30 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _border),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 3)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
+              color: const Color(0xFFD0E6ED),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Center(
               child: Text(
                 p.initials,
-                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: _darkGreen),
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1E293B),
+                ),
               ),
             ),
           ),
@@ -362,17 +598,38 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
               children: [
                 Text(
                   p.name,
-                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                  style: GoogleFonts.inter(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Usia: ${p.age} Tahun',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF334155),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Usia: ${p.age} Tahun  •  Kelamin: ${p.gender}',
-                  style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                  'Kelamin: ${p.gender}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF334155),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Alamat: ${p.address}',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                  'Alamat :${p.address}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF334155),
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -383,4 +640,82 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
       ),
     );
   }
+
+  Widget _buildFieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFF0F172A),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormTextField({
+    required TextEditingController controller,
+    required String hint,
+    required String validatorMsg,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+      ),
+      child: TextFormField(
+        controller: controller,
+        style: GoogleFonts.inter(
+          fontSize: 13.5,
+          color: const Color(0xFF0F172A),
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: GoogleFonts.inter(
+            fontSize: 13.5,
+            color: const Color(0xFF94A3B8),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
+        validator: (v) => (v == null || v.trim().isEmpty) ? validatorMsg : null,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOPOGRAPHY PAINTER UNTUK SCREEN TAMBAH OBAT
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TambahObatTopographyPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF10B981).withValues(alpha: 0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+
+    for (int i = 0; i < 12; i++) {
+      final path = Path();
+      final yOffset = 10.0 + (i * 85);
+      path.moveTo(0, yOffset);
+      path.cubicTo(
+        size.width * 0.35,
+        yOffset - 35,
+        size.width * 0.65,
+        yOffset + 45,
+        size.width,
+        yOffset - 15,
+      );
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
