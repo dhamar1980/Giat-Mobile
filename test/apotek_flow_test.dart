@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:giat/screens/apotek/apoteker_home_screen.dart';
 import 'package:giat/screens/apotek/notifikasi/apotek_notifikasi_screen.dart';
 import 'package:giat/screens/apotek/pesanan/apotek_pesanan_screen.dart';
+import 'package:giat/screens/apotek/pesanan/apotek_detail_pesanan_screen.dart';
 import 'package:giat/screens/apotek/resep/apotek_detail_resep_screen.dart';
 import 'package:giat/screens/apotek/obat/apotek_obat_screen.dart';
 import 'package:giat/screens/apotek/obat/apotek_detail_obat_screen.dart';
@@ -30,10 +31,13 @@ void main() {
     expect(find.textContaining('Budi'), findsWidgets);
     expect(find.textContaining('kelancaran ya...'), findsOneWidget);
 
-    // Verify sections
-    expect(find.text('Pesanan Perlu Diproses'), findsOneWidget);
-    expect(find.text('Aktivitas Hari Ini'), findsOneWidget);
+    // Verify sections and items
     expect(find.text('Perlu Perhatian'), findsOneWidget);
+    expect(find.text('Pesanan belum\ndiproses'), findsOneWidget);
+    expect(find.text('Resep belum\nditerima'), findsOneWidget);
+    expect(find.text('Stok Menipis'), findsOneWidget);
+    expect(find.text('Aktivitas Terbaru'), findsOneWidget);
+    expect(find.text('Resep #RX-00110 telah diterima'), findsOneWidget);
 
     // Verify bottom nav items
     expect(find.text('Home'), findsOneWidget);
@@ -45,7 +49,7 @@ void main() {
     // Tap Pesanan tab
     await tester.tap(find.text('Pesanan').last);
     await tester.pumpAndSettle();
-    expect(find.text('Pesanan Hari Ini'), findsOneWidget);
+    expect(find.text('Pesanan Menunggu Diproses'), findsOneWidget);
 
     // Tap Resep center button
     await tester.tap(find.text('Resep').last);
@@ -144,6 +148,10 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
+    // Reset or prepare test order in Menunggu
+    final existingTestOrder = ApotekMockData.orders.firstWhere((o) => o.id == 'ORD-0124');
+    existingTestOrder.status = ApotekOrderStatus.menunggu;
+
     await tester.pumpWidget(
       const MaterialApp(
         home: ApotekPesananScreen(),
@@ -151,18 +159,31 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Pesanan Hari Ini'), findsOneWidget);
+    expect(find.text('Pesanan Menunggu Diproses'), findsOneWidget);
     expect(find.text('Menunggu'), findsWidgets);
     expect(find.text('Diproses'), findsWidgets);
     expect(find.text('Selesai'), findsWidgets);
+    expect(find.text('ORD-0124'), findsOneWidget);
+    expect(find.text('Proses Pesanan'), findsWidgets);
 
-    // Tap Diproses tab
-    await tester.tap(find.text('Diproses').first);
+    // Ensure visible and tap "Proses Pesanan"
+    await tester.ensureVisible(find.text('Proses Pesanan').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Proses Pesanan').first);
     await tester.pumpAndSettle();
 
-    // Tap Selesai tab
-    await tester.tap(find.text('Selesai').first);
+    // Verify order is now in Diproses tab and button is "Pesanan Selesai"
+    expect(find.text('Pesanan Sedang Diproses'), findsOneWidget);
+    expect(find.text('Pesanan Selesai'), findsWidgets);
+
+    // Ensure visible and tap "Pesanan Selesai" button
+    await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Pesanan Selesai').first);
     await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Pesanan Selesai').first);
+    await tester.pumpAndSettle();
+
+    // Verify order is now in Selesai tab
+    expect(find.text('Pesanan Selesai'), findsWidgets);
   });
 
   testWidgets('ApotekObatScreen searches, filters, and opens detail', (tester) async {
@@ -262,5 +283,79 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Pusat Bantuan'), findsOneWidget);
     expect(find.text('Bagaimana cara memverifikasi resep?'), findsOneWidget);
+  });
+
+  testWidgets('ApotekDetailPesananScreen renders both Menunggu and Diproses flows faithfully', (tester) async {
+    tester.view.physicalSize = const Size(450, 950);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final testOrder = ApotekMockData.orders.firstWhere((o) => o.id == 'ORD-0012');
+    testOrder.status = ApotekOrderStatus.menunggu;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ApotekDetailPesananScreen(order: testOrder),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Verify State 1: Menunggu
+    expect(find.text('Kembali'), findsOneWidget);
+    expect(find.text('Detail Pesanan'), findsOneWidget);
+    expect(find.text('ORD-0012'), findsOneWidget);
+    expect(find.text('informasi Pasien'), findsOneWidget);
+    expect(find.text('BS'), findsOneWidget);
+    expect(find.text('Budi Santoso'), findsWidgets);
+    expect(find.text('Resep'), findsOneWidget);
+    expect(find.text('RX-00110'), findsOneWidget);
+    expect(find.text('Daftar Obat'), findsOneWidget);
+    expect(find.text('Obat Tersedia'), findsWidgets);
+    expect(find.text('Mulai Proses'), findsOneWidget);
+
+    // 2. Tap "Mulai Proses"
+    await tester.tap(find.text('Mulai Proses'));
+    await tester.pumpAndSettle();
+    ScaffoldMessenger.of(tester.element(find.byType(ApotekDetailPesananScreen))).clearSnackBars();
+    await tester.pumpAndSettle();
+
+    // 3. Verify State 2: Diproses
+    expect(testOrder.status, ApotekOrderStatus.diproses);
+    expect(find.text('Diproses'), findsOneWidget);
+    expect(find.text('Informasi Pesanan'), findsWidgets);
+    expect(find.text('Nomor Pesanan'), findsOneWidget);
+    expect(find.text('Mulai Diproses'), findsOneWidget);
+    expect(find.text('Progres Pesanan'), findsOneWidget);
+    expect(find.text('Pesanan diterima'), findsOneWidget);
+    expect(find.text('Obat sedang disiapkan'), findsOneWidget);
+    expect(find.text('Sedang berlangsung'), findsOneWidget);
+    expect(find.text('Pemeriksaan akhir'), findsOneWidget);
+    expect(find.text('Selesaikan Pesanan Sekarang'), findsOneWidget);
+
+    // 4. Tap "Selesaikan Pesanan Sekarang"
+    await tester.tap(find.text('Selesaikan Pesanan Sekarang'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    // 5. Verify State 3: Selesai (tombol aksi bawah ditiadakan sesuai permintaan)
+    expect(testOrder.status, ApotekOrderStatus.selesai);
+    expect(find.text('Selesai'), findsOneWidget);
+    expect(find.text('Pesanan Telah Selesai'), findsNothing);
+    expect(find.text('Selesaikan Pesanan Sekarang'), findsNothing);
+    expect(find.text('Mulai Proses'), findsNothing);
+
+    // 6. Langsung buka order yang sudah selesai (seperti dari list/pencarian Selesai)
+    final completedOrder = ApotekMockData.orders.firstWhere((o) => o.id == 'ORD-0120');
+    expect(completedOrder.status, ApotekOrderStatus.selesai);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ApotekDetailPesananScreen(order: completedOrder),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Selesai'), findsOneWidget);
+    expect(find.text('Pesanan Telah Selesai'), findsNothing);
+    expect(find.byType(ElevatedButton), findsNothing);
   });
 }

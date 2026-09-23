@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'pembayaran_model.dart';
 import 'pembayaran_berhasil_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../apotek/models/apotek_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PEMBAYARAN TRANSFER BANK / VIRTUAL ACCOUNT (Figma Node: 977:9580)
@@ -1044,6 +1045,20 @@ class _PembayaranTransferBankScreenState extends State<PembayaranTransferBankScr
             height: 48,
             child: ElevatedButton(
               onPressed: () {
+                // If this is a direct purchase (non-prescription or general purchase)
+                // create and route order to selected pharmacy's Menunggu queue
+                ApotekMockData.createDirectOrder(
+                  orderId: widget.orderData.orderNumber.isNotEmpty
+                      ? widget.orderData.orderNumber
+                      : 'ORD-0124',
+                  patientName: widget.orderData.recipientName.isNotEmpty
+                      ? widget.orderData.recipientName
+                      : widget.userName,
+                  patientAddress: widget.orderData.recipientAddress.isNotEmpty
+                      ? widget.orderData.recipientAddress
+                      : 'Jalan Kalimantan No. 37, Sumbersari, Jember',
+                );
+
                 // Navigate to PembayaranBerhasilScreen
                 Navigator.pushReplacement(
                   context,

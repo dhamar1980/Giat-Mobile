@@ -33,6 +33,9 @@ class ApotekOrder {
   final String recipeRef; // e.g. "RX-00110"
   final String doctorName; // e.g. "dr. Andi Wijaya"
   final String recipeDate; // e.g. "1 Juni 2025"
+  final String orderDateTime; // e.g. "01 Sep 2026, 10:15"
+  final String processStartTime; // e.g. "01 Sep 2026, 10:18"
+  int progressStep; // 1: Diterima, 2: Resep diperiksa, 3: Obat diperiksa, 4: Sedang disiapkan, 5: Pemeriksaan akhir
   ApotekOrderStatus status;
   final List<ApotekOrderItem> items;
 
@@ -49,6 +52,9 @@ class ApotekOrder {
     required this.recipeDate,
     required this.status,
     required this.items,
+    this.orderDateTime = '01 Sep 2026, 10:15',
+    this.processStartTime = '01 Sep 2026, 10:18',
+    this.progressStep = 4,
   });
 }
 
@@ -259,7 +265,7 @@ class ApotekFaqItem {
 class ApotekMockData {
   static final List<ApotekOrder> orders = [
     ApotekOrder(
-      id: 'ORD-0124',
+      id: 'ORD-0012',
       patientName: 'Budi Santoso',
       patientInitials: 'BS',
       patientAge: 42,
@@ -269,6 +275,9 @@ class ApotekMockData {
       recipeRef: 'RX-00110',
       doctorName: 'Dr. Andi Wijaya',
       recipeDate: '1 Juni 2025',
+      orderDateTime: '01 Sep 2026, 10:15',
+      processStartTime: '01 Sep 2026, 10:18',
+      progressStep: 4,
       status: ApotekOrderStatus.menunggu,
       items: [
         const ApotekOrderItem(
@@ -280,6 +289,44 @@ class ApotekMockData {
           medicineName: 'Amoxicillin 500 mg',
           formAndPack: 'Kapsul • 30 kapsul',
           qtyText: '1 Tablet',
+        ),
+        const ApotekOrderItem(
+          medicineName: 'Omeprazole 20 mg',
+          formAndPack: 'Kapsul • 10 kapsul',
+          qtyText: '1 Kapsul',
+        ),
+      ],
+    ),
+    ApotekOrder(
+      id: 'ORD-0124',
+      patientName: 'Budi Santoso',
+      patientInitials: 'BS',
+      patientAge: 42,
+      patientGender: 'Laki-laki',
+      patientAddress: 'Jalan Merpati 45 Madiun',
+      timeText: '10 menit lalu',
+      recipeRef: 'RX-00110',
+      doctorName: 'Dr. Andi Wijaya',
+      recipeDate: '1 Juni 2025',
+      orderDateTime: '01 Sep 2026, 10:15',
+      processStartTime: '01 Sep 2026, 10:18',
+      progressStep: 4,
+      status: ApotekOrderStatus.menunggu,
+      items: [
+        const ApotekOrderItem(
+          medicineName: 'Paracetamol 500 mg',
+          formAndPack: 'Tablet • 10 tablet',
+          qtyText: '2 Tablet',
+        ),
+        const ApotekOrderItem(
+          medicineName: 'Amoxicillin 500 mg',
+          formAndPack: 'Kapsul • 30 kapsul',
+          qtyText: '1 Tablet',
+        ),
+        const ApotekOrderItem(
+          medicineName: 'Omeprazole 20 mg',
+          formAndPack: 'Kapsul • 10 kapsul',
+          qtyText: '1 Kapsul',
         ),
       ],
     ),
@@ -678,6 +725,63 @@ class ApotekMockData {
       subtitle: '${recipe.id} (${recipe.patientName}) • Resep diverifikasi & masuk antrean pesanan',
       timeText: 'Baru saja',
       type: 'resep',
+    ));
+
+    return newOrder;
+  }
+
+  /// Patient buys medicine directly without doctor prescription
+  static ApotekOrder createDirectOrder({
+    required String orderId,
+    required String patientName,
+    String patientAddress = 'Jalan Kalimantan No. 37, Sumbersari, Jember',
+    List<ApotekOrderItem>? items,
+  }) {
+    // Check if already created
+    final existingIndex = orders.indexWhere((o) => o.id == orderId);
+    if (existingIndex != -1) {
+      return orders[existingIndex];
+    }
+
+    final defaultItems = items ?? [
+      const ApotekOrderItem(
+        medicineName: 'Paracetamol 500 mg',
+        formAndPack: 'Tablet • 10 tablet',
+        qtyText: '2 Tablet',
+      ),
+      const ApotekOrderItem(
+        medicineName: 'Amoxicillin 500 mg',
+        formAndPack: 'Kapsul • 30 kapsul',
+        qtyText: '1 Tablet',
+      ),
+    ];
+
+    final newOrder = ApotekOrder(
+      id: orderId,
+      patientName: patientName.isNotEmpty ? patientName : 'Budi Santoso',
+      patientInitials: patientName.isNotEmpty
+          ? patientName.split(' ').where((w) => w.isNotEmpty).map((w) => w[0]).take(2).join().toUpperCase()
+          : 'BS',
+      patientAge: 42,
+      patientGender: 'Laki-laki',
+      patientAddress: patientAddress,
+      timeText: 'Baru saja',
+      recipeRef: '', // Non-prescription
+      doctorName: '',
+      recipeDate: '',
+      status: ApotekOrderStatus.menunggu,
+      items: defaultItems,
+    );
+
+    orders.insert(0, newOrder);
+
+    // Record activity
+    activities.insert(0, ApotekActivity(
+      id: 'act-${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Pesanan Obat Masuk',
+      subtitle: '$orderId (${newOrder.patientName}) • Pembelian obat langsung menunggu diproses',
+      timeText: 'Baru saja',
+      type: 'pesanan',
     ));
 
     return newOrder;

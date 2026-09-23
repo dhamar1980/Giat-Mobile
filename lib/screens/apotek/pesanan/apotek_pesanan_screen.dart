@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
+import '../notifikasi/apotek_notifikasi_screen.dart';
 import 'apotek_detail_pesanan_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PESANAN MASUK APOTEK (Figma Node: 1100-19155, 1598-6527, 1598-6776, 1100-19050)
+// HALAMAN PESANAN APOTEK (Revisi Sesuai 5 Screenshot Desain GIAT)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ApotekPesananScreen extends StatefulWidget {
   final int initialTabIndex;
+  final ValueChanged<int>? onNavigateToTab;
 
   const ApotekPesananScreen({
     super.key,
     this.initialTabIndex = 0,
+    this.onNavigateToTab,
   });
 
   @override
@@ -23,7 +26,8 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
   static const _darkGreen = Color(0xFF065A37);
   static const _buttonDarkGreen = Color(0xFF044E2F);
   static const _bgColor = Color(0xFFF8FAF9);
-  static const _border = Color(0xFFE2E8F0);
+  static const _cardBorder = Color(0xFFE2E8F0);
+  static const _innerBorder = Color(0xFFCBD5E1);
 
   late int _selectedTabIndex;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -51,11 +55,12 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
 
     if (_searchQuery.trim().isEmpty) return byStatus;
 
+    final q = _searchQuery.toLowerCase().trim();
     return byStatus.where((o) {
-      return o.id.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          o.patientName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          o.recipeRef.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          o.doctorName.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchId = o.id.toLowerCase().contains(q);
+      final matchPatient = o.patientName.toLowerCase().contains(q);
+      final matchItems = o.items.any((it) => it.medicineName.toLowerCase().contains(q));
+      return matchId || matchPatient || matchItems;
     }).toList();
   }
 
@@ -67,223 +72,103 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
           onStatusChanged: () => setState(() {}),
         ),
       ),
-    );
+    ).then((_) => setState(() {}));
   }
 
-  /// Figma Node 1100:19050: Pop up Mulai Proses Pesanan
-  void _showProcessConfirmationDialog(ApotekOrder order) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Mulai proses pesanan?',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        content: Text(
-          'Pesanan ${order.id} akan dipindahkan ke daftar pesanan yang sedang diproses. Pastikan resep dan ketersediaan obat telah diperiksa.',
-          style: GoogleFonts.inter(
-            fontSize: 13.5,
-            color: const Color(0xFF475569),
-            height: 1.45,
-          ),
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF64748B),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            ),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _buttonDarkGreen,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() {
-                order.status = ApotekOrderStatus.diproses;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Pesanan ${order.id} berhasil dipindahkan ke status Diproses.'),
-                  backgroundColor: _darkGreen,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            child: Text(
-              'Mulai Proses',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
+  void _handleProcessOrder(ApotekOrder order) {
+    setState(() {
+      order.status = ApotekOrderStatus.diproses;
+      _selectedTabIndex = 1; // Pindah ke tab Diproses
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Pesanan ${order.id} berhasil dipindahkan ke status Diproses.'),
+        backgroundColor: _darkGreen,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  void _advanceOrder(ApotekOrder order) {
-    if (order.status == ApotekOrderStatus.menunggu) {
-      _showProcessConfirmationDialog(order);
-    } else if (order.status == ApotekOrderStatus.diproses) {
-      setState(() {
-        order.status = ApotekOrderStatus.selesai;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Pesanan ${order.id} telah diselesaikan.'),
-          backgroundColor: _darkGreen,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+  void _handleCompleteOrder(ApotekOrder order) {
+    setState(() {
+      order.status = ApotekOrderStatus.selesai;
+      _selectedTabIndex = 2; // Pindah ke tab Selesai
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Pesanan ${order.id} telah diselesaikan.'),
+        backgroundColor: _darkGreen,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _getFilteredOrders();
+    final topPadding = MediaQuery.of(context).padding.top;
+    final filteredOrders = _getFilteredOrders();
 
-    final menungguCount = ApotekMockData.orders.where((o) => o.status == ApotekOrderStatus.menunggu).length;
-    final diprosesCount = ApotekMockData.orders.where((o) => o.status == ApotekOrderStatus.diproses).length;
-    final selesaiCount = ApotekMockData.orders.where((o) => o.status == ApotekOrderStatus.selesai).length;
+    String sectionTitle;
+    if (_selectedTabIndex == 0) {
+      sectionTitle = 'Pesanan Menunggu Diproses';
+    } else if (_selectedTabIndex == 1) {
+      sectionTitle = 'Pesanan Sedang Diproses';
+    } else {
+      sectionTitle = 'Pesanan Selesai';
+    }
 
     return Scaffold(
       backgroundColor: _bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'Pesanan Hari Ini',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFF1F5F9), height: 1),
-        ),
-      ),
-      body: SafeArea(
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top chat bubble header (Figma Nodes 1100:19155, 1598:6527, 1598:6776)
-            Container(
-              width: double.infinity,
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+            // ── 1. Top Curved Green Header with Chat Bubbles ──
+            _buildHeaderSection(topPadding),
+
+            const SizedBox(height: 16),
+
+            // ── 2. Search & Tab Filter & Content ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFBBF7D0)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.receipt_long_rounded, size: 18, color: _darkGreen),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Selamat datang kembali! Yuk, cek dan proses pesanan masuk kamu sekarang di menu Pesanan. ✨✨',
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              color: const Color(0xFF14532D),
-                              fontWeight: FontWeight.w500,
-                              height: 1.35,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Search Bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (val) => setState(() => _searchQuery = val),
-                      decoration: InputDecoration(
-                        hintText: 'Cari nomor pesanan atau nama pasien...',
-                        hintStyle: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 22),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      ),
+                  // Search Bar with Dark Green Outline
+                  _buildSearchBar(),
+
+                  const SizedBox(height: 14),
+
+                  // Three Filter Tabs: Menunggu, Diproses, Selesai
+                  _buildFilterTabs(),
+
+                  const SizedBox(height: 20),
+
+                  // Section Title
+                  Text(
+                    sectionTitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
                     ),
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  // Segmented Tabs with Count Badges
-                  Row(
-                    children: [
-                      _buildStatusTab(0, 'Menunggu', '$menungguCount'),
-                      const SizedBox(width: 8),
-                      _buildStatusTab(1, 'Diproses', '$diprosesCount'),
-                      const SizedBox(width: 8),
-                      _buildStatusTab(2, 'Selesai', '$selesaiCount'),
-                    ],
-                  ),
+                  // Order Cards List
+                  if (filteredOrders.isEmpty)
+                    _buildEmptyState()
+                  else
+                    ...filteredOrders.map((order) => Padding(
+                          padding: const EdgeInsets.only(bottom: 18),
+                          child: _buildOrderCard(order),
+                        )),
+
+                  const SizedBox(height: 36),
                 ],
               ),
-            ),
-
-            // Order List
-            Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.inventory_2_outlined, size: 48, color: Color(0xFF94A3B8)),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Tidak ada pesanan pada status ini.',
-                            style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(20),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        final ord = filtered[index];
-                        return _buildOrderCard(ord);
-                      },
-                    ),
             ),
           ],
         ),
@@ -291,47 +176,311 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
     );
   }
 
-  Widget _buildStatusTab(int index, String title, String count) {
+  // ───────────────────────────────────────────────────────────────────────────
+  // HEADER SECTION (Green Gradient + Topography + Action Pill + Chat Bubbles)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildHeaderSection(double topPadding) {
+    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
+
+    return ClipPath(
+      clipper: _PesananHeaderClipper(),
+      child: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF22C55E),
+              Color(0xFF16A34A),
+              Color(0xFF065A37),
+            ],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _PesananHeaderCurvePainter(),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(20, topPadding + 6, 20, 42),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top Right Action Pill (Bell & Profile)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              children: [
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(4),
+                                  icon: const Icon(
+                                    Icons.notifications_none_rounded,
+                                    size: 22,
+                                    color: Color(0xFF1F2937),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.of(context)
+                                        .push(
+                                          MaterialPageRoute(
+                                            builder: (_) => const ApotekNotifikasiScreen(),
+                                          ),
+                                        )
+                                        .then((_) => setState(() {}));
+                                  },
+                                ),
+                                if (unreadNotifs > 0)
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFDC2626),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                widget.onNavigateToTab?.call(4);
+                              },
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF044E2F),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Chat Bubble 1 (Left Aligned - White Bubble)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildChatBubble(
+                      isLeft: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Selamat datang kembali! Yuk, cek dan proses pesanan masuk kamu sekarang di menu Pesanan.',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF065A37),
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Spacer(),
+                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Chat Bubble 2 (Right Aligned - White Bubble)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildChatBubble(
+                      isLeft: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Kelola dan proses pesanan yang masuk ✨✨',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF065A37),
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Spacer(),
+                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatBubble({
+    required bool isLeft,
+    required Widget child,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          constraints: BoxConstraints(
+            maxWidth: isLeft ? 330 : 280,
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 14, 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: isLeft ? const Radius.circular(4) : const Radius.circular(16),
+              bottomRight: isLeft ? const Radius.circular(16) : const Radius.circular(4),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+        // WhatsApp style speech bubble tail
+        Positioned(
+          bottom: 0,
+          left: isLeft ? -7 : null,
+          right: isLeft ? null : -7,
+          child: CustomPaint(
+            size: const Size(8, 12),
+            painter: _ChatTailPainter(isLeft: isLeft),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // SEARCH BAR (Pill shape with green outline)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: _darkGreen, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchCtrl,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        style: GoogleFonts.inter(
+          fontSize: 14,
+          color: const Color(0xFF0F172A),
+        ),
+        decoration: InputDecoration(
+          hintText: 'Cari nomor pesanan atau nama pasien...',
+          hintStyle: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF64748B)),
+          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF334155), size: 22),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18, color: Color(0xFF64748B)),
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // SEGMENTED TABS (Menunggu, Diproses, Selesai)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildFilterTabs() {
+    return Row(
+      children: [
+        _buildPillTab(index: 0, title: 'Menunggu'),
+        const SizedBox(width: 10),
+        _buildPillTab(index: 1, title: 'Diproses'),
+        const SizedBox(width: 10),
+        _buildPillTab(index: 2, title: 'Selesai'),
+      ],
+    );
+  }
+
+  Widget _buildPillTab({required int index, required String title}) {
     final isSelected = _selectedTabIndex == index;
+
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedTabIndex = index),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isSelected ? _darkGreen : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(10),
+            color: isSelected ? _darkGreen : const Color(0xFFE0F2FE),
+            borderRadius: BorderRadius.circular(24),
           ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? Colors.white : const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    count,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? Colors.white : const Color(0xFF475569),
-                    ),
-                  ),
-                ),
-              ],
+          child: Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? Colors.white : const Color(0xFF334155),
             ),
           ),
         ),
@@ -339,19 +488,20 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
     );
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // ORDER CARD (Matching user screenshots 1, 2, 3, 4, 5)
+  // ───────────────────────────────────────────────────────────────────────────
   Widget _buildOrderCard(ApotekOrder ord) {
-    final isFromRecipe = ord.recipeRef.isNotEmpty;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
@@ -359,148 +509,360 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // If from doctor recipe, show special banner badge
-          if (isFromRecipe)
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFBFDBFE)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.note_alt_rounded, size: 13, color: Color(0xFF2563EB)),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      'Resep Dokter (${ord.recipeRef}) • ${ord.doctorName}',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1D4ED8),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Order ID & Patient Name
+          // Top Row: Icon + ORD ID & Name + "Lihat Detail Pesanan ->"
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Light blue-cyan container with pharmacy/medicine icon
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6EFF6),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.local_pharmacy_rounded,
+                    color: _darkGreen,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // ID and Patient Name
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       ord.id,
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       ord.patientName,
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: const Color(0xFF475569)),
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF334155),
+                      ),
                     ),
                   ],
                 ),
               ),
-              TextButton(
-                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                onPressed: () => _openDetail(ord),
-                child: Row(
-                  children: [
-                    Text('Lihat Detail', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: _darkGreen)),
-                    const SizedBox(width: 2),
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: _darkGreen),
-                  ],
+
+              // "Lihat Detail Pesanan ->"
+              GestureDetector(
+                onTap: () => _openDetail(ord),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Lihat Detail Pesanan',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: _darkGreen,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.arrow_circle_right_outlined,
+                        size: 18,
+                        color: _darkGreen,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
 
-          const Divider(height: 18),
+          const SizedBox(height: 14),
 
-          // Items summary
-          ...ord.items.map((it) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        it.medicineName,
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+          // Inner Bordered Box for Items & Total
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _innerBorder),
+            ),
+            child: Column(
+              children: [
+                // Item List
+                ...ord.items.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final item = entry.value;
+
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.medicineName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    item.formAndPack,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Green Pill Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _darkGreen,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                item.qtyText,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      it.qtyText,
-                      style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
-                    ),
-                  ],
+                      if (idx < ord.items.length - 1)
+                        const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+                    ],
+                  );
+                }),
+
+                const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+
+                // Total Row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF334155),
+                        ),
+                      ),
+                      Text(
+                        '${ord.items.length} item obat',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              )),
+              ],
+            ),
+          ),
 
-          const SizedBox(height: 8),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
+          // Bottom Action Button based on status
+          if (ord.status == ApotekOrderStatus.menunggu) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _buttonDarkGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () => _handleProcessOrder(ord),
                 child: Text(
-                  'Total: ${ord.items.length} item obat',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                  'Proses Pesanan',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              if (ord.status == ApotekOrderStatus.menunggu)
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _buttonDarkGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
-                  ),
-                  onPressed: () => _advanceOrder(ord),
-                  child: Text('Proses Pesanan', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                )
-              else if (ord.status == ApotekOrderStatus.diproses)
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16A34A),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
-                  ),
-                  onPressed: () => _advanceOrder(ord),
-                  child: Text('Pesanan Selesai', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Selesai',
-                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF15803D)),
+            ),
+          ] else if (ord.status == ApotekOrderStatus.diproses) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _buttonDarkGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-            ],
+                onPressed: () => _handleCompleteOrder(ord),
+                child: Text(
+                  'Pesanan Selesai',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.receipt_long_outlined, size: 36, color: Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Tidak ada pesanan',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF334155),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Belum ada pesanan pada status ini.',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: const Color(0xFF94A3B8),
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOM CLIPPERS & PAINTERS FOR HEADER
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PesananHeaderClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.lineTo(0, size.height - 35);
+    path.cubicTo(
+      size.width * 0.25,
+      size.height + 18,
+      size.width * 0.65,
+      size.height - 45,
+      size.width,
+      size.height - 25,
+    );
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _ChatTailPainter extends CustomPainter {
+  final bool isLeft;
+  const _ChatTailPainter({required this.isLeft});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    if (isLeft) {
+      path.moveTo(size.width, 0);
+      path.lineTo(size.width, size.height);
+      path.lineTo(0, size.height);
+      path.close();
+    } else {
+      path.moveTo(0, 0);
+      path.lineTo(0, size.height);
+      path.lineTo(size.width, size.height);
+      path.close();
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PesananHeaderCurvePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.08)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+
+    for (int i = 0; i < 5; i++) {
+      final path = Path();
+      final yOffset = 30.0 + (i * 45);
+      path.moveTo(0, yOffset);
+      path.cubicTo(
+        size.width * 0.25,
+        yOffset + 35,
+        size.width * 0.75,
+        yOffset - 35,
+        size.width,
+        yOffset + 25,
+      );
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
