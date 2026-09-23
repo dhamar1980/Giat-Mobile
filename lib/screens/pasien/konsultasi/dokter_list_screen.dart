@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'konsultasi_chat_screen.dart';
 import 'dokter_detail_screen.dart';
+import 'jadwalkan_konsultasi_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../pragi/pragi_home_view.dart';
 import '../pantau/pantau_dashboard_screen.dart';
@@ -721,10 +722,21 @@ class _DokterListScreenState extends State<DokterListScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _selectedCategory = 'Semua Dokter';
-                          });
+                        onPressed: () async {
+                          final booked = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => JadwalkanKonsultasiScreen(
+                                userName: widget.userName,
+                              ),
+                            ),
+                          );
+                          if (booked == true && mounted) {
+                            setState(() {
+                              _selectedCategory = 'Konsultasi Saya';
+                              _hasUpcomingConsultation = true;
+                            });
+                          }
                         },
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1580,13 +1592,22 @@ class _DokterListScreenState extends State<DokterListScreen> {
                             ),
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                           ),
-                          onPressed: () {
-                            Navigator.push(
+                          onPressed: () async {
+                            final booked = await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => DokterDetailScreen(doctor: doc),
+                                builder: (_) => JadwalkanKonsultasiScreen(
+                                  doctor: doc,
+                                  userName: widget.userName,
+                                ),
                               ),
                             );
+                            if (booked == true && mounted) {
+                              setState(() {
+                                _selectedCategory = 'Konsultasi Saya';
+                                _hasUpcomingConsultation = true;
+                              });
+                            }
                           },
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,

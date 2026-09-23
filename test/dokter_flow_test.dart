@@ -62,6 +62,39 @@ void main() {
     expect(find.text('Profil Dokter'), findsOneWidget);
   });
 
+  testWidgets('DokterHomeScreen renders Ringkasan Aktivitas below Jadwal and scrolls to it', (tester) async {
+    tester.view.physicalSize = const Size(450, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: DokterHomeScreen(doctorName: 'Dr. Andi Pratama'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify all sections are rendered continuously on the home screen
+    expect(find.text('Pesan Terbaru'), findsOneWidget);
+    expect(find.text('Jadwal Hari ini'), findsOneWidget);
+    expect(find.text('Berikut Ringkasan aktivitas Anda hari ini.'), findsOneWidget);
+    expect(find.text('Konsultasi'), findsWidgets);
+    expect(find.text('Membuat resep'), findsWidgets);
+    expect(find.text('Paracetamol 500 mg'), findsOneWidget);
+    expect(find.text('Amoxicillin 500 mg'), findsOneWidget);
+    expect(find.text('2 Tablet'), findsOneWidget);
+    expect(find.text('1 Tablet'), findsOneWidget);
+    expect(find.text('2 item obat'), findsOneWidget);
+
+    // Tap on bubble 2 to scroll to summary
+    await tester.tap(find.textContaining('Berikut ringkasan aktivitas'));
+    await tester.pumpAndSettle();
+
+    // Tap on bubble 1 to scroll back to top
+    await tester.tap(find.textContaining('Dr. Andi Pratama'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('DokterNotifikasiScreen renders list of notifications', (tester) async {
     tester.view.physicalSize = const Size(450, 900);
     tester.view.devicePixelRatio = 1.0;
