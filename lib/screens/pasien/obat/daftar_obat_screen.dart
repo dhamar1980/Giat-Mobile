@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../widgets/pasien_bottom_navbar.dart';
 import 'resep_dokter_screen.dart';
 import 'pembelian_obat_screen.dart';
 import 'lacak_obat_screen.dart';
@@ -100,29 +101,6 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _darkGreen, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Layanan Obat & Resep',
-          style: GoogleFonts.inter(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history_rounded, color: _darkGreen),
-            tooltip: 'Riwayat Pesanan',
-            onPressed: () => _openRiwayatScreen(context),
-          ),
-        ],
-      ),
       body: Stack(
         children: [
           Positioned.fill(
@@ -130,11 +108,12 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
               painter: _ObatTopographyPainter(),
             ),
           ),
-          SafeArea(
-            top: false,
-            child: content,
-          ),
+          content,
         ],
+      ),
+      bottomNavigationBar: PasienBottomNavbar(
+        currentIndex: 4,
+        userName: widget.userName,
       ),
     );
   }
@@ -490,12 +469,14 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                                       size: 15,
                                     ),
                                     const SizedBox(width: 5),
-                                    Text(
-                                      'Siap ditebus ke apotek rekanan',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: _darkGreen,
+                                    Expanded(
+                                      child: Text(
+                                        'Siap ditebus ke apotek rekanan',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: _darkGreen,
+                                        ),
                                       ),
                                     ),
                                   ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../widgets/pasien_bottom_navbar.dart';
 import 'catat_kondisi_screen.dart';
 import 'riwayat_pemantauan_screen.dart';
 
@@ -261,6 +262,10 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
           ),
           content,
         ],
+      ),
+      bottomNavigationBar: PasienBottomNavbar(
+        currentIndex: 3,
+        userName: widget.userName,
       ),
     );
   }
@@ -814,14 +819,18 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
             onPressed: _handleOpenCatatKondisi,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.add_circle_outline_rounded, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  'Catat  Kondisi hari Ini',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Text(
+                    'Catat  Kondisi hari Ini',
+                    style: GoogleFonts.inter(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -843,14 +852,18 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Perkembangan Berat Badan',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+            Expanded(
+              child: Text(
+                'Perkembangan Berat Badan',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SizedBox(width: 8),
             GestureDetector(
               onTap: _handleOpenRiwayat,
               child: Row(
@@ -899,42 +912,45 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Terakhir dicatat (15 Sep)',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Terakhir dicatat (15 Sep)',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: _formatNumber(_currentWeight),
-                              style: GoogleFonts.inter(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0F172A),
+                        const SizedBox(height: 2),
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: _formatNumber(_currentWeight),
+                                style: GoogleFonts.inter(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF0F172A),
+                                ),
                               ),
-                            ),
-                            TextSpan(
-                              text: ' kg',
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF0F172A),
+                              TextSpan(
+                                text: ' kg',
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF0F172A),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
 
                   // Pill: Catatan Terakhir
                   Container(
@@ -990,7 +1006,11 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFE0F2FE)),
                 ),
-                child: Row(
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     Text(
                       'Highlight Status Tubuh:   ',
@@ -1008,7 +1028,6 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                         color: const Color(0xFF0F172A),
                       ),
                     ),
-                    const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'pragi_state_service.dart';
 import 'pragi_topography_background.dart';
-import '../konsultasi/dokter_list_screen.dart';
+import '../../../master_layout.dart';
 
 class PragiResultScreen extends StatelessWidget {
   final PragiScreeningResult result;
@@ -473,9 +473,12 @@ class PragiResultScreen extends StatelessWidget {
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () {
-              Navigator.push(
+              Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const DokterListScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const MasterLayout(initialIndex: 1),
+                ),
+                (route) => false,
               );
             },
             style: ElevatedButton.styleFrom(
@@ -487,12 +490,16 @@ class PragiResultScreen extends StatelessWidget {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.medical_services_rounded, size: 18),
                 const SizedBox(width: 8),
-                Text(
-                  'Konsultasi Dokter Sekarang',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13.5),
+                Flexible(
+                  child: Text(
+                    'Konsultasi Dokter Sekarang',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13.5),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

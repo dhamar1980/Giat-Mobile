@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'pragi/pragi_home_view.dart';
-import 'konsultasi/dokter_list_screen.dart';
-import 'pantau/pantau_dashboard_screen.dart';
-import 'obat/daftar_obat_screen.dart';
 import 'reminder/reminder_list_screen.dart';
 import 'profile/profile_pasien_screen.dart';
 import 'edukasi/edukasi_list_screen.dart';
 import 'edukasi/edukasi_detail_screen.dart';
+import 'widgets/pasien_bottom_navbar.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PASIEN HOME SCREEN (Figma Node: 771-5845)
@@ -30,7 +27,6 @@ class PasienHomeScreen extends StatefulWidget {
 
 class _PasienHomeScreenState extends State<PasienHomeScreen>
     with SingleTickerProviderStateMixin {
-  int _selectedIndex = 0;
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
@@ -753,218 +749,9 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
   // BOTTOM NAVIGATION BAR (Figma Node 1100:33127)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildBottomNavigationBar() {
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      clipBehavior: Clip.none,
-      children: [
-        // Main White Navbar Container with Green Glow
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF10B981).withValues(alpha: 0.16),
-                blurRadius: 20,
-                spreadRadius: 2,
-                offset: const Offset(0, -3),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            top: false,
-            child: Container(
-              height: 70,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavItem(
-                    index: 0,
-                    icon: _selectedIndex == 0 ? Icons.home_rounded : Icons.home_outlined,
-                    label: 'Home',
-                  ),
-                  _buildNavItem(
-                    index: 1,
-                    icon: _selectedIndex == 1 ? Icons.medical_services_rounded : Icons.medical_services_outlined,
-                    label: 'Konsultasi',
-                  ),
-                  _buildPragiCenterButton(),
-                  _buildNavItem(
-                    index: 3,
-                    icon: _selectedIndex == 3 ? Icons.show_chart_rounded : Icons.show_chart_outlined,
-                    label: 'Pantau',
-                  ),
-                  _buildNavItem(
-                    index: 4,
-                    icon: _selectedIndex == 4 ? Icons.medication_rounded : Icons.medication_outlined,
-                    label: 'Obat',
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final isSelected = _selectedIndex == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedIndex = index);
-        if (index == 1) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DokterListScreen()),
-          ).then((_) => setState(() => _selectedIndex = 0));
-        } else if (index == 3) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const PantauDashboardScreen()),
-          ).then((_) => setState(() => _selectedIndex = 0));
-        } else if (index == 4) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DaftarObatScreen()),
-          ).then((_) => setState(() => _selectedIndex = 0));
-        }
-      },
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 68,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Top indicator bar for active item
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: isSelected ? 22 : 0,
-              height: 3,
-              margin: const EdgeInsets.only(bottom: 5),
-              decoration: BoxDecoration(
-                color: _darkGreen,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            if (!isSelected) const SizedBox(height: 3),
-            Icon(
-              icon,
-              size: 24,
-              color: isSelected ? _darkGreen : const Color(0xFF94A3B8),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 11.5,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? _darkGreen : const Color(0xFF94A3B8),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPragiCenterButton() {
-    final isSelected = _selectedIndex == 2;
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedIndex = 2);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const PragiHomeView(),
-          ),
-        ).then((_) {
-          // Reset selected index when returning from PRAGI
-          setState(() => _selectedIndex = 0);
-        });
-      },
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Top indicator if selected
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: isSelected ? 22 : 0,
-              height: 3,
-              margin: const EdgeInsets.only(bottom: 2),
-              decoration: BoxDecoration(
-                color: _darkGreen,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            // PRAGI Elevated Mascot Avatar with green glow halo
-            Transform.translate(
-              offset: const Offset(0, -14),
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  border: Border.all(
-                    color: isSelected ? const Color(0xFF22C55E) : Colors.white,
-                    width: 2.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF22C55E).withValues(alpha: 0.45),
-                      blurRadius: 14,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/pragi.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: const Color(0xFF86EFAC),
-                      child: const Center(
-                        child: Icon(Icons.smart_toy_rounded, size: 24, color: _darkGreen),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Transform.translate(
-              offset: const Offset(0, -10),
-              child: Text(
-                'PRAGI',
-                style: GoogleFonts.inter(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? _darkGreen : const Color(0xFF044E2F),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return PasienBottomNavbar(
+      currentIndex: 0,
+      userName: widget.userName,
     );
   }
 }
