@@ -141,6 +141,7 @@ class ApotekMedicine {
   int sellPrice;
   final String expDate;
   final String? usageRule;
+  final String? imagePath;
   final List<ApotekMedicineBatch> batches;
 
   ApotekMedicine({
@@ -156,6 +157,7 @@ class ApotekMedicine {
     required this.sellPrice,
     required this.expDate,
     this.usageRule,
+    this.imagePath,
     required this.batches,
   });
 
@@ -460,6 +462,7 @@ class ApotekMockData {
       buyPrice: 3500,
       sellPrice: 5000,
       expDate: '12 Des 2027',
+      imagePath: 'assets/images/paracetamol_strip.jpg',
       usageRule: 'Diminum 3 kali sehari 1 tablet sesudah makan bila demam/nyeri.',
       batches: [
         const ApotekMedicineBatch(
@@ -488,6 +491,7 @@ class ApotekMockData {
       buyPrice: 8500,
       sellPrice: 12000,
       expDate: '12 Des 2027',
+      imagePath: 'assets/images/amoxicillin.jpg',
       usageRule: 'Harus dihabiskan sesuai anjuran dokter untuk mencegah resistensi.',
       batches: [
         const ApotekMedicineBatch(
@@ -510,6 +514,7 @@ class ApotekMockData {
       buyPrice: 28000,
       sellPrice: 35000,
       expDate: '12 Des 2027',
+      imagePath: 'assets/images/omeprazole.jpg',
       usageRule: 'Diminum 30 menit sebelum sarapan pagi.',
       batches: [],
     ),
@@ -693,6 +698,7 @@ class ApotekMockData {
     // Check if already created
     final existingIndex = orders.indexWhere((o) => o.id == orderId || o.recipeRef == recipe.id);
     if (existingIndex != -1) {
+      orders[existingIndex].status = ApotekOrderStatus.menunggu;
       return orders[existingIndex];
     }
 
@@ -722,12 +728,88 @@ class ApotekMockData {
     activities.insert(0, ApotekActivity(
       id: 'act-${DateTime.now().millisecondsSinceEpoch}',
       title: 'Menerima Resep Dokter',
-      subtitle: '${recipe.id} (${recipe.patientName}) • Resep diverifikasi & masuk antrean pesanan',
+      subtitle: '${recipe.id} (${recipe.patientName}) • Resep diterima & masuk antrean pesanan menunggu',
       timeText: 'Baru saja',
       type: 'resep',
     ));
 
     return newOrder;
+  }
+
+  /// Patient buys medicine using doctor prescription
+  /// Enters Apotek's Resep screen with status belumDiverifikasi
+  static ApotekRecipe addRecipeFromCheckout({
+    required String recipeId,
+    required String patientName,
+    required String patientAddress,
+    String doctorName = 'dr. Andi Pratama',
+    String dateText = '31 Agustus 2026',
+    String medRecNo = '#RM-48291',
+    List<ApotekRecipeItem>? items,
+  }) {
+    final cleanId = recipeId.startsWith('RSP-')
+        ? recipeId
+        : 'RSP-${recipeId.replaceAll(RegExp(r'[^0-9]'), '').padLeft(5, '0')}';
+
+    final existingIndex = recipes.indexWhere((r) => r.id == cleanId);
+    if (existingIndex != -1) {
+      recipes[existingIndex].status = ApotekRecipeStatus.belumDiverifikasi;
+      return recipes[existingIndex];
+    }
+
+    final defaultItems = items ?? [
+      const ApotekRecipeItem(
+        medicineName: 'Paracetamol 500 mg',
+        formAndPack: 'Tablet • 10 tablet',
+        doseRule: '3 x 1 tablet',
+        usageNotes: 'Aturan Pakai: Sesudah Makan',
+        qtyText: '2 Tablet',
+      ),
+      const ApotekRecipeItem(
+        medicineName: 'Amoxicillin 500 mg',
+        formAndPack: 'Kapsul • 30 kapsul',
+        doseRule: '3 x 1 kapsul',
+        usageNotes: 'Aturan Pakai: Sesudah Makan (Habiskan)',
+        qtyText: '1 Tablet',
+      ),
+    ];
+
+    final patientInitials = patientName.isNotEmpty
+        ? patientName.split(' ').where((w) => w.isNotEmpty).map((w) => w[0]).take(2).join().toUpperCase()
+        : 'BS';
+
+    final newRecipe = ApotekRecipe(
+      id: cleanId,
+      patientName: patientName.isNotEmpty ? patientName : 'Budi Santoso',
+      patientInitials: patientInitials,
+      medRecNo: medRecNo,
+      doctorName: doctorName,
+      dateText: dateText,
+      timeText: 'Baru saja',
+      status: ApotekRecipeStatus.belumDiverifikasi,
+      items: defaultItems,
+    );
+
+    recipes.insert(0, newRecipe);
+
+    activities.insert(0, ApotekActivity(
+      id: 'act-${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Resep Baru Masuk',
+      subtitle: '${newRecipe.id} (${newRecipe.patientName}) • Resep masuk menunggu verifikasi',
+      timeText: 'Baru saja',
+      type: 'resep',
+    ));
+
+    notifications.insert(0, ApotekNotification(
+      id: 'notif-${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Resep Masuk Baru',
+      body: 'Resep ${newRecipe.id} dari $doctorName untuk pasien ${newRecipe.patientName} baru saja masuk.',
+      time: 'Baru saja',
+      isRead: false,
+      type: 'resep',
+    ));
+
+    return newRecipe;
   }
 
   /// Patient buys medicine directly without doctor prescription

@@ -7,6 +7,7 @@ import 'package:giat/screens/apotek/pesanan/apotek_detail_pesanan_screen.dart';
 import 'package:giat/screens/apotek/resep/apotek_detail_resep_screen.dart';
 import 'package:giat/screens/apotek/obat/apotek_obat_screen.dart';
 import 'package:giat/screens/apotek/obat/apotek_detail_obat_screen.dart';
+import 'package:giat/screens/apotek/obat/apotek_tambah_obat_screen.dart';
 import 'package:giat/screens/apotek/profile/apotek_profile_screen.dart';
 import 'package:giat/screens/apotek/profile/apotek_jam_operasional_screen.dart';
 import 'package:giat/screens/apotek/profile/apotek_area_layanan_screen.dart';
@@ -118,19 +119,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Detail Resep'), findsOneWidget);
-    expect(find.text('Terima Resep'), findsOneWidget);
+    expect(find.text('Informasi Pasien'), findsOneWidget);
+    expect(find.text('Daftar Obat'), findsOneWidget);
+    expect(find.text('Terima Resep'), findsWidgets);
 
-    // Tap Terima Resep
-    await tester.tap(find.text('Terima Resep'));
-    await tester.pumpAndSettle();
-
-    // Verify confirmation modal
-    expect(find.text('Mulai Proses Resep?'), findsOneWidget);
-    expect(find.text('Mulai Proses'), findsOneWidget);
-
-    // Tap Mulai Proses in dialog
-    await tester.tap(find.text('Mulai Proses'));
+    // Tap tombol Terima Resep di bagian bawah
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Terima Resep'));
     await tester.pumpAndSettle();
 
     // Verify recipe is now verified
@@ -141,6 +135,28 @@ void main() {
     expect(matchingOrder.status, ApotekOrderStatus.menunggu);
     expect(matchingOrder.patientName, 'Pasien Uji Coba');
     expect(matchingOrder.items.first.medicineName, 'Candesartan 16 mg');
+  });
+
+  testWidgets('Patient checkout prescription routes to Apotek Resep screen then to Pesanan Menunggu', (tester) async {
+    // 1. Patient completes payment with prescription
+    final newRecipe = ApotekMockData.addRecipeFromCheckout(
+      recipeId: 'RSP-77777',
+      patientName: 'Ahmad Dahlan',
+      patientAddress: 'Jl. Merdeka No. 10',
+      doctorName: 'dr. Andi Pratama',
+      dateText: '31 Agustus 2026',
+    );
+
+    expect(newRecipe.status, ApotekRecipeStatus.belumDiverifikasi);
+    expect(ApotekMockData.recipes.any((r) => r.id == 'RSP-77777'), isTrue);
+
+    // 2. Pharmacy accepts the recipe
+    final createdOrder = ApotekMockData.acceptRecipeAndCreateOrder(newRecipe);
+
+    expect(newRecipe.status, ApotekRecipeStatus.diverifikasi);
+    expect(createdOrder.status, ApotekOrderStatus.menunggu);
+    expect(createdOrder.recipeRef, 'RSP-77777');
+    expect(ApotekMockData.orders.first.id, createdOrder.id);
   });
 
   testWidgets('ApotekPesananScreen filters by status and processes order', (tester) async {
@@ -210,7 +226,7 @@ void main() {
   });
 
   testWidgets('ApotekDetailObatScreen allows adding stock batch', (tester) async {
-    tester.view.physicalSize = const Size(450, 900);
+    tester.view.physicalSize = const Size(450, 950);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
@@ -224,15 +240,42 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Kembali'), findsOneWidget);
     expect(find.text('Detail Obat'), findsOneWidget);
     expect(find.text('Rincian Tambah Stok'), findsOneWidget);
     expect(find.text('Simpan Tambahan Stok'), findsOneWidget);
+    expect(find.text('Riwayat Batch Terakhir'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Simpan Tambahan Stok'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Simpan Tambahan Stok'));
     await tester.pumpAndSettle();
 
     // Verify stock increased
     expect(med.stock, greaterThan(initialStock));
+  });
+
+  testWidgets('ApotekTambahObatScreen renders all sections, preview, and allows adding new medicine', (tester) async {
+    tester.view.physicalSize = const Size(450, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ApotekTambahObatScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kembali'), findsOneWidget);
+    expect(find.text('Tambah Obat Baru'), findsOneWidget);
+    expect(find.textContaining('Gunakan formulir ini HANYA'), findsOneWidget);
+    expect(find.text('Pratinjau Obat'), findsOneWidget);
+    expect(find.text('Identitas & Sediaan'), findsOneWidget);
+    expect(find.text('Stok & Finansial'), findsOneWidget);
+    expect(find.text('Aturan & Catatan Khusus'), findsOneWidget);
+    expect(find.text('Simpan Obat Stok'), findsOneWidget);
+    expect(find.text('Batal & Bersihkan Inputan'), findsOneWidget);
   });
 
   testWidgets('ApotekProfileScreen and sub-screens render properly', (tester) async {

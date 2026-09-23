@@ -11,11 +11,13 @@ import 'apotek_detail_pesanan_screen.dart';
 class ApotekPesananScreen extends StatefulWidget {
   final int initialTabIndex;
   final ValueChanged<int>? onNavigateToTab;
+  final bool? isTopBarVisible;
 
   const ApotekPesananScreen({
     super.key,
     this.initialTabIndex = 0,
     this.onNavigateToTab,
+    this.isTopBarVisible,
   });
 
   @override
@@ -32,6 +34,9 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
   late int _selectedTabIndex;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  bool _internalIsTopBarVisible = true;
+
+  bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _internalIsTopBarVisible;
 
   @override
   void initState() {
@@ -119,13 +124,25 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── 1. Top Curved Green Header with Chat Bubbles ──
-            _buildHeaderSection(topPadding),
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis == Axis.vertical) {
+            final pixels = notification.metrics.pixels;
+            if (pixels > 20) {
+              if (_internalIsTopBarVisible) setState(() => _internalIsTopBarVisible = false);
+            } else if (pixels <= 5) {
+              if (!_internalIsTopBarVisible) setState(() => _internalIsTopBarVisible = true);
+            }
+          }
+          return false;
+        },
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── 1. Top Curved Green Header with Chat Bubbles ──
+              _buildHeaderSection(topPadding),
 
             const SizedBox(height: 16),
 
@@ -173,8 +190,9 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ───────────────────────────────────────────────────────────────────────────
   // HEADER SECTION (Green Gradient + Topography + Action Pill + Chat Bubbles)
@@ -205,88 +223,10 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(20, topPadding + 6, 20, 42),
+              padding: EdgeInsets.fromLTRB(20, topPadding + 60, 20, 42),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top Right Action Pill (Bell & Profile)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Stack(
-                              children: [
-                                IconButton(
-                                  constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.all(4),
-                                  icon: const Icon(
-                                    Icons.notifications_none_rounded,
-                                    size: 22,
-                                    color: Color(0xFF1F2937),
-                                  ),
-                                  onPressed: () {
-                                    Navigator.of(context)
-                                        .push(
-                                          MaterialPageRoute(
-                                            builder: (_) => const ApotekNotifikasiScreen(),
-                                          ),
-                                        )
-                                        .then((_) => setState(() {}));
-                                  },
-                                ),
-                                if (unreadNotifs > 0)
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFDC2626),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                widget.onNavigateToTab?.call(4);
-                              },
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF044E2F),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 14),
-
                   // Chat Bubble 1 (Left Aligned - White Bubble)
                   Align(
                     alignment: Alignment.centerLeft,

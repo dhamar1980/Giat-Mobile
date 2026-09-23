@@ -31,6 +31,7 @@ class DokterHomeScreen extends StatefulWidget {
 class _DokterHomeScreenState extends State<DokterHomeScreen>
     with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
+  bool _isTopBarVisible = true;
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _activitySummaryKey = GlobalKey();
 
@@ -130,26 +131,138 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _buildHomeTab(),
-          DokterKonsultasiScreen(
-            onProfileTap: () => setState(() => _selectedIndex = 4),
-          ),
-          DokterPasienScreen(
-            onProfileTap: () => setState(() => _selectedIndex = 4),
-          ),
-          DokterJadwalScreen(
-            onProfileTap: () => setState(() => _selectedIndex = 4),
-          ),
-          DokterProfileScreen(
-            doctorName: widget.doctorName,
-            onLogout: () => Navigator.of(context).pop(),
-          ),
-        ],
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis == Axis.vertical) {
+            final pixels = notification.metrics.pixels;
+            if (pixels > 20) {
+              if (_isTopBarVisible) setState(() => _isTopBarVisible = false);
+            } else if (pixels <= 5) {
+              if (!_isTopBarVisible) setState(() => _isTopBarVisible = true);
+            }
+          }
+          return false;
+        },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: [
+                  _buildHomeTab(),
+                  DokterKonsultasiScreen(
+                    onProfileTap: () => setState(() {
+                      _selectedIndex = 4;
+                      _isTopBarVisible = true;
+                    }),
+                  ),
+                  DokterPasienScreen(
+                    onProfileTap: () => setState(() {
+                      _selectedIndex = 4;
+                      _isTopBarVisible = true;
+                    }),
+                  ),
+                  DokterJadwalScreen(
+                    onProfileTap: () => setState(() {
+                      _selectedIndex = 4;
+                      _isTopBarVisible = true;
+                    }),
+                  ),
+                  DokterProfileScreen(
+                    doctorName: widget.doctorName,
+                    onLogout: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            // Floating Topbar overlay (hidden on Profile tab 4)
+            if (_selectedIndex != 4)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: AnimatedSlide(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                    offset: _isTopBarVisible ? Offset.zero : const Offset(0, -1.2),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: _isTopBarVisible ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: !_isTopBarVisible,
+                        child: _buildTopBar(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, right: 20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(4),
+              icon: const Icon(
+                Icons.notifications_none_rounded,
+                size: 22,
+                color: Color(0xFF1F2937),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedIndex = 4;
+                  _isTopBarVisible = true;
+                });
+              },
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF044E2F),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  size: 20,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -234,63 +347,10 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPadding + 8, 20, 26),
+            padding: EdgeInsets.fromLTRB(20, topPadding + 62, 20, 26),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Action Pill (Bell & Profile)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(4),
-                            icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF1F2937)),
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() => _selectedIndex = 4);
-                            },
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF044E2F),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 14),
-
                 // Chat Bubble Left (Selamat Datang Kembali) - White Background
                 Align(
                   alignment: Alignment.centerLeft,
@@ -1100,7 +1160,10 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     final isSelected = _selectedIndex == index;
     return GestureDetector(
       onTap: () {
-        setState(() => _selectedIndex = index);
+        setState(() {
+          _selectedIndex = index;
+          _isTopBarVisible = true;
+        });
       },
       behavior: HitTestBehavior.opaque,
       child: Column(
@@ -1141,7 +1204,10 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     final isSelected = _selectedIndex == 2;
     return GestureDetector(
       onTap: () {
-        setState(() => _selectedIndex = 2);
+        setState(() {
+          _selectedIndex = 2;
+          _isTopBarVisible = true;
+        });
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,

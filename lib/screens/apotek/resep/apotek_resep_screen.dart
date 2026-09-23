@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
+import '../notifikasi/apotek_notifikasi_screen.dart';
 import 'apotek_detail_resep_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DAFTAR RESEP MASUK APOTEK (Figma Node: 1100-21623)
+// DAFTAR RESEP MASUK APOTEK (Revisi Sesuai Screenshot Desain GIAT)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ApotekResepScreen extends StatefulWidget {
   final int initialTabIndex;
   final Function(int targetTab)? onNavigateToOrderTab;
+  final VoidCallback? onOpenProfile;
+  final bool? isTopBarVisible;
 
   const ApotekResepScreen({
     super.key,
     this.initialTabIndex = 0,
     this.onNavigateToOrderTab,
+    this.onOpenProfile,
+    this.isTopBarVisible,
   });
 
   @override
@@ -25,40 +30,19 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
   static const _darkGreen = Color(0xFF065A37);
   static const _buttonDarkGreen = Color(0xFF044E2F);
   static const _bgColor = Color(0xFFF8FAF9);
-  static const _border = Color(0xFFE2E8F0);
+  static const _cardBorder = Color(0xFFE2E8F0);
+  static const _innerBorder = Color(0xFFCBD5E1);
 
-  late int _selectedTabIndex;
-  final TextEditingController _searchCtrl = TextEditingController();
-  String _searchQuery = '';
+  bool _showAllHistory = false;
+  bool _internalIsTopBarVisible = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _selectedTabIndex = widget.initialTabIndex;
-  }
+  bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _internalIsTopBarVisible;
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  List<ApotekRecipe> _getFilteredRecipes() {
+  List<ApotekRecipe> _getIncomingRecipes() {
     final all = ApotekMockData.recipes;
-    final byStatus = all.where((r) {
-      if (_selectedTabIndex == 0) return true; // Semua
-      if (_selectedTabIndex == 1) return r.status == ApotekRecipeStatus.belumDiverifikasi;
-      if (_selectedTabIndex == 2) return r.status == ApotekRecipeStatus.diverifikasi;
-      return r.status == ApotekRecipeStatus.selesai;
-    }).toList();
-
-    if (_searchQuery.trim().isEmpty) return byStatus;
-
-    return byStatus.where((r) {
-      return r.id.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          r.patientName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          r.doctorName.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+    if (_showAllHistory) return all;
+    // Tampilkan resep masuk yang belum diverifikasi / belum diterima
+    return all.where((r) => r.status == ApotekRecipeStatus.belumDiverifikasi).toList();
   }
 
   void _openDetail(ApotekRecipe recipe) {
@@ -68,191 +52,444 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
           recipe: recipe,
           onStatusChanged: () => setState(() {}),
           onNavigateToOrderTab: widget.onNavigateToOrderTab,
+          onOpenProfile: widget.onOpenProfile,
         ),
       ),
     ).then((_) => setState(() {}));
   }
 
-  /// Figma Node 1100:23057: Pop Up Validasi Mulai Proses Resep
-  void _showAcceptRecipeDialog(ApotekRecipe recipe) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Mulai Proses Resep?',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        content: Text(
-          'Pesanan ${recipe.id} akan dipindahkan ke daftar resep yang sedang diproses. Pastikan resep dan ketersediaan obat telah diperiksa.',
-          style: GoogleFonts.inter(
-            fontSize: 13.5,
-            color: const Color(0xFF475569),
-            height: 1.45,
-          ),
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF64748B),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            ),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _buttonDarkGreen,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              final newOrder = ApotekMockData.acceptRecipeAndCreateOrder(recipe);
-              setState(() {});
+  void _handleAcceptRecipe(ApotekRecipe recipe) {
+    final newOrder = ApotekMockData.acceptRecipeAndCreateOrder(recipe);
+    setState(() {});
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Resep ${recipe.id} diverifikasi! Masuk ke Pesanan MENUNGGU (${newOrder.id}).',
-                  ),
-                  backgroundColor: _darkGreen,
-                  behavior: SnackBarBehavior.floating,
-                  action: SnackBarAction(
-                    label: 'Buka Pesanan',
-                    textColor: const Color(0xFF86EFAC),
-                    onPressed: () {
-                      widget.onNavigateToOrderTab?.call(0);
-                    },
-                  ),
-                ),
-              );
-            },
-            child: Text(
-              'Mulai Proses',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Resep ${recipe.id} berhasil diterima! Masuk ke Pesanan Menunggu (${newOrder.id}).',
+        ),
+        backgroundColor: _darkGreen,
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Buka Pesanan',
+          textColor: const Color(0xFF86EFAC),
+          onPressed: () {
+            widget.onNavigateToOrderTab?.call(0);
+          },
+        ),
       ),
     );
+
+    // Otomatis alihkan ke Pesanan Menunggu setelah klik Terima Resep
+    widget.onNavigateToOrderTab?.call(0);
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _getFilteredRecipes();
-
-    final allCount = ApotekMockData.recipes.length;
-    final belumCount = ApotekMockData.recipes.where((r) => r.status == ApotekRecipeStatus.belumDiverifikasi).length;
-    final verifCount = ApotekMockData.recipes.where((r) => r.status == ApotekRecipeStatus.diverifikasi).length;
-    final selesaiCount = ApotekMockData.recipes.where((r) => r.status == ApotekRecipeStatus.selesai).length;
+    final topPadding = MediaQuery.of(context).padding.top;
+    final incomingList = _getIncomingRecipes();
 
     return Scaffold(
       backgroundColor: _bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'Daftar Resep Masuk',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFF1F5F9), height: 1),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis == Axis.vertical) {
+            final pixels = notification.metrics.pixels;
+            if (pixels > 20) {
+              if (_internalIsTopBarVisible) setState(() => _internalIsTopBarVisible = false);
+            } else if (pixels <= 5) {
+              if (!_internalIsTopBarVisible) setState(() => _internalIsTopBarVisible = true);
+            }
+          }
+          return false;
+        },
+        child: Stack(
           children: [
-            // Top chat bubble header (Figma Node 1100:21623)
-            Container(
-              width: double.infinity,
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+            // Background Topography Curves
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _ResepTopographyPainter(),
+              ),
+            ),
+
+            SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                    ),
-                    child: Row(
+                  // ── 1. Top Curved Green Header with Chat Bubbles (Screenshot 1) ──
+                  _buildHeaderSection(topPadding),
+
+                  const SizedBox(height: 18),
+
+                  // ── 2. Content Section ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.medical_services_rounded, size: 18, color: Color(0xFF2563EB)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Selamat datang kembali! Yuk, cek dan proses resep masuk kamu sekarang di menu Resep. ✨✨',
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              color: const Color(0xFF1E40AF),
-                              fontWeight: FontWeight.w500,
-                              height: 1.35,
-                            ),
+                        // Section Title: "Daftar Resep Masuk" (Screenshot 1)
+                        Text(
+                          'Daftar Resep Masuk',
+                          style: GoogleFonts.inter(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF0F172A),
                           ),
                         ),
+
+                        const SizedBox(height: 14),
+
+                        // Recipe List
+                        if (incomingList.isEmpty)
+                          _buildEmptyState()
+                        else
+                          ...incomingList.map((recipe) => Padding(
+                                padding: const EdgeInsets.only(bottom: 18),
+                                child: _buildRecipeCard(recipe),
+                              )),
+
+                        const SizedBox(height: 36),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  // Search Bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (val) => setState(() => _searchQuery = val),
-                      decoration: InputDecoration(
-                        hintText: 'Cari nomor resep, pasien, atau dokter...',
-                        hintStyle: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 22),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // HEADER SECTION (Mockup Screenshot 1: Green Gradient + 2 Chat Bubbles + Pill)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildHeaderSection(double topPadding) {
+    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
+
+    return ClipPath(
+      clipper: _ResepHeaderClipper(),
+      child: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF22C55E),
+              Color(0xFF16A34A),
+              Color(0xFF065A37),
+            ],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _ResepHeaderCurvePainter(),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(20, topPadding + 60, 20, 42),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Chat Bubble 1 (Left Aligned - White Bubble)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildChatBubble(
+                      isLeft: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Selamat datang kembali! Yuk, cek dan proses resep masuk kamu sekarang di menu Resep.',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF065A37),
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Spacer(),
+                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 12),
 
-                  // Segmented Tabs with Count Badges (Semua, Belum Diverifikasi, Diverifikasi, Selesai)
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
+                  // Chat Bubble 2 (Right Aligned - White Bubble)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildChatBubble(
+                      isLeft: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Kelola dan proses resep yang masuk ✨✨',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF065A37),
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Spacer(),
+                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatBubble({
+    required bool isLeft,
+    required Widget child,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          constraints: BoxConstraints(
+            maxWidth: isLeft ? 330 : 280,
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 14, 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: isLeft ? const Radius.circular(4) : const Radius.circular(16),
+              bottomRight: isLeft ? const Radius.circular(16) : const Radius.circular(4),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+        // WhatsApp style speech bubble tail
+        Positioned(
+          bottom: 0,
+          left: isLeft ? -7 : null,
+          right: isLeft ? null : -7,
+          child: CustomPaint(
+            size: const Size(8, 12),
+            painter: _ChatTailPainter(isLeft: isLeft),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // RECIPE CARD (Mockup Screenshot 1)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildRecipeCard(ApotekRecipe r) {
+    final isPending = r.status == ApotekRecipeStatus.belumDiverifikasi;
+
+    return GestureDetector(
+      onTap: () => _openDetail(r),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Row: Clipboard Icon + ID & Patient/Doctor + Meta
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Soft mint container with clipboard prescription icon
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD6EFF6),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: _ClipboardPrescriptionIcon(
+                      color: _darkGreen,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // ID, Patient • Doctor, 2 item obat • 10 menit lalu
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        r.id,
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${r.patientName} • ${r.doctorName}',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF334155),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${r.items.length} item obat • ${r.timeText}',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            // Inner Bordered Box for Items & Total
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _innerBorder),
+              ),
+              child: Column(
+                children: [
+                  ...r.items.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final item = entry.value;
+
+                    return Column(
                       children: [
-                        _buildStatusTab(0, 'Semua', '$allCount'),
-                        const SizedBox(width: 8),
-                        _buildStatusTab(1, 'Belum Diverifikasi', '$belumCount'),
-                        const SizedBox(width: 8),
-                        _buildStatusTab(2, 'Diverifikasi', '$verifCount'),
-                        const SizedBox(width: 8),
-                        _buildStatusTab(3, 'Selesai', '$selesaiCount'),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.medicineName,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      item.formAndPack,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+
+                              // Green Pill Badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _darkGreen,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  item.qtyText,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (idx < r.items.length - 1)
+                          const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+                      ],
+                    );
+                  }),
+
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+
+                  // Total Row
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF334155),
+                          ),
+                        ),
+                        Text(
+                          '${r.items.length} item obat',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -260,267 +497,268 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
               ),
             ),
 
-            // Recipe List
-            Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.note_alt_outlined, size: 48, color: Color(0xFF94A3B8)),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Tidak ada resep pada kategori ini.',
-                            style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(20),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        final recipe = filtered[index];
-                        return _buildRecipeCard(recipe);
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            const SizedBox(height: 14),
 
-  Widget _buildStatusTab(int index, String title, String count) {
-    final isSelected = _selectedTabIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTabIndex = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? _darkGreen : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.inter(
-                fontSize: 12.5,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? Colors.white : const Color(0xFF64748B),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                count,
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? Colors.white : const Color(0xFF475569),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecipeCard(ApotekRecipe r) {
-    String badgeText;
-    Color badgeBg;
-    Color badgeColor;
-
-    switch (r.status) {
-      case ApotekRecipeStatus.belumDiverifikasi:
-        badgeText = 'Belum Diverifikasi';
-        badgeBg = const Color(0xFFFEF3C7);
-        badgeColor = const Color(0xFFB45309);
-        break;
-      case ApotekRecipeStatus.diverifikasi:
-        badgeText = 'Diverifikasi';
-        badgeBg = const Color(0xFFDCFCE7);
-        badgeColor = const Color(0xFF15803D);
-        break;
-      case ApotekRecipeStatus.selesai:
-        badgeText = 'Selesai';
-        badgeBg = const Color(0xFFF1F5F9);
-        badgeColor = const Color(0xFF64748B);
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: Recipe ID & Status Badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0F2FE),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.description_rounded, color: Color(0xFF0369A1), size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            r.id,
-                            style: GoogleFonts.inter(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF0F172A),
-                            ),
-                          ),
-                          Text(
-                            '${r.patientName} • ${r.doctorName}',
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              color: const Color(0xFF475569),
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: badgeBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  badgeText,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: badgeColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const Divider(height: 20),
-
-          // Items summary
-          ...r.items.map((it) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        it.medicineName,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1E293B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      it.qtyText,
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-
-          const SizedBox(height: 8),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'Total: ${r.items.length} item obat  •  ${r.timeText}',
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    color: const Color(0xFF94A3B8),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (r.status == ApotekRecipeStatus.belumDiverifikasi)
-                ElevatedButton(
+            // Action Button: "Terima Resep"
+            if (isPending)
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _buttonDarkGreen,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  onPressed: () => _showAcceptRecipeDialog(r),
+                  onPressed: () => _handleAcceptRecipe(r),
                   child: Text(
                     'Terima Resep',
-                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                )
-              else
-                OutlinedButton(
+                ),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _darkGreen,
-                    side: const BorderSide(color: _darkGreen),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    side: const BorderSide(color: _darkGreen, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   onPressed: () => _openDetail(r),
                   child: Text(
-                    'Lihat Detail',
-                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    'Lihat Detail Resep (Sudah Diterima)',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-            ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.assignment_outlined, size: 36, color: Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Tidak ada resep masuk baru',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF334155),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Semua resep dokter telah diterima dan dipindahkan ke menu Pesanan Menunggu.',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: const Color(0xFF64748B),
+              height: 1.35,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 18),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _buttonDarkGreen,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              widget.onNavigateToOrderTab?.call(0);
+            },
+            child: Text(
+              'Buka Menu Pesanan',
+              style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLIPPER & PAINTERS FOR RESEP SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ClipboardPrescriptionIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _ClipboardPrescriptionIcon({
+    this.size = 28,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            child: Icon(
+              Icons.assignment_outlined,
+              size: size * 0.92,
+              color: color,
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Transform.rotate(
+              angle: -0.785, // -45 deg
+              child: Icon(
+                Icons.medication_rounded,
+                size: size * 0.48,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResepHeaderClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.lineTo(0, size.height - 35);
+    path.cubicTo(
+      size.width * 0.25,
+      size.height + 18,
+      size.width * 0.65,
+      size.height - 45,
+      size.width,
+      size.height - 25,
+    );
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _ResepHeaderCurvePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.08)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+
+    for (int i = 0; i < 4; i++) {
+      final path = Path();
+      final yOffset = size.height * (0.35 + (i * 0.18));
+      path.moveTo(-20, yOffset);
+      path.cubicTo(
+        size.width * 0.3,
+        yOffset - 30,
+        size.width * 0.7,
+        yOffset + 25,
+        size.width + 20,
+        yOffset - 20,
+      );
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _ChatTailPainter extends CustomPainter {
+  final bool isLeft;
+  const _ChatTailPainter({required this.isLeft});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    if (isLeft) {
+      path.moveTo(size.width, 0);
+      path.lineTo(size.width, size.height);
+      path.lineTo(0, size.height);
+      path.close();
+    } else {
+      path.moveTo(0, 0);
+      path.lineTo(0, size.height);
+      path.lineTo(size.width, size.height);
+      path.close();
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _ResepTopographyPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF10B981).withValues(alpha: 0.05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    for (int i = 0; i < 10; i++) {
+      final path = Path();
+      final yOffset = 40.0 + (i * 90);
+      path.moveTo(0, yOffset);
+      path.cubicTo(
+        size.width * 0.35,
+        yOffset - 30,
+        size.width * 0.65,
+        yOffset + 40,
+        size.width,
+        yOffset - 10,
+      );
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

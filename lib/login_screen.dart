@@ -24,9 +24,9 @@ const _demoUsers = [
   {'email': 'dokter@giat.id', 'password': '123456', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
 
   // 3. Apoteker (email "apoteker", password "apoteker")
-  {'email': 'apoteker', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Budi'},
-  {'email': 'apoteker@giat.id', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Budi'},
-  {'email': 'apoteker@giat.id', 'password': '123456', 'role': 'apoteker', 'name': 'Budi'},
+  {'email': 'apoteker', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
+  {'email': 'apoteker@giat.id', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
+  {'email': 'apoteker@giat.id', 'password': '123456', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

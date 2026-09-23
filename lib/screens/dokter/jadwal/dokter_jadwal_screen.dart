@@ -12,10 +12,12 @@ import '../profile/dokter_profile_screen.dart';
 
 class DokterJadwalScreen extends StatefulWidget {
   final VoidCallback? onProfileTap;
+  final bool? isTopBarVisible;
 
   const DokterJadwalScreen({
     super.key,
     this.onProfileTap,
+    this.isTopBarVisible,
   });
 
   @override
@@ -29,6 +31,9 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
   static const _dateInactiveBg = Color(0xFFDDF2FD);
 
   int _selectedDayIndex = 0;
+  bool _isTopBarVisible = true;
+
+  bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
   final List<String> _days = [
     'Senin, 01 Agu',
     'Selasa, 02 Agu',
@@ -67,33 +72,34 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: Stack(
-        children: [
-          // ── Background Topography Wave ──
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _DokterJadwalTopographyPainter(),
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis == Axis.vertical) {
+            final pixels = notification.metrics.pixels;
+            if (pixels > 20) {
+              if (_isTopBarVisible) setState(() => _isTopBarVisible = false);
+            } else if (pixels <= 5) {
+              if (!_isTopBarVisible) setState(() => _isTopBarVisible = true);
+            }
+          }
+          return false;
+        },
+        child: Stack(
+          children: [
+            // ── Background Topography Wave ──
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _DokterJadwalTopographyPainter(),
+              ),
             ),
-          ),
 
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── Top Header Bar: Notification & Profile Capsule ──
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildNotificationProfileCapsule(),
-                    ],
-                  ),
-                ),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 52),
 
-                const SizedBox(height: 2),
-
-                // ── Title Pill: "Jadwal Pasien" ──
+                  // ── Title Pill: "Jadwal Pasien" ──
                 Center(
                   child: _buildTitlePill('Jadwal Pasien'),
                 ),
@@ -186,6 +192,7 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

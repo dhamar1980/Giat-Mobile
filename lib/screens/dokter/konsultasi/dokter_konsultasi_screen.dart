@@ -11,10 +11,12 @@ import 'dokter_room_chat_screen.dart';
 
 class DokterKonsultasiScreen extends StatefulWidget {
   final VoidCallback? onProfileTap;
+  final bool? isTopBarVisible;
 
   const DokterKonsultasiScreen({
     super.key,
     this.onProfileTap,
+    this.isTopBarVisible,
   });
 
   @override
@@ -31,6 +33,9 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
   int _selectedFilterIndex = 0; // 0: Semua, 1: Terjadwal, 2: Selesai
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  bool _isTopBarVisible = true;
+
+  bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
 
   @override
   void dispose() {
@@ -89,36 +94,39 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: Stack(
-        children: [
-          // ── Wavy Topography Background ──
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 240,
-            child: CustomPaint(
-              painter: _KonsultasiHeaderTopographyPainter(),
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis == Axis.vertical) {
+            final pixels = notification.metrics.pixels;
+            if (pixels > 20) {
+              if (_isTopBarVisible) setState(() => _isTopBarVisible = false);
+            } else if (pixels <= 5) {
+              if (!_isTopBarVisible) setState(() => _isTopBarVisible = true);
+            }
+          }
+          return false;
+        },
+        child: Stack(
+          children: [
+            // ── Wavy Topography Background ──
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 240,
+              child: CustomPaint(
+                painter: _KonsultasiHeaderTopographyPainter(),
+              ),
             ),
-          ),
 
-          SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // ── Top Header Bar: Notification & Profile Capsule ──
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildNotificationProfileCapsule(),
-                    ],
-                  ),
-                ),
+            SafeArea(
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 52),
 
-                // ── Centered Pill Badge: "Daftar Konsultasi" ──
+                  // ── Centered Pill Badge: "Daftar Konsultasi" ──
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
                   decoration: BoxDecoration(
@@ -211,6 +219,9 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
                           ),
                         )
                       : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
                           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                           itemCount: filtered.length,
                           separatorBuilder: (context, _) => const SizedBox(height: 14),
@@ -224,6 +235,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

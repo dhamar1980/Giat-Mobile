@@ -11,10 +11,12 @@ import 'dokter_detail_pasien_screen.dart';
 
 class DokterPasienScreen extends StatefulWidget {
   final VoidCallback? onProfileTap;
+  final bool? isTopBarVisible;
 
   const DokterPasienScreen({
     super.key,
     this.onProfileTap,
+    this.isTopBarVisible,
   });
 
   @override
@@ -28,6 +30,9 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
 
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  bool _isTopBarVisible = true;
+
+  bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
 
   @override
   void dispose() {
@@ -58,32 +63,33 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: Stack(
-        children: [
-          // ── Topography Wave Background ──
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _PasienTopographyPainter(),
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis == Axis.vertical) {
+            final pixels = notification.metrics.pixels;
+            if (pixels > 20) {
+              if (_isTopBarVisible) setState(() => _isTopBarVisible = false);
+            } else if (pixels <= 5) {
+              if (!_isTopBarVisible) setState(() => _isTopBarVisible = true);
+            }
+          }
+          return false;
+        },
+        child: Stack(
+          children: [
+            // ── Topography Wave Background ──
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _PasienTopographyPainter(),
+              ),
             ),
-          ),
 
-          SafeArea(
-            child: Column(
-              children: [
-                // ── Top Bar: Bell Notification & Doctor Profile Capsule ──
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildNotificationProfileCapsule(),
-                    ],
-                  ),
-                ),
+            SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 52),
 
-                const SizedBox(height: 2),
-
-                // ── Title Badge: "Daftar Pasien" ──
+                  // ── Title Badge: "Daftar Pasien" ──
                 _buildTitlePill('Daftar Pasien'),
 
                 const SizedBox(height: 16),
@@ -151,6 +157,7 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

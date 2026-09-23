@@ -1045,19 +1045,32 @@ class _PembayaranTransferBankScreenState extends State<PembayaranTransferBankScr
             height: 48,
             child: ElevatedButton(
               onPressed: () {
-                // If this is a direct purchase (non-prescription or general purchase)
-                // create and route order to selected pharmacy's Menunggu queue
-                ApotekMockData.createDirectOrder(
-                  orderId: widget.orderData.orderNumber.isNotEmpty
-                      ? widget.orderData.orderNumber
-                      : 'ORD-0124',
-                  patientName: widget.orderData.recipientName.isNotEmpty
-                      ? widget.orderData.recipientName
-                      : widget.userName,
-                  patientAddress: widget.orderData.recipientAddress.isNotEmpty
-                      ? widget.orderData.recipientAddress
-                      : 'Jalan Kalimantan No. 37, Sumbersari, Jember',
-                );
+                // Jika pembelian menggunakan resep dokter, masukkan ke antrean Resep Masuk Apotek
+                if (widget.orderData.prescriptionNumber.isNotEmpty) {
+                  ApotekMockData.addRecipeFromCheckout(
+                    recipeId: widget.orderData.prescriptionNumber.startsWith('RSP')
+                        ? widget.orderData.prescriptionNumber
+                        : 'RSP-00125',
+                    patientName: widget.orderData.recipientName.isNotEmpty
+                        ? widget.orderData.recipientName
+                        : widget.userName,
+                    patientAddress: widget.orderData.recipientAddress.isNotEmpty
+                        ? widget.orderData.recipientAddress
+                        : 'Jalan Merpati 45 Madiun',
+                  );
+                } else {
+                  ApotekMockData.createDirectOrder(
+                    orderId: widget.orderData.orderNumber.isNotEmpty
+                        ? widget.orderData.orderNumber
+                        : 'ORD-0124',
+                    patientName: widget.orderData.recipientName.isNotEmpty
+                        ? widget.orderData.recipientName
+                        : widget.userName,
+                    patientAddress: widget.orderData.recipientAddress.isNotEmpty
+                        ? widget.orderData.recipientAddress
+                        : 'Jalan Kalimantan No. 37, Sumbersari, Jember',
+                  );
+                }
 
                 // Navigate to PembayaranBerhasilScreen
                 Navigator.pushReplacement(
