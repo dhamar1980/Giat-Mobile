@@ -157,26 +157,14 @@ class _KonsultasiVideoCallScreenState extends State<KonsultasiVideoCallScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    widget.doctorName,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 16.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Icon(
-                                  Icons.verified_rounded,
-                                  color: Color(0xFF10B981),
-                                  size: 16,
-                                ),
-                              ],
+                            Text(
+                              widget.doctorName,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(

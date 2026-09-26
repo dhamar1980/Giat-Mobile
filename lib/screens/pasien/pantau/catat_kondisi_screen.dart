@@ -1,3 +1,4 @@
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
@@ -761,26 +762,13 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
 class _CatatTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.06)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 7; i++) {
-      final path = Path();
-      final yOffset = 20.0 + (i * 80);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.3,
-        yOffset - 30,
-        size.width * 0.7,
-        yOffset + 40,
-        size.width,
-        yOffset - 15,
-      );
-      canvas.drawPath(path, paint);
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
     }
-  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;

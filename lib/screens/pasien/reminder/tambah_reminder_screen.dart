@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../widgets/giat_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAMBAH REMINDER BARU (Figma Nodes: 771-4931 & 771-5091)
@@ -783,25 +784,12 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
 class _ReminderTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.3;
-
-    for (int i = 0; i < 7; i++) {
-      final path = Path();
-      final yOffset = size.height * 0.15 + (i * 85);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.25,
-        yOffset - 40,
-        size.width * 0.7,
-        yOffset + 50,
-        size.width,
-        yOffset - 20,
-      );
-      canvas.drawPath(path, paint);
-    }
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
   }
 
   @override

@@ -10,6 +10,7 @@ import 'screens/pasien/obat/daftar_obat_screen.dart';
 import 'screens/pasien/profile/profile_pasien_screen.dart';
 import 'screens/pasien/reminder/reminder_list_screen.dart';
 import 'screens/pasien/widgets/pasien_bottom_navbar.dart';
+import 'widgets/giat_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER LAYOUT GIAT (Persistent TopBar, Content Switcher, & Navbar)
@@ -92,6 +93,11 @@ class _MasterLayoutState extends State<MasterLayout> {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // ── 0. BACKGROUND TOPOGRAPHY & GRADIENT (Figma 1018:5009) ──
+          const Positioned.fill(
+            child: GiatBackground(),
+          ),
+
           // ── 1. CONTENT: Mentok ke atas (Full Bleed) ──
           Positioned.fill(
             child: IndexedStack(

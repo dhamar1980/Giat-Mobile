@@ -5,6 +5,7 @@ import '../../../kebijakan_privasi_screen.dart';
 import '../../../login_screen.dart';
 import 'kata_sandi_keamanan_screen.dart';
 import 'edit_informasi_pribadi_screen.dart';
+import '../../../widgets/giat_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFIL PASIEN - GIAT HEALTHCARE
@@ -1282,36 +1283,12 @@ class _HeaderWaveOverlayPainter extends CustomPainter {
 class _ProfileTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final wavePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.15
-      ..strokeCap = StrokeCap.round;
-
-    const baseColor = Color(0xFF10B981);
-
-    // Subtle wave contour lines across the middle and lower right
-    final opacities = [0.06, 0.08, 0.10, 0.12, 0.09, 0.07];
-
-    for (int i = 0; i < opacities.length; i++) {
-      wavePaint.color = baseColor.withValues(alpha: opacities[i]);
-      final y0 = (h * 0.42) + (i * 38.0);
-
-      final path = Path()
-        ..moveTo(-30, y0)
-        ..cubicTo(
-          w * 0.30,
-          y0 - 24,
-          w * 0.65,
-          y0 + 35,
-          w + 30,
-          y0 - 15,
-        );
-
-      canvas.drawPath(path, wavePaint);
-    }
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
   }
 
   @override

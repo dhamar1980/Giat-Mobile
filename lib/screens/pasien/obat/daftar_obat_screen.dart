@@ -6,6 +6,7 @@ import 'resep_dokter_screen.dart';
 import 'pembelian_obat_screen.dart';
 import 'lacak_obat_screen.dart';
 import 'riwayat_obat_screen.dart';
+import '../../../widgets/giat_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN OBAT & RESEP PASIEN (Figma Screen: Tab Obat Pasien)
@@ -369,47 +370,13 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Resep Dokter Spesialis',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 15.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: const Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF065A37),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.calendar_today_rounded,
-                                            size: 11,
-                                            color: Colors.white,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Hari ini, 14:00 WIB',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 10.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  'Resep Dokter Spesialis',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0F172A),
+                                  ),
                                 ),
                                 const SizedBox(height: 5),
                                 Text(
@@ -1183,25 +1150,12 @@ class _CardCornerContoursPainter extends CustomPainter {
 class _ObatTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.06)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 8; i++) {
-      final path = Path();
-      final yOffset = size.height * 0.20 + (i * 90);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.3,
-        yOffset - 35,
-        size.width * 0.7,
-        yOffset + 45,
-        size.width,
-        yOffset - 15,
-      );
-      canvas.drawPath(path, paint);
-    }
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
   }
 
   @override

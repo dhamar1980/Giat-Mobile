@@ -6,6 +6,7 @@ import 'dokter_detail_screen.dart';
 import 'jadwalkan_konsultasi_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
+import '../../../widgets/giat_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI: DAFTAR DOKTER & KONSULTASI SAYA (Sesuai Desain Figma)
@@ -567,41 +568,13 @@ class _DokterListScreenState extends State<DokterListScreen> {
         // ── 1. Section: Konsultasi Mendatang ──
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Konsultasi Mendatang',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              // Subtle simulation switch for testing empty vs active state
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _hasUpcomingConsultation = !_hasUpcomingConsultation;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _hasUpcomingConsultation ? 'Status: Aktif' : 'Status: Kosong',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF475569),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          child: Text(
+            'Konsultasi Mendatang',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -774,23 +747,13 @@ class _DokterListScreenState extends State<DokterListScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Dr. Anisa Putri',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 15.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: const Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Icon(
-                                      Icons.check_circle_rounded,
-                                      size: 16,
-                                      color: Color(0xFF16A34A),
-                                    ),
-                                  ],
+                                Text(
+                                  'Dr. Anisa Putri',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0F172A),
+                                  ),
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
@@ -1377,25 +1340,13 @@ class _DokterListScreenState extends State<DokterListScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                doc['name'],
-                                style: GoogleFonts.inter(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                              if (doc['isVerified'] == true) ...[
-                                const SizedBox(width: 6),
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 16,
-                                  color: Color(0xFF16A34A),
-                                ),
-                              ],
-                            ],
+                          Text(
+                            doc['name'],
+                            style: GoogleFonts.inter(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
+                            ),
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -1615,25 +1566,12 @@ class _DokterListScreenState extends State<DokterListScreen> {
 class _KonsultasiTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.05)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 7; i++) {
-      final path = Path();
-      final yOffset = size.height * 0.25 + (i * 85);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.3,
-        yOffset - 40,
-        size.width * 0.7,
-        yOffset + 50,
-        size.width,
-        yOffset - 20,
-      );
-      canvas.drawPath(path, paint);
-    }
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
   }
 
   @override

@@ -39,7 +39,7 @@ class _PragiHomeViewState extends State<PragiHomeView> {
       valueListenable: PragiService().historyNotifier,
       builder: (context, history, _) {
         final latest = history.isNotEmpty ? history.first : null;
-        final pastHistory = history.length > 1 ? history.sublist(1) : <PragiScreeningResult>[];
+        final pastHistory = history.length > 1 ? history.sublist(1).take(3).toList() : <PragiScreeningResult>[];
 
         return Column(
           children: [
@@ -240,41 +240,14 @@ class _PragiHomeViewState extends State<PragiHomeView> {
 
                             const SizedBox(height: 24),
 
-                            // Section: Riwayat Skrining
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Riwayat Skrining',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Menampilkan semua riwayat skrining.')),
-                                    );
-                                  },
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Lihat Semua Riwayat',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: const Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      const Icon(Icons.arrow_circle_right_outlined, size: 16, color: Color(0xFF0F172A)),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            // Section: Riwayat Skrining (Maksimal 3 riwayat terakhir)
+                            Text(
+                              'Riwayat Skrining',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF0F172A),
+                              ),
                             ),
 
                             const SizedBox(height: 12),
@@ -349,37 +322,14 @@ class _PragiHomeViewState extends State<PragiHomeView> {
               color: _darkGreen,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Halo, Aku PRAGI 👋👋\nAku AI yang membantu kamu melakukan skrining awal risiko CKD lohh...',
-                  style: GoogleFonts.inter(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '12.00',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          color: const Color(0xFF86EFAC),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.done_all, size: 14, color: Color(0xFF86EFAC)),
-                    ],
-                  ),
-                ),
-              ],
+            child: Text(
+              'Halo, Aku PRAGI 👋👋\nAku AI yang membantu kamu melakukan skrining awal risiko CKD lohh...',
+              style: GoogleFonts.inter(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                height: 1.35,
+              ),
             ),
           ),
         ),
@@ -422,36 +372,13 @@ class _PragiHomeViewState extends State<PragiHomeView> {
                     bottomLeft: Radius.circular(4),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Siap mengetahui gambaran risiko kamu?',
-                      style: GoogleFonts.inter(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '12.00',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              color: const Color(0xFF86EFAC),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.done_all, size: 14, color: Color(0xFF86EFAC)),
-                        ],
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Siap mengetahui gambaran risiko kamu?',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),

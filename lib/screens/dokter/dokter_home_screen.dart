@@ -11,6 +11,7 @@ import 'jadwal/dokter_jadwal_screen.dart';
 import 'profile/dokter_profile_screen.dart';
 import 'resep/dokter_review_resep_sheet.dart';
 import '../../login_screen.dart';
+import '../../widgets/giat_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOKTER HOME SCREEN (Figma Node: 1008-17556)
@@ -1349,25 +1350,12 @@ class _DokterChatBubblePainter extends CustomPainter {
 class _DokterTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withOpacity(0.06)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 6; i++) {
-      final path = Path();
-      final yOffset = size.height * 0.4 + (i * 70);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.3,
-        yOffset - 30,
-        size.width * 0.7,
-        yOffset + 40,
-        size.width,
-        yOffset - 10,
-      );
-      canvas.drawPath(path, paint);
-    }
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
   }
 
   @override

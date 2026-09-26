@@ -9,6 +9,7 @@ import 'resep/apotek_resep_screen.dart';
 import 'obat/apotek_obat_screen.dart';
 import 'profile/apotek_profile_screen.dart';
 import '../../login_screen.dart';
+import '../../widgets/giat_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // APOTEKER HOME SCREEN (Figma Node: 1100-18253)
@@ -935,25 +936,12 @@ class _CardWavePainter extends CustomPainter {
 class _ApotekerTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withOpacity(0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 10; i++) {
-      final path = Path();
-      final yOffset = size.height * 0.35 + (i * 65);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.3,
-        yOffset - 25,
-        size.width * 0.65,
-        yOffset + 35,
-        size.width,
-        yOffset - 15,
-      );
-      canvas.drawPath(path, paint);
-    }
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
   }
 
   @override

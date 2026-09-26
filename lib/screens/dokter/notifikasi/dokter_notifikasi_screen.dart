@@ -1,3 +1,4 @@
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
@@ -449,47 +450,13 @@ class DokterNotifikasiScreen extends StatelessWidget {
 class _NotifikasiTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final wavePaint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.16)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.25
-      ..strokeCap = StrokeCap.round;
-
-    final w = size.width;
-    final h = size.height;
-
-    // 1. Kurva Gelombang Atas (Top Contours di sekitar Header)
-    for (int i = 0; i < 5; i++) {
-      final path = Path();
-      final yOffset = -25.0 + (i * 24.0);
-      path.moveTo(-20, yOffset + 35);
-      path.cubicTo(
-        w * 0.30,
-        yOffset + 60,
-        w * 0.65,
-        yOffset - 10,
-        w + 30,
-        yOffset + 25,
-      );
-      canvas.drawPath(path, wavePaint);
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
     }
-
-    // 2. Kurva Gelombang Bawah (Bottom Contours mengalir ke sudut bawah)
-    for (int i = 0; i < 8; i++) {
-      final path = Path();
-      final yOffset = h * 0.52 + (i * 32.0);
-      path.moveTo(-30, yOffset + 30);
-      path.cubicTo(
-        w * 0.35,
-        yOffset + 65,
-        w * 0.70,
-        yOffset - 15,
-        w + 40,
-        yOffset + 40,
-      );
-      canvas.drawPath(path, wavePaint);
-    }
-  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;

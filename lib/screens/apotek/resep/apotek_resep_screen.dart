@@ -1,3 +1,4 @@
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
@@ -697,26 +698,13 @@ class _ChatTailPainter extends CustomPainter {
 class _ResepTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.05)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 10; i++) {
-      final path = Path();
-      final yOffset = 40.0 + (i * 90);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.35,
-        yOffset - 30,
-        size.width * 0.65,
-        yOffset + 40,
-        size.width,
-        yOffset - 10,
-      );
-      canvas.drawPath(path, paint);
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
     }
-  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;

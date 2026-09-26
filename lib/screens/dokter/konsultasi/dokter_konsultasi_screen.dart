@@ -1,3 +1,4 @@
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
@@ -550,26 +551,13 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
 class _KonsultasiHeaderTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 6; i++) {
-      final path = Path();
-      final yOffset = 20.0 + (i * 45);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.3,
-        yOffset - 25,
-        size.width * 0.65,
-        yOffset + 35,
-        size.width,
-        yOffset - 10,
-      );
-      canvas.drawPath(path, paint);
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
     }
-  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;

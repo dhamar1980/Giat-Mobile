@@ -1,3 +1,4 @@
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'keranjang_screen.dart';
@@ -933,26 +934,13 @@ class _DetailObatScreenState extends State<DetailObatScreen> {
 class _DetailObatTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.07)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.3;
-
-    for (int i = 0; i < 9; i++) {
-      final path = Path();
-      final yOffset = 15.0 + (i * 95);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.35,
-        yOffset - 35,
-        size.width * 0.65,
-        yOffset + 45,
-        size.width,
-        yOffset - 15,
-      );
-      canvas.drawPath(path, paint);
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
     }
-  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;

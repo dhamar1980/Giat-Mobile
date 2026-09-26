@@ -101,6 +101,24 @@ class PragiService {
       riskLevel: 'Rendah',
       riskScore: 'Risiko Terpantau Rendah',
     ),
+    PragiScreeningResult(
+      id: 'scr-004',
+      date: DateTime(2026, 7, 18),
+      gender: 'Laki-laki',
+      ageRange: '45 – 49 thn',
+      heightCm: 168,
+      weightKg: 65.0,
+      bmi: 23.0,
+      hasHeartDisease: false,
+      hasStroke: false,
+      diabetesStatus: 'Tidak',
+      hasPhysicalActivity: true,
+      hasSmokingHistory: false,
+      hasExcessiveAlcohol: false,
+      hasMobilityDifficulty: false,
+      riskLevel: 'Rendah',
+      riskScore: 'Risiko Terpantau Rendah',
+    ),
   ]);
 
   void addResult(PragiScreeningResult result) {

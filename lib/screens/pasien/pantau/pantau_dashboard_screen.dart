@@ -4,6 +4,7 @@ import '../profile/profile_pasien_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 import 'catat_kondisi_screen.dart';
 import 'riwayat_pemantauan_screen.dart';
+import '../../../widgets/giat_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA PENCATATAN BERAT BADAN
@@ -1358,25 +1359,12 @@ class _PantauHeaderCurvePainter extends CustomPainter {
 class _PantauTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.06)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (int i = 0; i < 6; i++) {
-      final path = Path();
-      final yOffset = size.height * 0.35 + (i * 70);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.3,
-        yOffset - 35,
-        size.width * 0.7,
-        yOffset + 45,
-        size.width,
-        yOffset - 15,
-      );
-      canvas.drawPath(path, paint);
-    }
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
   }
 
   @override

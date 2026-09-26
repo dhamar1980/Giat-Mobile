@@ -1,3 +1,4 @@
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
@@ -1264,27 +1265,13 @@ enum _StepStatus {
 class _DetailPesananTopographyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF10B981).withOpacity(0.09)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    // Draw smooth flowing topographic contours from top to bottom
-    for (int i = 0; i < 9; i++) {
-      final path = Path();
-      final yOffset = 18.0 + (i * 70);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.28,
-        yOffset - 22,
-        size.width * 0.68,
-        yOffset + 28,
-        size.width,
-        yOffset - 12,
-      );
-      canvas.drawPath(path, paint);
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: true,
+      showLines: true,
+    );
     }
-  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
