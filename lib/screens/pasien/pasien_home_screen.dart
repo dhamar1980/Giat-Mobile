@@ -68,34 +68,42 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
       statusBarIconBrightness: Brightness.dark,
     ));
 
-    final content = SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
-      padding: const EdgeInsets.only(bottom: 28),
-      child: FadeTransition(
-        opacity: _fadeAnim,
-        child: SlideTransition(
-          position: _slideAnim,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Top Header Section with Green Arc & Chat Bubbles ──
-              _buildHeaderSection(),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Top Header Section with Green Arc & Chat Bubbles (Fixed at top, does not scroll) ──
+        _buildHeaderSection(),
 
-              const SizedBox(height: 20),
+        // ── Scrollable Body Content Below Header ──
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.only(bottom: 28),
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: SlideTransition(
+                position: _slideAnim,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
 
-              // ── Section 1: Pengingat Hari Ini ──
-              _buildReminderSection(),
+                    // ── Section 1: Pengingat Hari Ini ──
+                    _buildReminderSection(),
 
-              const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-              // ── Section 2: Edukasi Untukmu ──
-              _buildEducationSection(),
-            ],
+                    // ── Section 2: Edukasi Untukmu ──
+                    _buildEducationSection(),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
 
     if (widget.isEmbedded) {
@@ -171,9 +179,11 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
           Padding(
             padding: EdgeInsets.fromLTRB(
               20,
-              widget.isEmbedded ? (MediaQuery.of(context).padding.top + 72) : 12,
+              widget.isEmbedded
+                  ? (MediaQuery.of(context).padding.top + 78)
+                  : (MediaQuery.of(context).padding.top + 16),
               20,
-              28,
+              36,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,11 +266,11 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                   const SizedBox(height: 12),
                 ],
 
-                // Chat Bubble Left (Figma Node 771:5908 - Theme 1)
+                // Single Chat Bubble
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 300),
+                    constraints: const BoxConstraints(maxWidth: 320),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -268,7 +278,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                         topLeft: Radius.circular(16),
                         topRight: Radius.circular(16),
                         bottomRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(2),
+                        bottomLeft: Radius.circular(4),
                       ),
                       border: Border.all(
                         color: _chatBubbleGreen,
@@ -289,101 +299,25 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Selamat Datang Kembali,\n${widget.userName} 👋🏻',
+                          'Selamat Datang Kembali, ${widget.userName} 👋🏻',
                           style: GoogleFonts.inter(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                             color: _chatBubbleGreen,
-                            height: 1.35,
                           ),
                         ),
-                        const SizedBox(height: 5),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            const Spacer(),
-                            Text(
-                              '12.00',
-                              style: GoogleFonts.inter(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w400,
-                                color: _chatBubbleGreen.withValues(alpha: 0.65),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.done_all_rounded, size: 15, color: _chatBubbleCheckBlue),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // Chat Bubble Right (Figma Node 771:5917 - Theme 2)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 315),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(2),
-                      ),
-                      border: Border.all(
-                        color: _chatBubbleGreen,
-                        width: 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _chatBubbleGreen.withValues(alpha: 0.18),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                        const SizedBox(height: 4),
                         Text(
                           'Rawat ginjal hari ini demi masa depan. Langkah kecilmu menjaga ginjal tetap sehat. ✨✨',
                           style: GoogleFonts.inter(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w400,
-                            color: _chatBubbleGreen,
-                            height: 1.4,
+                            color: _chatBubbleGreen.withValues(alpha: 0.9),
+                            height: 1.35,
                           ),
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            const Spacer(),
-                            Text(
-                              '12.00',
-                              style: GoogleFonts.inter(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w400,
-                                color: _chatBubbleGreen.withValues(alpha: 0.65),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.done_all_rounded, size: 15, color: _chatBubbleCheckBlue),
-                          ],
                         ),
                       ],
                     ),

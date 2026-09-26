@@ -65,7 +65,7 @@ void main() {
     // Tap Profil tab
     await tester.tap(find.text('Profil'));
     await tester.pumpAndSettle();
-    expect(find.text('Profil Apotek'), findsOneWidget);
+    expect(find.text('Petugas Apotek'), findsOneWidget);
   });
 
   testWidgets('ApotekNotifikasiScreen renders notifications and marks read', (tester) async {
@@ -290,7 +290,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Profil Apotek'), findsOneWidget);
+    expect(find.text('Petugas Apotek'), findsOneWidget);
     expect(find.text('Apt. Aminah, S.Farm'), findsOneWidget);
     expect(find.text('Status Layanan'), findsWidgets);
     expect(find.text('Jam Operasional'), findsWidgets);

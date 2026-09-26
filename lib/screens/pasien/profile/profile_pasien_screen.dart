@@ -473,35 +473,44 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
             ),
           ),
 
-          // Scrollable Profile Content
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Organic Curved Green Header
-                _buildHeader(topPadding),
+          // Pinned Header and Scrollable Content
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Organic Curved Green Header (Fixed at top, does not scroll)
+              _buildHeader(topPadding),
 
-                const SizedBox(height: 18),
+              // Scrollable Profile Content
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  padding: const EdgeInsets.only(bottom: 40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 18),
 
-                // 1. Ringkasan Kesehatan
-                _buildSectionTitle('Ringkasan Kesehatan'),
-                _buildRingkasanKesehatanCard(),
+                      // 1. Ringkasan Kesehatan
+                      _buildSectionTitle('Ringkasan Kesehatan'),
+                      _buildRingkasanKesehatanCard(),
 
-                const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-                // 2. Informasi Pribadi & Kesehatan
-                _buildSectionTitle('Informasi Pribadi & Kesehatan'),
-                _buildInformasiPribadiCard(),
+                      // 2. Informasi Pribadi & Kesehatan
+                      _buildSectionTitle('Informasi Pribadi & Kesehatan'),
+                      _buildInformasiPribadiCard(),
 
-                const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-                // 3. Pengaturan Akun & Keamanan
-                _buildSectionTitle('Pengaturan Akun & Keamanan'),
-                _buildPengaturanAkunCards(),
-                const SizedBox(height: 30),
-              ],
-            ),
+                      // 3. Pengaturan Akun & Keamanan
+                      _buildSectionTitle('Pengaturan Akun & Keamanan'),
+                      _buildPengaturanAkunCards(),
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -635,26 +644,55 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Avatar Circle with White Border
+                    // Avatar Circle with White Border & Camera Edit Badge
                     GestureDetector(
                       onTap: _showChangeProfilePhotoModal,
-                      child: Container(
-                        width: 106,
-                        height: 106,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.18),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 106,
+                            height: 106,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: _buildAvatarImage(),
-                        ),
+                            child: ClipOval(
+                              child: _buildAvatarImage(),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 2,
+                            right: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(6.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFBBF24),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                size: 16,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 

@@ -97,7 +97,7 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 52),
+                  const SizedBox(height: 76),
 
                   // ── Title Pill: "Jadwal Pasien" ──
                 Center(

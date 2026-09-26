@@ -191,48 +191,51 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final content = SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── 1. Top Header Banner with Curved Arc & Chat Bubbles ──
-          _buildHeaderSection(),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── 1. Top Header Banner with Curved Arc & Chat Bubbles (Fixed at top, does not scroll) ──
+        _buildHeaderSection(),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
+        // ── Scrollable Body Content Below Header ──
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.only(bottom: 100),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
 
-                // ── 2. Kondisi Tubuh Saat Ini ──
-                _buildKondisiTubuhSection(),
+                  // ── 2. Kondisi Tubuh Saat Ini ──
+                  _buildKondisiTubuhSection(),
 
-                const SizedBox(height: 22),
+                  const SizedBox(height: 22),
 
-                // ── 3. Kondisi Hari Ini ──
-                _buildKondisiHariIniSection(),
+                  // ── 3. Kondisi Hari Ini ──
+                  _buildKondisiHariIniSection(),
 
-                const SizedBox(height: 22),
+                  const SizedBox(height: 22),
 
-                // ── 4. Perkembangan Berat Badan (Chart) ──
-                _buildPerkembanganBeratBadanSection(),
+                  // ── 4. Perkembangan Berat Badan (Chart) ──
+                  _buildPerkembanganBeratBadanSection(),
 
-                const SizedBox(height: 22),
+                  const SizedBox(height: 22),
 
-                // ── 5. Tips untukmu ──
-                _buildTipsSection(),
+                  // ── 5. Tips untukmu ──
+                  _buildTipsSection(),
 
-                const SizedBox(height: 20),
-              ],
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
 
     if (widget.isEmbedded) {
@@ -260,7 +263,9 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
               painter: _PantauTopographyPainter(),
             ),
           ),
-          content,
+          Positioned.fill(
+            child: content,
+          ),
         ],
       ),
       bottomNavigationBar: PasienBottomNavbar(
@@ -271,11 +276,11 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 1. TOP HEADER BANNER (Gradient, Organic Curves & 2 Chat Bubbles)
+  // 1. TOP HEADER BANNER (Gradient, Organic Curves & 1 Chat Bubble)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildHeaderSection() {
     final topPadding = widget.isEmbedded
-        ? (MediaQuery.of(context).padding.top + 72)
+        ? (MediaQuery.of(context).padding.top + 78)
         : (MediaQuery.of(context).padding.top + 16);
 
     return Container(
@@ -305,7 +310,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
           ),
 
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPadding, 20, 26),
+            padding: EdgeInsets.fromLTRB(20, topPadding, 20, 36),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -373,68 +378,19 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                   const SizedBox(height: 12),
                 ],
 
-                // ── Chat Bubble 1 (Left Aligned) ──
+                // ── Single Chat Bubble ──
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 290),
+                    constraints: const BoxConstraints(maxWidth: 320),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(3),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Pantau Kesehatan yuk..',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: _bubbleDarkGreen,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.done_all_rounded,
-                          size: 16,
-                          color: Color(0xFF38BDF8),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // ── Chat Bubble 2 (Right Aligned) ──
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 14, 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(18),
-                        bottomRight: Radius.circular(3),
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(4),
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -445,22 +401,26 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                       ],
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Catat  kondisi  tubuhmu  dan  lihat\nperkembangannya  dari  waktu  ke\nwaktu',
+                          'Pantau Kesehatan yuk.. 👋',
                           style: GoogleFonts.inter(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: _bubbleDarkGreen,
-                            height: 1.4,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Icon(
-                          Icons.done_all_rounded,
-                          size: 16,
-                          color: Color(0xFF38BDF8),
+                        Text(
+                          'Catat kondisi tubuhmu dan lihat perkembangannya dari waktu ke waktu ✨✨',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: _bubbleDarkGreen.withValues(alpha: 0.9),
+                            height: 1.35,
+                          ),
                         ),
                       ],
                     ),

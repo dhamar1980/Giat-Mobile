@@ -87,20 +87,25 @@ class DokterProfileScreen extends StatelessWidget {
                 ),
               ),
 
-              SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                padding: const EdgeInsets.only(bottom: 110),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Organic Curved Green Header (Screenshot 1 & 2)
-                    _buildHeader(context, currentName, currentSpecialty, profileState),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Organic Curved Green Header (Fixed at top, does not scroll)
+                  _buildHeader(context, currentName, currentSpecialty, profileState),
 
-                    const SizedBox(height: 20),
+                  // Scrollable content below pinned header
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      padding: const EdgeInsets.only(bottom: 110),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
 
-                    // Section 1: Profil Dokter
-                    _buildSectionTitle('Profil Dokter'),
-                    const SizedBox(height: 8),
+                          // Section 1: Profil Dokter
+                          _buildSectionTitle('Profil Dokter'),
+                          const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
@@ -327,10 +332,260 @@ class DokterProfileScreen extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
-        );
-      },
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+},
+);
+}
+
+  void _showChangeProfilePhotoModal(BuildContext context, DokterProfileState profileState) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag indicator handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Sheet Title
+            Text(
+              'Ganti Foto Profil Dokter',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Pilih foto profil yang jelas dan profesional',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Action: Kamera
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.camera_alt_rounded, color: _darkGreen, size: 22),
+              ),
+              title: Text(
+                'Ambil Foto dari Kamera',
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+              onTap: () {
+                Navigator.pop(ctx);
+                profileState.updateAvatar(
+                  type: 'asset',
+                  path: 'assets/images/dokter_apoteker.jpg',
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Foto profil dokter berhasil diperbarui dari kamera!',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: _darkGreen,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+            ),
+
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+            // Action: Galeri
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E7FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.photo_library_rounded, color: Color(0xFF4338CA), size: 22),
+              ),
+              title: Text(
+                'Pilih dari Galeri Foto',
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+              onTap: () {
+                Navigator.pop(ctx);
+                profileState.updateAvatar(
+                  type: 'network',
+                  path: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Foto profil dokter berhasil dipilih dari galeri!',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: _darkGreen,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+            ),
+
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+            // Action: Avatar Preset
+            Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 10, left: 8),
+              child: Text(
+                'Pilihan Avatar Dokter',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF475569),
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 72,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: profileState.presetAvatars.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 14),
+                itemBuilder: (context, idx) {
+                  final item = profileState.presetAvatars[idx];
+                  final isSelected = profileState.avatarPath == item['path'];
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      profileState.updateAvatar(
+                        type: item['type']!,
+                        path: item['path']!,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Avatar ${item['name']} berhasil diterapkan!',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                          ),
+                          backgroundColor: _darkGreen,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? _darkGreen : const Color(0xFFE2E8F0),
+                          width: isSelected ? 3 : 1.5,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: item['type'] == 'asset'
+                            ? Image.asset(item['path']!, fit: BoxFit.cover)
+                            : Image.network(
+                                item['path']!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) => Container(
+                                  color: const Color(0xFFDCFCE7),
+                                  child: const Icon(Icons.person, color: _darkGreen),
+                                ),
+                              ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+            // Action: Hapus Foto Profil
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626), size: 22),
+              ),
+              title: Text(
+                'Hapus Foto Profil',
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFFDC2626),
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                profileState.resetAvatar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Foto profil berhasil dihapus (avatar bawaan)',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: const Color(0xFFDC2626),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -361,29 +616,103 @@ class DokterProfileScreen extends StatelessWidget {
                 painter: _HeaderWaveOverlayPainter(),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, topPadding + 16, 20, 48),
-              child: Center(
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Circular Avatar with White Border (Screenshot 1 & 2)
-                    Container(
-                      width: 104,
-                      height: 104,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
+                    // Top Navigation Row: "✏️ Edit" pill button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        GestureDetector(
+                          onTap: () => _showChangeProfilePhotoModal(context, profileState),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFBBF24), // Vibrant golden amber
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.edit, size: 13, color: Color(0xFF0F172A)),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Edit',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Circular Avatar with White Border & Camera Edit Badge
+                    GestureDetector(
+                      onTap: () => _showChangeProfilePhotoModal(context, profileState),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 104,
+                            height: 104,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: profileState.buildAvatarWidget(size: 104, iconSize: 52),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 2,
+                            right: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(6.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFBBF24),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                size: 16,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
                           ),
                         ],
-                      ),
-                      child: ClipOval(
-                        child: profileState.buildAvatarWidget(size: 104, iconSize: 52),
                       ),
                     ),
 

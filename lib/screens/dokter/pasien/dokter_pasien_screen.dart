@@ -87,7 +87,7 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
             SafeArea(
               child: Column(
                 children: [
-                  const SizedBox(height: 52),
+                  const SizedBox(height: 76),
 
                   // ── Title Badge: "Daftar Pasien" ──
                 _buildTitlePill('Daftar Pasien'),

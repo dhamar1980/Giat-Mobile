@@ -103,7 +103,7 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
                 // ── Top Navigation Bar: Back & (Bell + Avatar) ──
                 _buildTopNavigationBar(),
 
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
 
                 // ── Screen Title Badge: "Buat Resep" ──
                 _buildTitlePill('Buat Resep'),
@@ -287,61 +287,48 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
           ),
 
           // Right: Bell Notification & User Profile Avatar Capsule
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+          // Right: Bell Notification & User Profile Avatar Capsule
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  icon: const Icon(
+                    Icons.notifications_none_rounded,
+                    size: 22,
+                    color: Color(0xFF1F2937),
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Icon(Icons.notifications_none_rounded, size: 20, color: Color(0xFF334155)),
-                      Positioned(
-                        right: 1,
-                        top: 1,
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFEF4444),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ],
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: _darkGreen,
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: const BoxDecoration(
-                      color: _darkGreen,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.person, color: Colors.white, size: 18),
-                    ),
-                  ),
-                ],
-              ),
+                  child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+                ),
+              ],
             ),
           ),
         ],

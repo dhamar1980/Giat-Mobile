@@ -128,75 +128,50 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.axis == Axis.vertical) {
-            final pixels = notification.metrics.pixels;
-            if (pixels > 20) {
-              if (_isTopBarVisible) setState(() => _isTopBarVisible = false);
-            } else if (pixels <= 5) {
-              if (!_isTopBarVisible) setState(() => _isTopBarVisible = true);
-            }
-          }
-          return false;
-        },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: IndexedStack(
-                index: _selectedIndex,
-                children: [
-                  _buildHomeTab(),
-                  ApotekPesananScreen(
-                    key: ValueKey('pesanan-$_pesananInitialTab'),
-                    initialTabIndex: _pesananInitialTab,
-                    onNavigateToTab: (tab) => _switchToTab(tab),
-                  ),
-                  ApotekResepScreen(
-                    key: ValueKey('resep-$_resepInitialTab'),
-                    initialTabIndex: _resepInitialTab,
-                    onNavigateToOrderTab: (tab) {
-                      _switchToTab(1, pesananTab: tab);
-                    },
-                    onOpenProfile: () => _switchToTab(4),
-                  ),
-                  ApotekObatScreen(
-                    key: ValueKey('obat-$_obatInitialFilter'),
-                    initialFilter: _obatInitialFilter,
-                    onOpenProfile: () => _switchToTab(4),
-                  ),
-                  ApotekProfileScreen(
-                    apotekerName: widget.apotekerName,
-                    onLogout: () => Navigator.of(context).pop(),
-                  ),
-                ],
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: [
+                _buildHomeTab(),
+                ApotekPesananScreen(
+                  key: ValueKey('pesanan-$_pesananInitialTab'),
+                  initialTabIndex: _pesananInitialTab,
+                  onNavigateToTab: (tab) => _switchToTab(tab),
+                ),
+                ApotekResepScreen(
+                  key: ValueKey('resep-$_resepInitialTab'),
+                  initialTabIndex: _resepInitialTab,
+                  onNavigateToOrderTab: (tab) {
+                    _switchToTab(1, pesananTab: tab);
+                  },
+                  onOpenProfile: () => _switchToTab(4),
+                ),
+                ApotekObatScreen(
+                  key: ValueKey('obat-$_obatInitialFilter'),
+                  initialFilter: _obatInitialFilter,
+                  onOpenProfile: () => _switchToTab(4),
+                ),
+                ApotekProfileScreen(
+                  apotekerName: widget.apotekerName,
+                  onLogout: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          // Topbar overlay tetap / netap (hidden on Profile tab 4)
+          if (_selectedIndex != 4)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: _buildTopBar(),
               ),
             ),
-            // Floating Topbar overlay (hidden on Profile tab 4)
-            if (_selectedIndex != 4)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: AnimatedSlide(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOut,
-                    offset: _isTopBarVisible ? Offset.zero : const Offset(0, -1.2),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: _isTopBarVisible ? 1.0 : 0.0,
-                      child: IgnorePointer(
-                        ignoring: !_isTopBarVisible,
-                        child: _buildTopBar(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
@@ -289,32 +264,38 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
           ),
         ),
 
-        SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 28),
-          child: FadeTransition(
-            opacity: _fadeAnim,
-            child: SlideTransition(
-              position: _slideAnim,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Header Section with Chat Bubbles ──
-                  _buildHeaderSection(topPadding),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header Section with Chat Bubbles (Fixed at top, does NOT scroll) ──
+            _buildHeaderSection(topPadding),
 
-                  const SizedBox(height: 20),
+            // ── Scrollable Body Content Below Header ──
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.only(top: 20, bottom: 28),
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Section 1: Perlu Perhatian (3 Cards) ──
+                        _buildAttentionSection(),
 
-                  // ── Section 1: Perlu Perhatian (3 Cards) ──
-                  _buildAttentionSection(),
+                        const SizedBox(height: 24),
 
-                  const SizedBox(height: 24),
-
-                  // ── Section 2: Aktivitas Terbaru (Timeline) ──
-                  _buildRecentActivitySection(),
-                ],
+                        // ── Section 2: Aktivitas Terbaru (Timeline) ──
+                        _buildRecentActivitySection(),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -324,103 +305,76 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
   // HEADER SECTION (Mockup: Green gradient, action pill & white chat bubbles)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildHeaderSection(double topPadding) {
-    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
-
-    return ClipPath(
-      clipper: _ApotekerHeaderClipper(),
-      child: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF22C55E),
-              Color(0xFF16A34A),
-              Color(0xFF065A37),
-            ],
-          ),
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF22C55E),
+            Color(0xFF16A34A),
+            Color(0xFF065A37),
+          ],
         ),
-        child: Stack(
-          children: [
-            Positioned.fill(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(36),
+          bottomRight: Radius.circular(36),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
+              ),
               child: CustomPaint(
                 painter: _ApotekerHeaderCurvePainter(),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, topPadding + 62, 20, 46),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Chat Bubble 1 (Left Aligned - White Bubble)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildChatBubble(
-                      isLeft: true,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Selamat Datang Kembali,\n${widget.apotekerName}! 👋',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF065A37),
-                              height: 1.35,
-                            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, topPadding + 78, 20, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Single Chat Bubble
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildChatBubble(
+                    isLeft: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Selamat Datang Kembali, ${widget.apotekerName}! 👋',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF065A37),
                           ),
-                          const SizedBox(height: 4),
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Spacer(),
-                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
-                            ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Semoga aktivitas hari ini diberikan kelancaran ya... ✨✨',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF065A37).withValues(alpha: 0.9),
+                            height: 1.35,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 14),
-
-                  // Chat Bubble 2 (Right Aligned - White Bubble)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _buildChatBubble(
-                      isLeft: false,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Semoga aktivitas hari ini\ndiberikan kelancaran ya... ✨✨',
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF065A37),
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Spacer(),
-                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -433,8 +387,8 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
       clipBehavior: Clip.none,
       children: [
         Container(
-          constraints: const BoxConstraints(maxWidth: 290),
-          padding: const EdgeInsets.fromLTRB(16, 12, 14, 8),
+          constraints: const BoxConstraints(maxWidth: 340),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(
@@ -675,8 +629,22 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
                           title: 'Stok Paracetamol 500 mg menipis',
                           time: '1 jam lalu',
                           circleColor: const Color(0xFFDC2626),
-                          showLineBelow: false,
+                          showLineBelow: true,
                           onTap: () => _switchToTab(3, obatFilter: 'Stock Menipis'),
+                        ),
+                        _buildTimelineItem(
+                          title: 'Pesanan #ORD-00122 telah diambil kurir',
+                          time: '2 jam lalu',
+                          circleColor: const Color(0xFF0284C7),
+                          showLineBelow: true,
+                          onTap: () => _switchToTab(1, pesananTab: 1),
+                        ),
+                        _buildTimelineItem(
+                          title: 'Verifikasi resep #RX-00109 selesai',
+                          time: '3 jam lalu',
+                          circleColor: const Color(0xFF10B981),
+                          showLineBelow: false,
+                          onTap: () => _switchToTab(2, resepTab: 2),
                         ),
                       ],
                     ),

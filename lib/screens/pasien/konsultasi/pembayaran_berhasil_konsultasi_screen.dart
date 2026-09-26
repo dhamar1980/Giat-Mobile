@@ -202,7 +202,7 @@ class PembayaranBerhasilKonsultasiScreen extends StatelessWidget {
                         ),
                         child: const Icon(
                           Icons.person_rounded,
-                          size: 18,
+                          size: 20,
                           color: Colors.white,
                         ),
                       ),

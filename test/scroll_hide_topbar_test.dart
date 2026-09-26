@@ -5,7 +5,7 @@ import 'package:giat/screens/dokter/dokter_home_screen.dart';
 import 'package:giat/screens/apotek/apoteker_home_screen.dart';
 
 void main() {
-  testWidgets('MasterLayout (Pasien) hides top action pill on scroll down, shows when scrolled back to top', (WidgetTester tester) async {
+  testWidgets('MasterLayout (Pasien) keeps top action pill persistent (netap) on scroll', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(500, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -21,35 +21,17 @@ void main() {
     expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
     expect(find.byIcon(Icons.person_rounded), findsOneWidget);
 
-    // Initial AnimatedOpacity should be 1.0
-    final initialOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 1.0,
-    );
-    expect(initialOpacityFinder, findsWidgets);
-
     // Scroll down on the active tab
     final contentToDrag = find.textContaining('Selamat Datang Kembali').first;
     await tester.drag(contentToDrag, const Offset(0, -300));
     await tester.pumpAndSettle();
 
-    // After scrolling down, AnimatedOpacity should transition to 0.0 (hidden)
-    final hiddenOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 0.0,
-    );
-    expect(hiddenOpacityFinder, findsOneWidget);
-
-    // Now scroll back up and reach the top (mentok)
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, 500));
-    await tester.pumpAndSettle();
-
-    // Top bar should reappear with opacity 1.0
-    final restoredOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 1.0,
-    );
-    expect(restoredOpacityFinder, findsWidgets);
+    // After scrolling down, notification and profile icons remain persistent (netap)
+    expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.person_rounded), findsOneWidget);
   });
 
-  testWidgets('DokterHomeScreen (Dokter) hides top action pill on scroll down, shows when scrolled back to top', (WidgetTester tester) async {
+  testWidgets('DokterHomeScreen (Dokter) keeps top action pill persistent (netap) on scroll', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(500, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -65,35 +47,17 @@ void main() {
     expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
     expect(find.byIcon(Icons.person_rounded), findsOneWidget);
 
-    // Initial AnimatedOpacity for top bar should be 1.0
-    final initialOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 1.0,
-    );
-    expect(initialOpacityFinder, findsWidgets);
-
     // Scroll down on the active home tab
     final contentToDrag = find.textContaining('Selamat Datang Kembali').first;
     await tester.drag(contentToDrag, const Offset(0, -300));
     await tester.pumpAndSettle();
 
-    // After scrolling down, AnimatedOpacity becomes 0.0 (hidden)
-    final hiddenOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 0.0,
-    );
-    expect(hiddenOpacityFinder, findsOneWidget);
-
-    // Scroll back up to the top (mentok)
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, 500));
-    await tester.pumpAndSettle();
-
-    // Top bar reappears with opacity 1.0
-    final restoredOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 1.0,
-    );
-    expect(restoredOpacityFinder, findsWidgets);
+    // Top action pill remains persistent (netap)
+    expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.person_rounded), findsOneWidget);
   });
 
-  testWidgets('ApotekerHomeScreen (Apotek) hides top action pill on scroll down, shows when scrolled back to top', (WidgetTester tester) async {
+  testWidgets('ApotekerHomeScreen (Apotek) keeps top action pill persistent (netap) on scroll', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(500, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -109,31 +73,13 @@ void main() {
     expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
     expect(find.byIcon(Icons.person_rounded), findsOneWidget);
 
-    // Initial AnimatedOpacity for top bar should be 1.0
-    final initialOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 1.0,
-    );
-    expect(initialOpacityFinder, findsWidgets);
-
     // Scroll down on the active home tab
     final contentToDrag = find.textContaining('Selamat Datang Kembali').first;
     await tester.drag(contentToDrag, const Offset(0, -300));
     await tester.pumpAndSettle();
 
-    // After scrolling down, AnimatedOpacity becomes 0.0 (hidden)
-    final hiddenOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 0.0,
-    );
-    expect(hiddenOpacityFinder, findsOneWidget);
-
-    // Scroll back up to the top (mentok)
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, 500));
-    await tester.pumpAndSettle();
-
-    // Top bar reappears with opacity 1.0
-    final restoredOpacityFinder = find.byWidgetPredicate(
-      (widget) => widget is AnimatedOpacity && widget.opacity == 1.0,
-    );
-    expect(restoredOpacityFinder, findsWidgets);
+    // Top action pill remains persistent (netap)
+    expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.person_rounded), findsOneWidget);
   });
 }

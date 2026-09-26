@@ -263,7 +263,7 @@ class _MenungguPembayaranVaScreenState extends State<MenungguPembayaranVaScreen>
                         ),
                         child: const Icon(
                           Icons.person_rounded,
-                          size: 18,
+                          size: 20,
                           color: Colors.white,
                         ),
                       ),

@@ -36,48 +36,51 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final content = SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
-      padding: const EdgeInsets.only(bottom: 110),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Top Header Section: Gradient Arc & Chat Bubbles ──
-          _buildHeaderSection(),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Top Header Section: Gradient Arc & Chat Bubbles (Fixed at top, does not scroll) ──
+        _buildHeaderSection(),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
+        // ── Scrollable Body Content Below Header ──
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.only(bottom: 110),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
 
-                // ── Bagian 1: Resep Saya ──
-                _buildResepSayaSection(),
+                  // ── Bagian 1: Resep Saya ──
+                  _buildResepSayaSection(),
 
-                const SizedBox(height: 22),
+                  const SizedBox(height: 22),
 
-                // ── Bagian 2: Katalog Apotek ──
-                _buildKatalogApotekSection(),
+                  // ── Bagian 2: Katalog Apotek ──
+                  _buildKatalogApotekSection(),
 
-                const SizedBox(height: 22),
+                  const SizedBox(height: 22),
 
-                // ── Bagian 3: Panduan Pembelian Obat & Resep ──
-                _buildPanduanSection(),
+                  // ── Bagian 3: Panduan Pembelian Obat & Resep ──
+                  _buildPanduanSection(),
 
-                const SizedBox(height: 22),
+                  const SizedBox(height: 22),
 
-                // ── Bagian 4: Status Pengiriman & Kartu Pesanan ──
-                _buildStatusPengirimanSection(),
+                  // ── Bagian 4: Status Pengiriman & Kartu Pesanan ──
+                  _buildStatusPengirimanSection(),
 
-                const SizedBox(height: 10),
-              ],
+                  const SizedBox(height: 10),
+                ],
+              ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
 
     if (widget.isEmbedded) {
@@ -108,7 +111,9 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
               painter: _ObatTopographyPainter(),
             ),
           ),
-          content,
+          Positioned.fill(
+            child: content,
+          ),
         ],
       ),
       bottomNavigationBar: PasienBottomNavbar(
@@ -123,8 +128,8 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildHeaderSection() {
     final topPadding = widget.isEmbedded
-        ? (MediaQuery.of(context).padding.top + 72)
-        : (MediaQuery.of(context).padding.top + 16);
+        ? (MediaQuery.of(context).padding.top + 78)
+        : (MediaQuery.of(context).padding.top + 12);
 
     return Container(
       width: double.infinity,
@@ -153,7 +158,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
           ),
 
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPadding, 20, 26),
+            padding: EdgeInsets.fromLTRB(20, topPadding, 20, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -221,69 +226,19 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                   const SizedBox(height: 12),
                 ],
 
-                // ── Chat Bubble 1 (Left Aligned) ──
+                // ── Single Chat Bubble ──
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 310),
+                    constraints: const BoxConstraints(maxWidth: 340),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(3),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Halo! Mulai kelola resep dan kebutuhan obat Anda bersama dokter spesialis GIAT 👋',
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              color: _darkGreen,
-                              height: 1.35,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.done_all_rounded,
-                          size: 16,
-                          color: Color(0xFF38BDF8),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // ── Chat Bubble 2 (Right Aligned) ──
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 320),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 14, 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(18),
-                        bottomRight: Radius.circular(3),
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(4),
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -294,27 +249,32 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                       ],
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Rawat kesehatanmu dengan pengelolaan obat yang aman dan terpadu. Langkah kecil menuju pulih sempurna. ✨✨',
+                          'Halo! Mulai kelola resep dan obat 👋',
                           style: GoogleFonts.inter(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: _darkGreen,
-                            height: 1.4,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Icon(
-                          Icons.done_all_rounded,
-                          size: 16,
-                          color: Color(0xFF38BDF8),
+                        Text(
+                          'Rawat kesehatanmu dengan pengelolaan obat yang aman dan terpadu bersama GIAT. ✨✨',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: _darkGreen.withValues(alpha: 0.9),
+                            height: 1.35,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
+
               ],
             ),
           ),

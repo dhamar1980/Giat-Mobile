@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
 import '../konsultasi/dokter_room_chat_screen.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
+import '../profile/dokter_profile_screen.dart';
 import '../resep/dokter_review_resep_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ class _DokterDetailPasienScreenState extends State<DokterDetailPasienScreen> {
                 // ── Top Bar: Kembali & (Bell + Avatar) ──
                 _buildTopNavigationBar(),
 
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
 
                 // ── Title Badge: "Detail Pasien" ──
                 _buildTitlePill('Detail Pasien'),
@@ -349,44 +350,59 @@ class _DokterDetailPasienScreenState extends State<DokterDetailPasienScreen> {
           ),
 
           // Right: Bell Notification & User Profile Avatar Capsule
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  icon: const Icon(
+                    Icons.notifications_none_rounded,
+                    size: 22,
+                    color: Color(0xFF1F2937),
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.notifications_none_rounded, size: 20, color: Color(0xFF334155)),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 28,
-                    height: 28,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => DokterProfileScreen(
+                          doctorName: 'Dr. Budi Santoso',
+                          onLogout: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 32,
+                    height: 32,
                     decoration: const BoxDecoration(
                       color: _darkGreen,
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
-                      child: Icon(Icons.person, color: Colors.white, size: 18),
-                    ),
+                    child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],

@@ -49,31 +49,39 @@ class _PragiHomeViewState extends State<PragiHomeView> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Row(
                   children: [
-                          const Spacer(),
-                          // Notification Bell
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: IconButton(
-                              icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF1E293B)),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Tidak ada notifikasi baru.')),
-                                );
-                              },
-                            ),
+                    const Spacer(),
+                    // Standard Bell & Profile Action Capsule
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                          const SizedBox(width: 10),
-                          // Profile Circle Button
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(4),
+                            icon: const Icon(
+                              Icons.notifications_none_rounded,
+                              size: 22,
+                              color: Color(0xFF1F2937),
+                            ),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 8),
                           GestureDetector(
                             onTap: () {
                               Navigator.push(
@@ -82,64 +90,64 @@ class _PragiHomeViewState extends State<PragiHomeView> {
                               );
                             },
                             child: Container(
-                              width: 42,
-                              height: 42,
+                              width: 32,
+                              height: 32,
                               decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: _darkGreen,
                               ),
-                              child: const Icon(Icons.person, color: Colors.white, size: 22),
+                              child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ],
+                ),
+              )
+            else
+              SizedBox(height: MediaQuery.of(context).padding.top + 76),
 
-                    // Scrollable Main Content
-                    Expanded(
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
-                        ),
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          widget.isEmbedded ? (MediaQuery.of(context).padding.top + 72) : 4,
-                          20,
-                          24,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Center Badge: Prajurit Ginjal
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: _darkGreen,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _darkGreen.withValues(alpha: 0.25),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  'Prajurit Ginjal',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
+            // Center Badge: Prajurit Ginjal (Fixed at top, does NOT scroll)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _darkGreen,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _darkGreen.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'Prajurit Ginjal',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
 
-                            const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-                            // PRAGI Chat Welcome Bubbles
-                            _buildWelcomeSection(),
+            // Scrollable Main Content Below Fixed Header
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // PRAGI Chat Welcome Bubbles
+                    _buildWelcomeSection(),
 
                             const SizedBox(height: 18),
 

@@ -171,39 +171,45 @@ class _DokterListScreenState extends State<DokterListScreen> {
           doc['specialty'].toString().toLowerCase().contains(query);
     }).toList();
 
-    final content = SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Top Header Section (Green Arc + Bubbles) ──
-          _buildHeaderSection(),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Top Header Section (Green Arc + Bubbles) (Fixed at top, does not scroll) ──
+        _buildHeaderSection(),
 
-          const SizedBox(height: 16),
+        // ── Scrollable Body Content Below Header ──
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.only(top: 16, bottom: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Search Bar ──
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildSearchBar(),
+                ),
 
-          // ── Search Bar ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _buildSearchBar(),
+                const SizedBox(height: 14),
+
+                // ── Filter Chips ──
+                _buildFilterChips(),
+
+                const SizedBox(height: 20),
+
+                // ── Content Switcher: Konsultasi Saya OR Doctor Search List ──
+                if (_selectedCategory == 'Konsultasi Saya')
+                  _buildKonsultasiSayaView()
+                else
+                  _buildDokterOnlineSection(filteredDoctors),
+              ],
+            ),
           ),
-
-          const SizedBox(height: 14),
-
-          // ── Filter Chips ──
-          _buildFilterChips(),
-
-          const SizedBox(height: 20),
-
-          // ── Content Switcher: Konsultasi Saya OR Doctor Search List ──
-          if (_selectedCategory == 'Konsultasi Saya')
-            _buildKonsultasiSayaView()
-          else
-            _buildDokterOnlineSection(filteredDoctors),
-        ],
-      ),
+        ),
+      ],
     );
 
     if (widget.isEmbedded) {
@@ -281,9 +287,9 @@ class _DokterListScreenState extends State<DokterListScreen> {
           Padding(
             padding: EdgeInsets.fromLTRB(
               20,
-              widget.isEmbedded ? (MediaQuery.of(context).padding.top + 72) : 16,
+              widget.isEmbedded ? (MediaQuery.of(context).padding.top + 78) : 12,
               20,
-              24,
+              18,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,18 +373,18 @@ class _DokterListScreenState extends State<DokterListScreen> {
                   const SizedBox(height: 12),
                 ],
 
-                // Chat Bubble Left (White Background, Dark Green Text)
+                // Single Chat Bubble
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 290),
+                    constraints: const BoxConstraints(maxWidth: 340),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomRight: Radius.circular(18),
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
                         bottomLeft: Radius.circular(4),
                       ),
                       boxShadow: [
@@ -391,74 +397,26 @@ class _DokterListScreenState extends State<DokterListScreen> {
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Halo! Mulai konsultasi kesehatan ginjal Anda bersama dokter spesialis GIAT 👋',
+                          'Halo! Mulai konsultasi dokter spesialis GIAT 👋',
                           style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
                             color: const Color(0xFF044E2F),
                             height: 1.35,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Spacer(),
-                            Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // Chat Bubble Right (White Background, Dark Green Text)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 310),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(18),
-                        bottomRight: Radius.circular(4),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
                         Text(
                           'Rawat ginjal hari ini demi masa depan. Langkah kecilmu menjaga ginjal tetap sehat. ✨✨',
                           style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF044E2F),
-                            height: 1.4,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w400,
+                            color: const Color(0xFF044E2F).withValues(alpha: 0.9),
+                            height: 1.35,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Spacer(),
-                            Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
-                          ],
                         ),
                       ],
                     ),

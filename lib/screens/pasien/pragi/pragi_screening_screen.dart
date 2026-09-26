@@ -153,8 +153,9 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
               children: [
                 // Top Bar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Back Pill
                       GestureDetector(
@@ -190,32 +191,32 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
                           ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 12),
                       // Center Category Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _darkGreen,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _darkGreen.withValues(alpha: 0.25),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _darkGreen,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _darkGreen.withValues(alpha: 0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            'Demografi Pasien',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
                             ),
-                          ],
-                        ),
-                        child: Text(
-                          'Demografi Pasien',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      const SizedBox(width: 80), // Balance back button
                     ],
                   ),
                 ),

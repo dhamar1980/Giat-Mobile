@@ -124,7 +124,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 52),
+                  const SizedBox(height: 76),
 
                   // ── Centered Pill Badge: "Daftar Konsultasi" ──
                 Container(

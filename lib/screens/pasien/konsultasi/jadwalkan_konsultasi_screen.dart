@@ -253,7 +253,7 @@ class _JadwalkanKonsultasiScreenState extends State<JadwalkanKonsultasiScreen> {
                         ),
                         child: const Icon(
                           Icons.person_rounded,
-                          size: 18,
+                          size: 20,
                           color: Colors.white,
                         ),
                       ),

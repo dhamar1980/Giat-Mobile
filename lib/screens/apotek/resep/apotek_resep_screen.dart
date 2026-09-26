@@ -90,39 +90,27 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.axis == Axis.vertical) {
-            final pixels = notification.metrics.pixels;
-            if (pixels > 20) {
-              if (_internalIsTopBarVisible) setState(() => _internalIsTopBarVisible = false);
-            } else if (pixels <= 5) {
-              if (!_internalIsTopBarVisible) setState(() => _internalIsTopBarVisible = true);
-            }
-          }
-          return false;
-        },
-        child: Stack(
-          children: [
-            // Background Topography Curves
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _ResepTopographyPainter(),
-              ),
+      body: Stack(
+        children: [
+          // Background Topography Curves
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _ResepTopographyPainter(),
             ),
+          ),
 
-            SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── 1. Top Curved Green Header with Chat Bubbles (Screenshot 1) ──
-                  _buildHeaderSection(topPadding),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── 1. Top Curved Green Header with Chat Bubbles (Fixed at top, does not scroll) ──
+              _buildHeaderSection(topPadding),
 
-                  const SizedBox(height: 18),
-
-                  // ── 2. Content Section ──
-                  Padding(
+              // ── 2. Content Section (Scrollable) ──
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.only(top: 18, bottom: 28),
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,11 +140,11 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -165,103 +153,76 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
   // HEADER SECTION (Mockup Screenshot 1: Green Gradient + 2 Chat Bubbles + Pill)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildHeaderSection(double topPadding) {
-    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
-
-    return ClipPath(
-      clipper: _ResepHeaderClipper(),
-      child: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF22C55E),
-              Color(0xFF16A34A),
-              Color(0xFF065A37),
-            ],
-          ),
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF22C55E),
+            Color(0xFF16A34A),
+            Color(0xFF065A37),
+          ],
         ),
-        child: Stack(
-          children: [
-            Positioned.fill(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(36),
+          bottomRight: Radius.circular(36),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
+              ),
               child: CustomPaint(
                 painter: _ResepHeaderCurvePainter(),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, topPadding + 60, 20, 42),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Chat Bubble 1 (Left Aligned - White Bubble)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildChatBubble(
-                      isLeft: true,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Selamat datang kembali! Yuk, cek dan proses resep masuk kamu sekarang di menu Resep.',
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF065A37),
-                              height: 1.35,
-                            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, topPadding + 78, 20, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Single Chat Bubble
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildChatBubble(
+                    isLeft: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Kelola Resep Masuk ✨✨',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF065A37),
                           ),
-                          const SizedBox(height: 4),
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Spacer(),
-                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
-                            ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Yuk, cek dan proses resep masuk pasien kamu sekarang di menu Resep.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF065A37).withValues(alpha: 0.9),
+                            height: 1.35,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Chat Bubble 2 (Right Aligned - White Bubble)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _buildChatBubble(
-                      isLeft: false,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Kelola dan proses resep yang masuk ✨✨',
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF065A37),
-                              height: 1.35,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Spacer(),
-                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -274,10 +235,8 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
       clipBehavior: Clip.none,
       children: [
         Container(
-          constraints: BoxConstraints(
-            maxWidth: isLeft ? 330 : 280,
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 12, 14, 8),
+          constraints: const BoxConstraints(maxWidth: 340),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(

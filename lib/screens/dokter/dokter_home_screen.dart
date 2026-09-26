@@ -131,75 +131,50 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.axis == Axis.vertical) {
-            final pixels = notification.metrics.pixels;
-            if (pixels > 20) {
-              if (_isTopBarVisible) setState(() => _isTopBarVisible = false);
-            } else if (pixels <= 5) {
-              if (!_isTopBarVisible) setState(() => _isTopBarVisible = true);
-            }
-          }
-          return false;
-        },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: IndexedStack(
-                index: _selectedIndex,
-                children: [
-                  _buildHomeTab(),
-                  DokterKonsultasiScreen(
-                    onProfileTap: () => setState(() {
-                      _selectedIndex = 4;
-                      _isTopBarVisible = true;
-                    }),
-                  ),
-                  DokterPasienScreen(
-                    onProfileTap: () => setState(() {
-                      _selectedIndex = 4;
-                      _isTopBarVisible = true;
-                    }),
-                  ),
-                  DokterJadwalScreen(
-                    onProfileTap: () => setState(() {
-                      _selectedIndex = 4;
-                      _isTopBarVisible = true;
-                    }),
-                  ),
-                  DokterProfileScreen(
-                    doctorName: widget.doctorName,
-                    onLogout: () => Navigator.of(context).pop(),
-                  ),
-                ],
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: [
+                _buildHomeTab(),
+                DokterKonsultasiScreen(
+                  onProfileTap: () => setState(() {
+                    _selectedIndex = 4;
+                    _isTopBarVisible = true;
+                  }),
+                ),
+                DokterPasienScreen(
+                  onProfileTap: () => setState(() {
+                    _selectedIndex = 4;
+                    _isTopBarVisible = true;
+                  }),
+                ),
+                DokterJadwalScreen(
+                  onProfileTap: () => setState(() {
+                    _selectedIndex = 4;
+                    _isTopBarVisible = true;
+                  }),
+                ),
+                DokterProfileScreen(
+                  doctorName: widget.doctorName,
+                  onLogout: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          // Topbar overlay tetap / netap (hidden on Profile tab 4)
+          if (_selectedIndex != 4)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: _buildTopBar(),
               ),
             ),
-            // Floating Topbar overlay (hidden on Profile tab 4)
-            if (_selectedIndex != 4)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: AnimatedSlide(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOut,
-                    offset: _isTopBarVisible ? Offset.zero : const Offset(0, -1.2),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: _isTopBarVisible ? 1.0 : 0.0,
-                      child: IgnorePointer(
-                        ignoring: !_isTopBarVisible,
-                        child: _buildTopBar(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
@@ -276,41 +251,47 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           ),
         ),
 
-        SingleChildScrollView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 24),
-          child: FadeTransition(
-            opacity: _fadeAnim,
-            child: SlideTransition(
-              position: _slideAnim,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Header Section with Chat Bubbles (Figma Node 1008:17556) ──
-                  _buildHeaderSection(),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header Section with Chat Bubbles (Fixed at top, does NOT scroll) ──
+            _buildHeaderSection(),
 
-                  const SizedBox(height: 20),
+            // ── Scrollable Body Content Below Header ──
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                padding: const EdgeInsets.only(top: 16, bottom: 24),
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Section 1: Pesan Terbaru (Figma Node 1008:17556) ──
+                        _buildRecentMessagesSection(),
 
-                  // ── Section 1: Pesan Terbaru (Figma Node 1008:17556) ──
-                  _buildRecentMessagesSection(),
+                        const SizedBox(height: 20),
 
-                  const SizedBox(height: 20),
+                        // ── Section 2: Jadwal Hari Ini (Figma Node 1008:17556) ──
+                        _buildTodayScheduleTimelineSection(),
 
-                  // ── Section 2: Jadwal Hari Ini (Figma Node 1008:17556) ──
-                  _buildTodayScheduleTimelineSection(),
+                        const SizedBox(height: 24),
 
-                  const SizedBox(height: 24),
-
-                  // ── Section 3: Ringkasan Aktivitas Hari Ini (Figma Node 1008:17556 - Variant 2) ──
-                  KeyedSubtree(
-                    key: _activitySummaryKey,
-                    child: _buildActivitySummarySection(),
+                        // ── Section 3: Ringkasan Aktivitas Hari Ini (Figma Node 1008:17556 - Variant 2) ──
+                        KeyedSubtree(
+                          key: _activitySummaryKey,
+                          child: _buildActivitySummarySection(),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -347,67 +328,13 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPadding + 62, 20, 26),
+            padding: EdgeInsets.fromLTRB(20, topPadding + 78, 20, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Chat Bubble Left (Selamat Datang Kembali) - White Background
+                // Single Chat Bubble
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      if (_scrollController.hasClients) {
-                        _scrollController.animateTo(
-                          0,
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeInOutCubic,
-                        );
-                      }
-                    },
-                    child: CustomPaint(
-                      painter: const _DokterChatBubblePainter(
-                        isLeft: true,
-                        isSelected: false,
-                      ),
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 300),
-                        margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Selamat Datang Kembali,\n${widget.doctorName} 👏🏻',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF065A37),
-                                height: 1.35,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Align(
-                              alignment: Alignment.centerRight,
-                              child: Icon(
-                                Icons.done_all_rounded,
-                                size: 15,
-                                color: Color(0xFF38BDF8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Chat Bubble Right (Berikut ringkasan aktivitas...) - White Background
-                Align(
-                  alignment: Alignment.centerRight,
                   child: GestureDetector(
                     onTap: () {
                       HapticFeedback.selectionClick();
@@ -421,33 +348,33 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                     },
                     child: CustomPaint(
                       painter: const _DokterChatBubblePainter(
-                        isLeft: false,
+                        isLeft: true,
                         isSelected: false,
                       ),
                       child: Container(
-                        constraints: const BoxConstraints(maxWidth: 300),
+                        constraints: const BoxConstraints(maxWidth: 340),
                         margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.fromLTRB(16, 12, 20, 8),
+                        padding: const EdgeInsets.fromLTRB(20, 12, 16, 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Berikut ringkasan aktivitas Anda\nhari ini. ✨✨',
+                              'Selamat Datang Kembali, ${widget.doctorName} 👏🏻',
                               style: GoogleFonts.inter(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
                                 color: const Color(0xFF065A37),
-                                height: 1.35,
                               ),
                             ),
                             const SizedBox(height: 4),
-                            const Align(
-                              alignment: Alignment.centerRight,
-                              child: Icon(
-                                Icons.done_all_rounded,
-                                size: 15,
-                                color: Color(0xFF38BDF8),
+                            Text(
+                              'Berikut ringkasan aktivitas Anda hari ini. ✨✨',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF065A37).withValues(alpha: 0.9),
+                                height: 1.35,
                               ),
                             ),
                           ],

@@ -89,88 +89,55 @@ class _MasterLayoutState extends State<MasterLayout> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.axis == Axis.vertical) {
-            final pixels = notification.metrics.pixels;
-            if (pixels > 20) {
-              if (_isTopBarVisible) {
-                setState(() {
-                  _isTopBarVisible = false;
-                });
-              }
-            } else if (pixels <= 5) {
-              if (!_isTopBarVisible) {
-                setState(() {
-                  _isTopBarVisible = true;
-                });
-              }
-            }
-          }
-          return false;
-        },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // ── 1. CONTENT: Mentok ke atas (Full Bleed) ──
-            Positioned.fill(
-              child: IndexedStack(
-                index: _currentIndex,
-                children: [
-                  // Tab 0: Home Pasien
-                  PasienHomeScreen(
-                    userName: widget.userName,
-                    isEmbedded: true,
-                  ),
-
-                  // Tab 1: Konsultasi Dokter
-                  DokterListScreen(
-                    userName: widget.userName,
-                    isEmbedded: true,
-                  ),
-
-                  // Tab 2: PRAGI AI Assistant & Screening
-                  const PragiHomeView(
-                    isEmbedded: true,
-                  ),
-
-                  // Tab 3: Pantau Kesehatan Ginjal
-                  PantauDashboardScreen(
-                    userName: widget.userName,
-                    isEmbedded: true,
-                  ),
-
-                  // Tab 4: Jadwal & Stok Obat
-                  const DaftarObatScreen(
-                    isEmbedded: true,
-                  ),
-                ],
-              ),
-            ),
-
-            // ── 2. TOPBAR: Mengambang di atas content di pojok kanan (Latar belakang transparan) ──
-            Positioned(
-              top: 0,
-              right: 0,
-              child: SafeArea(
-                bottom: false,
-                child: AnimatedSlide(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeInOut,
-                  offset: _isTopBarVisible ? Offset.zero : const Offset(0, -1.2),
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: _isTopBarVisible ? 1.0 : 0.0,
-                    child: IgnorePointer(
-                      ignoring: !_isTopBarVisible,
-                      child: _buildTopBar(),
-                    ),
-                  ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── 1. CONTENT: Mentok ke atas (Full Bleed) ──
+          Positioned.fill(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: [
+                // Tab 0: Home Pasien
+                PasienHomeScreen(
+                  userName: widget.userName,
+                  isEmbedded: true,
                 ),
-              ),
+
+                // Tab 1: Konsultasi Dokter
+                DokterListScreen(
+                  userName: widget.userName,
+                  isEmbedded: true,
+                ),
+
+                // Tab 2: PRAGI AI Assistant & Screening
+                const PragiHomeView(
+                  isEmbedded: true,
+                ),
+
+                // Tab 3: Pantau Kesehatan Ginjal
+                PantauDashboardScreen(
+                  userName: widget.userName,
+                  isEmbedded: true,
+                ),
+
+                // Tab 4: Jadwal & Stok Obat
+                const DaftarObatScreen(
+                  isEmbedded: true,
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+
+          // ── 2. TOPBAR: Tetap / Netap di pojok kanan atas ──
+          Positioned(
+            top: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: _buildTopBar(),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );

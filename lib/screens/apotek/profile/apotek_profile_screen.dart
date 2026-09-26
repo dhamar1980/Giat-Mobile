@@ -33,6 +33,321 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   static const _bgColor = Color(0xFFF7FAF8);
   static const _border = Color(0xFFE2E8F0);
 
+  String _avatarType = 'asset'; // 'asset', 'network', 'default'
+  String _avatarPath = 'assets/images/dokter_apoteker.jpg';
+
+  final List<Map<String, String>> _presetAvatars = [
+    {
+      'name': 'Apt. Aminah (Resmi)',
+      'path': 'assets/images/dokter_apoteker.jpg',
+      'type': 'asset',
+    },
+    {
+      'name': 'Apt. Sarah (Farmasi)',
+      'path': 'assets/images/sarah_amelia.jpg',
+      'type': 'asset',
+    },
+    {
+      'name': 'Apt. Rina',
+      'path': 'https://images.unsplash.com/photo-1594824813629-87a70197d19a?auto=format&fit=crop&q=80&w=300',
+      'type': 'network',
+    },
+    {
+      'name': 'Apt. Budi',
+      'path': 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
+      'type': 'network',
+    },
+    {
+      'name': 'Apt. Diana',
+      'path': 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+      'type': 'network',
+    },
+  ];
+
+  Widget _buildAvatarImage() {
+    if (_avatarType == 'default') {
+      return Container(
+        color: const Color(0xFFDCFCE7),
+        child: const Center(
+          child: Icon(Icons.local_pharmacy_rounded, size: 52, color: _darkGreen),
+        ),
+      );
+    } else if (_avatarType == 'network') {
+      return Image.network(
+        _avatarPath,
+        width: 104,
+        height: 104,
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => Container(
+          color: const Color(0xFFDCFCE7),
+          child: const Center(
+            child: Icon(Icons.person_rounded, size: 52, color: _darkGreen),
+          ),
+        ),
+      );
+    } else {
+      return Image.asset(
+        _avatarPath,
+        width: 104,
+        height: 104,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, stack) => Container(
+          color: const Color(0xFF044E2F),
+          child: const Center(
+            child: Icon(Icons.person_rounded, size: 52, color: Colors.white),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showChangeProfilePhotoModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Ganti Foto Profil Apoteker',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Pilih foto profil apoteker yang jelas dan profesional',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Action: Kamera
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.camera_alt_rounded, color: _darkGreen, size: 22),
+              ),
+              title: Text(
+                'Ambil Foto dari Kamera',
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _avatarType = 'asset';
+                  _avatarPath = 'assets/images/dokter_apoteker.jpg';
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Foto profil berhasil diperbarui dari kamera!',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: _darkGreen,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+            ),
+
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+            // Action: Galeri
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E7FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.photo_library_rounded, color: Color(0xFF4338CA), size: 22),
+              ),
+              title: Text(
+                'Pilih dari Galeri Foto',
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _avatarType = 'network';
+                  _avatarPath = 'https://images.unsplash.com/photo-1594824813629-87a70197d19a?auto=format&fit=crop&q=80&w=300';
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Foto profil berhasil dipilih dari galeri!',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: _darkGreen,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+            ),
+
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+            // Action: Avatar Preset
+            Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 10, left: 8),
+              child: Text(
+                'Pilihan Avatar Apoteker',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF475569),
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 72,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: _presetAvatars.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 14),
+                itemBuilder: (context, idx) {
+                  final item = _presetAvatars[idx];
+                  final isSelected = _avatarPath == item['path'];
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _avatarType = item['type']!;
+                        _avatarPath = item['path']!;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Avatar ${item['name']} berhasil diterapkan!',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                          ),
+                          backgroundColor: _darkGreen,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? _darkGreen : const Color(0xFFE2E8F0),
+                          width: isSelected ? 3 : 1.5,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: item['type'] == 'asset'
+                            ? Image.asset(item['path']!, fit: BoxFit.cover)
+                            : Image.network(
+                                item['path']!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) => Container(
+                                  color: const Color(0xFFDCFCE7),
+                                  child: const Icon(Icons.person, color: _darkGreen),
+                                ),
+                              ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+            // Action: Hapus Foto Profil
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626), size: 22),
+              ),
+              title: Text(
+                'Hapus Foto Profil',
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFFDC2626),
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _avatarType = 'default';
+                  _avatarPath = '';
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Foto profil berhasil dihapus (avatar bawaan)',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: const Color(0xFFDC2626),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showLogoutConfirmation() {
     showDialog(
       context: context,
@@ -94,39 +409,41 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
               ),
             ),
 
-            SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-              padding: const EdgeInsets.only(bottom: 36),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Organic Curved Green Header
-                  _buildHeader(context),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Organic Curved Green Header (Fixed at top, does not scroll)
+                _buildHeader(context),
 
-                  const SizedBox(height: 18),
+                // Scrollable content below pinned header
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                    padding: const EdgeInsets.only(bottom: 36),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 18),
+                          // Card Jam Operasional & Area Layanan
+                          _buildOperationalCard(),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Card Jam Operasional & Area Layanan
-                        _buildOperationalCard(),
+                          const SizedBox(height: 22),
 
-                        const SizedBox(height: 22),
+                          // Section 1: Pengaturan Layanan & Keamanan
+                          _buildSettingsSection(),
 
-                        // Section 1: Pengaturan Layanan & Keamanan
-                        _buildSettingsSection(),
+                          const SizedBox(height: 22),
 
-                        const SizedBox(height: 22),
-
-                        // Section 2: Akun
-                        _buildAccountSection(),
-                      ],
+                          // Section 2: Akun
+                          _buildAccountSection(),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),
@@ -164,52 +481,145 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                 painter: _HeaderWaveOverlayPainter(),
               ),
             ),
-            if (widget.showBackButton && Navigator.of(context).canPop())
-              Positioned(
-                top: topPadding + 6,
-                left: 10,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, topPadding + 14, 20, 44),
-              child: Center(
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 44),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Circular Avatar with White Border (matches screenshot)
-                    Container(
-                      width: 104,
-                      height: 104,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/dokter_apoteker.jpg',
-                          width: 104,
-                          height: 104,
-                          fit: BoxFit.cover,
-                          errorBuilder: (ctx, err, stack) => Container(
-                            color: const Color(0xFF044E2F),
-                            child: const Center(
-                              child: Icon(Icons.person_rounded, size: 54, color: Colors.white),
+                    // Top Navigation Row: Back button (if enabled) & "✏️ Edit" pill button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (widget.showBackButton && Navigator.of(context).canPop())
+                          GestureDetector(
+                            onTap: () => Navigator.of(context).pop(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.arrow_back, size: 15, color: Color(0xFF0F172A)),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Kembali',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          const SizedBox.shrink(),
+
+                        // Tombol "✏️ Edit"
+                        GestureDetector(
+                          onTap: () => _showChangeProfilePhotoModal(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFBBF24), // Vibrant golden amber
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.edit, size: 13, color: Color(0xFF0F172A)),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Edit',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Circular Avatar with White Border & Camera Edit Badge
+                    GestureDetector(
+                      onTap: () => _showChangeProfilePhotoModal(context),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 104,
+                            height: 104,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: _buildAvatarImage(),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 2,
+                            right: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(6.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFBBF24),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                size: 16,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+
                     const SizedBox(height: 14),
+
                     // Name
                     Text(
                       widget.apotekerName,

@@ -124,177 +124,138 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
 
     return Scaffold(
       backgroundColor: _bgColor,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.axis == Axis.vertical) {
-            final pixels = notification.metrics.pixels;
-            if (pixels > 20) {
-              if (_internalIsTopBarVisible) setState(() => _internalIsTopBarVisible = false);
-            } else if (pixels <= 5) {
-              if (!_internalIsTopBarVisible) setState(() => _internalIsTopBarVisible = true);
-            }
-          }
-          return false;
-        },
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── 1. Top Curved Green Header with Chat Bubbles ──
-              _buildHeaderSection(topPadding),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── 1. Top Curved Green Header with Chat Bubbles (Fixed at top, does not scroll) ──
+          _buildHeaderSection(topPadding),
 
-            const SizedBox(height: 16),
+          // ── 2. Search & Tab Filter & Content (Scrollable) ──
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.only(top: 16, bottom: 28),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Search Bar with Dark Green Outline
+                    _buildSearchBar(),
 
-            // ── 2. Search & Tab Filter & Content ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Search Bar with Dark Green Outline
-                  _buildSearchBar(),
+                    const SizedBox(height: 14),
 
-                  const SizedBox(height: 14),
+                    // Three Filter Tabs: Menunggu, Diproses, Selesai
+                    _buildFilterTabs(),
 
-                  // Three Filter Tabs: Menunggu, Diproses, Selesai
-                  _buildFilterTabs(),
+                    const SizedBox(height: 20),
 
-                  const SizedBox(height: 20),
-
-                  // Section Title
-                  Text(
-                    sectionTitle,
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0F172A),
+                    // Section Title
+                    Text(
+                      sectionTitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF0F172A),
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  // Order Cards List
-                  if (filteredOrders.isEmpty)
-                    _buildEmptyState()
-                  else
-                    ...filteredOrders.map((order) => Padding(
-                          padding: const EdgeInsets.only(bottom: 18),
-                          child: _buildOrderCard(order),
-                        )),
+                    // Order Cards List
+                    if (filteredOrders.isEmpty)
+                      _buildEmptyState()
+                    else
+                      ...filteredOrders.map((order) => Padding(
+                            padding: const EdgeInsets.only(bottom: 18),
+                            child: _buildOrderCard(order),
+                          )),
 
-                  const SizedBox(height: 36),
-                ],
+                    const SizedBox(height: 36),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    ),
-  );
-}
+    );
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // HEADER SECTION (Green Gradient + Topography + Action Pill + Chat Bubbles)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildHeaderSection(double topPadding) {
-    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
-
-    return ClipPath(
-      clipper: _PesananHeaderClipper(),
-      child: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF22C55E),
-              Color(0xFF16A34A),
-              Color(0xFF065A37),
-            ],
-          ),
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF22C55E),
+            Color(0xFF16A34A),
+            Color(0xFF065A37),
+          ],
         ),
-        child: Stack(
-          children: [
-            Positioned.fill(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(36),
+          bottomRight: Radius.circular(36),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
+              ),
               child: CustomPaint(
                 painter: _PesananHeaderCurvePainter(),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, topPadding + 60, 20, 42),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Chat Bubble 1 (Left Aligned - White Bubble)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildChatBubble(
-                      isLeft: true,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Selamat datang kembali! Yuk, cek dan proses pesanan masuk kamu sekarang di menu Pesanan.',
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF065A37),
-                              height: 1.35,
-                            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, topPadding + 78, 20, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Single Chat Bubble
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildChatBubble(
+                    isLeft: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Kelola Pesanan Masuk ✨✨',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF065A37),
                           ),
-                          const SizedBox(height: 4),
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Spacer(),
-                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
-                            ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Yuk, cek dan proses pesanan masuk obat kamu sekarang di menu Pesanan.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF065A37).withValues(alpha: 0.9),
+                            height: 1.35,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Chat Bubble 2 (Right Aligned - White Bubble)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _buildChatBubble(
-                      isLeft: false,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Kelola dan proses pesanan yang masuk ✨✨',
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF065A37),
-                              height: 1.35,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Spacer(),
-                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFF38BDF8)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -307,10 +268,8 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
       clipBehavior: Clip.none,
       children: [
         Container(
-          constraints: BoxConstraints(
-            maxWidth: isLeft ? 330 : 280,
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 12, 14, 8),
+          constraints: const BoxConstraints(maxWidth: 340),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(
