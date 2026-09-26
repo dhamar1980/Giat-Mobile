@@ -3,7 +3,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:giat/widgets/giat_background.dart';
 
 void main() {
-  testWidgets('GiatBackground renders without error and paints correctly', (tester) async {
+  testWidgets('GiatBackground renders without error and paints standard correctly', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SizedBox(
+          width: 402,
+          height: 874,
+          child: GiatBackground(
+            showBottomWaves: false,
+            child: SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(GiatBackground), findsOneWidget);
+  });
+
+  testWidgets('GiatBackground renders welcome screen configuration correctly', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: SizedBox(
@@ -11,6 +28,8 @@ void main() {
           height: 874,
           child: GiatBackground(
             showBottomWaves: true,
+            showBottomGradient: true,
+            smallTopGradient: true,
             child: SizedBox.expand(),
           ),
         ),

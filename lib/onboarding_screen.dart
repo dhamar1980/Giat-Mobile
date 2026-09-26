@@ -84,6 +84,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: _bg,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ));
 
     return Scaffold(
@@ -91,15 +93,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       body: Stack(
         children: [
           // ── Background Gelombang Atas & Bawah (Tengah Kosong) Sesuai Figma ──
-          Positioned(
-            top: 0,
-            left: 0,
-            width: screenSize.width,
-            height: screenSize.height,
+          Positioned.fill(
             child: GiatAuthBackground(
               screenSize: screenSize,
               showBottomWaves: true,
-              baseColor: const Color(0xFFF7F9FF),
+              showBottomGradient: true,
+              smallTopGradient: true,
+              baseColor: _bg,
             ),
           ),
 

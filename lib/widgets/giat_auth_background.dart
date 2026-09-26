@@ -10,12 +10,16 @@ import 'giat_background.dart';
 class GiatAuthBackground extends StatelessWidget {
   final Size screenSize;
   final bool showBottomWaves;
+  final bool? showBottomGradient;
+  final bool smallTopGradient;
   final Color baseColor;
 
   const GiatAuthBackground({
     super.key,
     required this.screenSize,
     this.showBottomWaves = true,
+    this.showBottomGradient,
+    this.smallTopGradient = false,
     this.baseColor = const Color(0xFFF6FAF7),
   });
 
@@ -29,6 +33,8 @@ class GiatAuthBackground extends StatelessWidget {
         painter: GiatTopoWavePainter(
           fixedSize: screenSize,
           showBottomWaves: showBottomWaves,
+          showBottomGradient: showBottomGradient,
+          smallTopGradient: smallTopGradient,
           baseColor: baseColor,
         ),
       ),
@@ -40,11 +46,15 @@ class GiatAuthBackground extends StatelessWidget {
 class GiatTopoWavePainter extends CustomPainter {
   final Size fixedSize;
   final bool showBottomWaves;
+  final bool? showBottomGradient;
+  final bool smallTopGradient;
   final Color baseColor;
 
   const GiatTopoWavePainter({
     required this.fixedSize,
     this.showBottomWaves = true,
+    this.showBottomGradient,
+    this.smallTopGradient = false,
     this.baseColor = const Color(0xFFF6FAF7),
   });
 
@@ -55,6 +65,8 @@ class GiatTopoWavePainter extends CustomPainter {
       size,
       fixedSize: fixedSize,
       showBottomWaves: showBottomWaves,
+      showBottomGradient: showBottomGradient,
+      smallTopGradient: smallTopGradient,
       showGradient: true,
       showLines: true,
       baseColor: baseColor,
@@ -65,6 +77,8 @@ class GiatTopoWavePainter extends CustomPainter {
   bool shouldRepaint(covariant GiatTopoWavePainter oldDelegate) =>
       oldDelegate.fixedSize != fixedSize ||
       oldDelegate.showBottomWaves != showBottomWaves ||
+      oldDelegate.showBottomGradient != showBottomGradient ||
+      oldDelegate.smallTopGradient != smallTopGradient ||
       oldDelegate.baseColor != baseColor;
 }
 
