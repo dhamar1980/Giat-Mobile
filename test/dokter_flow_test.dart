@@ -34,11 +34,11 @@ void main() {
     expect(find.text('Jadwal Hari ini'), findsOneWidget);
     expect(find.text('Ahmad Hidayat'), findsOneWidget);
 
-    // Verify bottom nav items
+    // Verify bottom nav & quick menu items
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Konsultasi'), findsWidgets);
-    expect(find.text('Pasien'), findsOneWidget);
-    expect(find.text('Jadwal'), findsOneWidget);
+    expect(find.text('Pasien'), findsWidgets);
+    expect(find.text('Jadwal'), findsWidgets);
     expect(find.text('Profil'), findsOneWidget);
 
     // Tap Konsultasi tab
@@ -47,12 +47,12 @@ void main() {
     expect(find.text('Daftar Konsultasi'), findsOneWidget);
 
     // Tap Pasien center button
-    await tester.tap(find.text('Pasien'));
+    await tester.tap(find.text('Pasien').last);
     await tester.pumpAndSettle();
     expect(find.text('Daftar Pasien'), findsOneWidget);
 
     // Tap Jadwal tab
-    await tester.tap(find.text('Jadwal'));
+    await tester.tap(find.text('Jadwal').last);
     await tester.pumpAndSettle();
     expect(find.text('Jadwal Pasien'), findsOneWidget);
 

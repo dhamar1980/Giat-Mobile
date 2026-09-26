@@ -6,6 +6,7 @@ import 'profile/profile_pasien_screen.dart';
 import 'edukasi/edukasi_list_screen.dart';
 import 'edukasi/edukasi_detail_screen.dart';
 import 'widgets/pasien_bottom_navbar.dart';
+import '../../master_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PASIEN HOME SCREEN (Figma Node: 771-5845)
@@ -14,11 +15,13 @@ import 'widgets/pasien_bottom_navbar.dart';
 class PasienHomeScreen extends StatefulWidget {
   final String userName;
   final bool isEmbedded;
+  final ValueChanged<int>? onNavigateTab;
 
   const PasienHomeScreen({
     super.key,
     this.userName = 'Pasien',
     this.isEmbedded = false,
+    this.onNavigateTab,
   });
 
   @override
@@ -88,7 +91,12 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+
+                    // ── Quick Access Menu: 4 Circular Buttons (Mobile JKN Style) ──
+                    _buildQuickActionMenu(),
+
+                    const SizedBox(height: 22),
 
                     // ── Section 1: Pengingat Hari Ini ──
                     _buildReminderSection(),
@@ -324,6 +332,109 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // NAVIGATION HELPER (Tab switcher / Screen router)
+  // ───────────────────────────────────────────────────────────────────────────
+  void _navigateToTab(int tabIndex) {
+    if (widget.onNavigateTab != null) {
+      widget.onNavigateTab!(tabIndex);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MasterLayout(
+            userName: widget.userName,
+            initialIndex: tabIndex,
+          ),
+        ),
+      );
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // QUICK ACTION MENU (4 Menu Cepat Konsisten - Rounded Box Style)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildQuickActionMenu() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _cardBorderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Konsultasi
+          Expanded(
+            child: _QuickMenuRoundedItem(
+              label: 'Konsultasi',
+              iconWidget: const Icon(
+                Icons.medical_services_rounded,
+                color: _darkGreen,
+                size: 27,
+              ),
+              onTap: () => _navigateToTab(1),
+            ),
+          ),
+
+          // 2. Skrining Resiko Penyakit CKD
+          Expanded(
+            child: _QuickMenuRoundedItem(
+              label: 'Skrining Resiko\nPenyakit CKD',
+              iconWidget: Image.asset(
+                'assets/images/pragi.png',
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.smart_toy_rounded,
+                  color: _darkGreen,
+                  size: 27,
+                ),
+              ),
+              onTap: () => _navigateToTab(2),
+            ),
+          ),
+
+          // 3. Pantau
+          Expanded(
+            child: _QuickMenuRoundedItem(
+              label: 'Pantau',
+              iconWidget: const Icon(
+                Icons.monitor_heart_rounded,
+                color: _darkGreen,
+                size: 27,
+              ),
+              onTap: () => _navigateToTab(3),
+            ),
+          ),
+
+          // 4. Obat
+          Expanded(
+            child: _QuickMenuRoundedItem(
+              label: 'Obat',
+              iconWidget: const Icon(
+                Icons.medication_rounded,
+                color: _darkGreen,
+                size: 27,
+              ),
+              onTap: () => _navigateToTab(4),
             ),
           ),
         ],
@@ -766,4 +877,102 @@ class _SubtleCardOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUICK MENU ROUNDED ITEM COMPONENT (Interactive Bouncing Rounded Box + Label)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _QuickMenuRoundedItem extends StatefulWidget {
+  final String label;
+  final Widget iconWidget;
+  final VoidCallback onTap;
+
+  const _QuickMenuRoundedItem({
+    required this.label,
+    required this.iconWidget,
+    required this.onTap,
+  });
+
+  @override
+  State<_QuickMenuRoundedItem> createState() => _QuickMenuRoundedItemState();
+}
+
+class _QuickMenuRoundedItemState extends State<_QuickMenuRoundedItem> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedScale(
+            scale: _isPressed ? 0.92 : 1.0,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeInOut,
+            child: Container(
+              width: 56,
+              height: 56,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFE8F8F0),
+                    Color(0xFFD1FAE5),
+                  ],
+                ),
+                border: Border.all(
+                  color: const Color(0xFFBBEFD7),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF065A37).withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Center(child: widget.iconWidget),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 32,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Text(
+                widget.label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1E293B),
+                  height: 1.25,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

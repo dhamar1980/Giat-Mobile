@@ -101,6 +101,7 @@ class _MasterLayoutState extends State<MasterLayout> {
                 PasienHomeScreen(
                   userName: widget.userName,
                   isEmbedded: true,
+                  onNavigateTab: _onTabSelected,
                 ),
 
                 // Tab 1: Konsultasi Dokter
