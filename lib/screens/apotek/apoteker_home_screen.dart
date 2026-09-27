@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -423,7 +423,7 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // SECTION 1: PERLU PERHATIAN (3 Summary Cards)
+  // SECTION 1: PERLU PERHATIAN (3 Summary Cards - Styled like Dokter & Pasien)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildAttentionSection() {
     return Padding(
@@ -442,124 +442,40 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
           const SizedBox(height: 12),
           Row(
             children: [
-              // Card 1: Pesanan belum diproses (Dark Green)
+              // Card 1: Pesanan belum diproses
               Expanded(
-                child: _buildAttentionCard(
+                child: _AttentionCardItem(
                   count: '${ApotekMockData.orders.where((o) => o.status == ApotekOrderStatus.menunggu).length}',
                   title: 'Pesanan belum\ndiproses',
-                  bgColor: const Color(0xFF065A37),
-                  textColor: Colors.white,
-                  countColor: Colors.white,
-                  borderColor: null,
-                  watermarkColor: Colors.white.withOpacity(0.08),
+                  icon: Icons.shopping_bag_outlined,
                   onTap: () => _switchToTab(1, pesananTab: 0),
                 ),
               ),
               const SizedBox(width: 10),
 
-              // Card 2: Resep belum diterima (Light Mint/Blue with dark border)
+              // Card 2: Resep belum diterima
               Expanded(
-                child: _buildAttentionCard(
+                child: _AttentionCardItem(
                   count: '${ApotekMockData.recipes.where((r) => r.status == ApotekRecipeStatus.belumDiverifikasi).length}',
                   title: 'Resep belum\nditerima',
-                  bgColor: const Color(0xFFF0FDF9),
-                  textColor: const Color(0xFF1E293B),
-                  countColor: const Color(0xFF0F172A),
-                  borderColor: const Color(0xFF065A37).withOpacity(0.85),
-                  watermarkColor: const Color(0xFF065A37).withOpacity(0.06),
+                  icon: Icons.receipt_long_rounded,
                   onTap: () => _switchToTab(2, resepTab: 0),
                 ),
               ),
               const SizedBox(width: 10),
 
-              // Card 3: 3 Stok Menipis (Soft Red/Pink)
+              // Card 3: 3 Stok Menipis
               Expanded(
-                child: _buildAttentionCard(
+                child: _AttentionCardItem(
                   count: '3',
                   title: 'Stok Menipis',
-                  bgColor: const Color(0xFFFEF2F2),
-                  textColor: const Color(0xFFDC2626),
-                  countColor: const Color(0xFFDC2626),
-                  borderColor: const Color(0xFFFCA5A5),
-                  watermarkColor: const Color(0xFFDC2626).withOpacity(0.06),
+                  icon: Icons.inventory_2_outlined,
                   onTap: () => _switchToTab(3, obatFilter: 'Stock Menipis'),
                 ),
               ),
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAttentionCard({
-    required String count,
-    required String title,
-    required Color bgColor,
-    required Color textColor,
-    required Color countColor,
-    required Color? borderColor,
-    required Color watermarkColor,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 110,
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(16),
-          border: borderColor != null ? Border.all(color: borderColor, width: 1.2) : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(15),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _CardWavePainter(color: watermarkColor),
-                ),
-              ),
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        count,
-                        style: GoogleFonts.inter(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: countColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: textColor,
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -590,7 +506,7 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
               border: Border.all(color: const Color(0xFFF1F5F9)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
@@ -605,7 +521,7 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
                     left: 0,
                     child: CustomPaint(
                       size: const Size(120, 80),
-                      painter: _CardWavePainter(color: const Color(0xFF10B981).withOpacity(0.08)),
+                      painter: _CardWavePainter(color: const Color(0xFF10B981).withValues(alpha: 0.08)),
                     ),
                   ),
                   Padding(
@@ -615,35 +531,35 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
                         _buildTimelineItem(
                           title: 'Resep #RX-00110 telah diterima',
                           time: '10 menit lalu',
-                          circleColor: const Color(0xFF065A37),
+                          circleColor: _darkGreen,
                           showLineBelow: true,
                           onTap: () => _switchToTab(2, resepTab: 1),
                         ),
                         _buildTimelineItem(
                           title: 'Resep #ORD-00124 selesai',
                           time: '25 menit lalu',
-                          circleColor: const Color(0xFF22C55E),
+                          circleColor: _darkGreen,
                           showLineBelow: true,
                           onTap: () => _switchToTab(1, pesananTab: 2),
                         ),
                         _buildTimelineItem(
                           title: 'Stok Paracetamol 500 mg menipis',
                           time: '1 jam lalu',
-                          circleColor: const Color(0xFFDC2626),
+                          circleColor: _darkGreen,
                           showLineBelow: true,
                           onTap: () => _switchToTab(3, obatFilter: 'Stock Menipis'),
                         ),
                         _buildTimelineItem(
                           title: 'Pesanan #ORD-00122 telah diambil kurir',
                           time: '2 jam lalu',
-                          circleColor: const Color(0xFF0284C7),
+                          circleColor: _darkGreen,
                           showLineBelow: true,
                           onTap: () => _switchToTab(1, pesananTab: 1),
                         ),
                         _buildTimelineItem(
                           title: 'Verifikasi resep #RX-00109 selesai',
                           time: '3 jam lalu',
-                          circleColor: const Color(0xFF10B981),
+                          circleColor: _darkGreen,
                           showLineBelow: false,
                           onTap: () => _switchToTab(2, resepTab: 2),
                         ),
@@ -680,9 +596,16 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
                   decoration: BoxDecoration(
                     color: circleColor,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: circleColor.withValues(alpha: 0.25),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                   child: const Center(
-                    child: Icon(Icons.check, size: 14, color: Colors.white),
+                    child: Icon(Icons.check_rounded, size: 14, color: Colors.white),
                   ),
                 ),
                 if (showLineBelow)
@@ -690,7 +613,7 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
                     child: Container(
                       width: 2,
                       margin: const EdgeInsets.symmetric(vertical: 4),
-                      color: const Color(0xFF10B981),
+                      color: const Color(0xFFD1FAE5),
                     ),
                   ),
               ],
@@ -974,5 +897,155 @@ class _ApotekerHeaderCurvePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATTENTION CARD ITEM (Styled like Dokter & Pasien Quick Action Cards)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AttentionCardItem extends StatefulWidget {
+  final String count;
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _AttentionCardItem({
+    required this.count,
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  State<_AttentionCardItem> createState() => _AttentionCardItemState();
+}
+
+class _AttentionCardItemState extends State<_AttentionCardItem> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeInOut,
+        child: Container(
+          height: 128,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFE2E8F0),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+              BoxShadow(
+                color: const Color(0xFF065A37).withValues(alpha: 0.03),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _CardWavePainter(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.05),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Soft mint gradient icon box matching Dokter & Pasien
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFFE8F8F0),
+                                Color(0xFFD1FAE5),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: const Color(0xFFBBEFD7),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF065A37).withValues(alpha: 0.06),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Icon(
+                              widget.icon,
+                              size: 20,
+                              color: const Color(0xFF065A37),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.count,
+                          style: GoogleFonts.inter(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF065A37),
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        SizedBox(
+                          height: 28,
+                          child: Text(
+                            widget.title,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF475569),
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
