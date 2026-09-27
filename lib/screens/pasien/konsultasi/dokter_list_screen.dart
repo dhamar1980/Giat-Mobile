@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'konsultasi_chat_screen.dart';
@@ -1569,7 +1569,7 @@ class _KonsultasiTopographyPainter extends CustomPainter {
     GiatBackgroundPainter.paintBackground(
       canvas,
       size,
-      showGradient: true,
+      showGradient: false,
       showLines: true,
     );
   }

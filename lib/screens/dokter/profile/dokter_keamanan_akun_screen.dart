@@ -1,4 +1,4 @@
-import 'package:giat/widgets/giat_background.dart';
+﻿import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dokter_ganti_kata_sandi_screen.dart';
@@ -278,7 +278,7 @@ class _KeamananTopographyPainter extends CustomPainter {
     GiatBackgroundPainter.paintBackground(
       canvas,
       size,
-      showGradient: true,
+      showGradient: false,
       showLines: true,
     );
     }

@@ -93,9 +93,9 @@ class _MasterLayoutState extends State<MasterLayout> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ── 0. BACKGROUND TOPOGRAPHY & GRADIENT (Figma 1018:5009) ──
+          // ── 0. BACKGROUND TOPOGRAPHY (Figma 1018:5009) ──
           const Positioned.fill(
-            child: GiatBackground(),
+            child: GiatBackground(showGradient: false),
           ),
 
           // ── 1. CONTENT: Mentok ke atas (Full Bleed) ──

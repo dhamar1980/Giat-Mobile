@@ -36,7 +36,7 @@ class GiatBackground extends StatelessWidget {
     this.showBottomGradient,
     this.smallTopGradient = false,
     this.authTopGradient = false,
-    this.showGradient = true,
+    this.showGradient = false,
     this.showLines = true,
     this.baseColor = const Color(0xFFF6FAF7),
   });
@@ -76,7 +76,7 @@ class GiatBackgroundPainter extends CustomPainter {
     this.showBottomGradient,
     this.smallTopGradient = false,
     this.authTopGradient = false,
-    this.showGradient = true,
+    this.showGradient = false,
     this.showLines = true,
     this.baseColor = const Color(0xFFF6FAF7),
   });
@@ -107,7 +107,7 @@ class GiatBackgroundPainter extends CustomPainter {
     bool? showBottomGradient,
     bool smallTopGradient = false,
     bool authTopGradient = false,
-    bool showGradient = true,
+    bool showGradient = false,
     bool showLines = true,
     Color baseColor = const Color(0xFFF6FAF7),
   }) {

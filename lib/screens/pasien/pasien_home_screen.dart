@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'reminder/reminder_list_screen.dart';
@@ -812,7 +812,7 @@ class _HomeTopographyPainter extends CustomPainter {
     GiatBackgroundPainter.paintBackground(
       canvas,
       size,
-      showGradient: true,
+      showGradient: false,
       showLines: true,
     );
   }

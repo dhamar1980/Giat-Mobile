@@ -1,4 +1,4 @@
-import 'package:giat/widgets/giat_background.dart';
+﻿import 'package:giat/widgets/giat_background.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1053,7 +1053,7 @@ class _QrisTopographyPainter extends CustomPainter {
     GiatBackgroundPainter.paintBackground(
       canvas,
       size,
-      showGradient: true,
+      showGradient: false,
       showLines: true,
     );
     }

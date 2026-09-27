@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
@@ -1153,7 +1153,7 @@ class _ObatTopographyPainter extends CustomPainter {
     GiatBackgroundPainter.paintBackground(
       canvas,
       size,
-      showGradient: true,
+      showGradient: false,
       showLines: true,
     );
   }

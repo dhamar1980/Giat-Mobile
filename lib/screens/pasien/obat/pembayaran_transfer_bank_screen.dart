@@ -1,4 +1,4 @@
-import 'package:giat/widgets/giat_background.dart';
+﻿import 'package:giat/widgets/giat_background.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1199,7 +1199,7 @@ class _TransferTopographyPainter extends CustomPainter {
     GiatBackgroundPainter.paintBackground(
       canvas,
       size,
-      showGradient: true,
+      showGradient: false,
       showLines: true,
     );
     }

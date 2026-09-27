@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../widgets/giat_background.dart';
 
 /// Topography background painter matching GIAT & PRAGI aesthetic (Figma 1018:5009)
@@ -14,7 +14,7 @@ class PragiTopographyPainter extends CustomPainter {
     GiatBackgroundPainter.paintBackground(
       canvas,
       size,
-      showGradient: true,
+      showGradient: false,
       showLines: true,
     );
   }
