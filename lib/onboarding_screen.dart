@@ -340,41 +340,17 @@ class _ChatBubble extends StatelessWidget {
         padding: EdgeInsets.only(
           left: isRight ? 18 : 22,
           right: isRight ? 22 : 18,
-          top: 14,
-          bottom: 10,
+          top: 12,
+          bottom: 12,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '12.00',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.75),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const _DoubleCheckIcon(),
-                ],
-              ),
-            ),
-          ],
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w500,
+            color: Colors.white,
+            height: 1.4,
+          ),
         ),
       ),
     );
@@ -417,46 +393,6 @@ class _KidneyBadge extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // PAINTERS
 // ─────────────────────────────────────────────────────────────────────────────
-
-class _DoubleCheckIcon extends StatelessWidget {
-  const _DoubleCheckIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 17,
-      height: 12,
-      child: CustomPaint(painter: _DblCheckPainter()),
-    );
-  }
-}
-
-class _DblCheckPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = const Color(0xFF38BDF8)
-      ..strokeWidth = 1.6
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final p1 = Path()
-      ..moveTo(0, size.height * 0.55)
-      ..lineTo(size.width * 0.28, size.height * 0.9)
-      ..lineTo(size.width * 0.68, size.height * 0.15);
-    canvas.drawPath(p1, p);
-
-    final p2 = Path()
-      ..moveTo(size.width * 0.32, size.height * 0.55)
-      ..lineTo(size.width * 0.60, size.height * 0.9)
-      ..lineTo(size.width * 1.0, size.height * 0.15);
-    canvas.drawPath(p2, p);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter _) => false;
-}
 
 class _RightBubblePainter extends CustomPainter {
   final Color color;

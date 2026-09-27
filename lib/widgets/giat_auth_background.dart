@@ -12,6 +12,7 @@ class GiatAuthBackground extends StatelessWidget {
   final bool showBottomWaves;
   final bool? showBottomGradient;
   final bool smallTopGradient;
+  final bool authTopGradient;
   final Color baseColor;
 
   const GiatAuthBackground({
@@ -20,6 +21,7 @@ class GiatAuthBackground extends StatelessWidget {
     this.showBottomWaves = true,
     this.showBottomGradient,
     this.smallTopGradient = false,
+    this.authTopGradient = true,
     this.baseColor = const Color(0xFFF6FAF7),
   });
 
@@ -35,6 +37,7 @@ class GiatAuthBackground extends StatelessWidget {
           showBottomWaves: showBottomWaves,
           showBottomGradient: showBottomGradient,
           smallTopGradient: smallTopGradient,
+          authTopGradient: authTopGradient,
           baseColor: baseColor,
         ),
       ),
@@ -48,6 +51,7 @@ class GiatTopoWavePainter extends CustomPainter {
   final bool showBottomWaves;
   final bool? showBottomGradient;
   final bool smallTopGradient;
+  final bool authTopGradient;
   final Color baseColor;
 
   const GiatTopoWavePainter({
@@ -55,6 +59,7 @@ class GiatTopoWavePainter extends CustomPainter {
     this.showBottomWaves = true,
     this.showBottomGradient,
     this.smallTopGradient = false,
+    this.authTopGradient = true,
     this.baseColor = const Color(0xFFF6FAF7),
   });
 
@@ -67,6 +72,7 @@ class GiatTopoWavePainter extends CustomPainter {
       showBottomWaves: showBottomWaves,
       showBottomGradient: showBottomGradient,
       smallTopGradient: smallTopGradient,
+      authTopGradient: authTopGradient,
       showGradient: true,
       showLines: true,
       baseColor: baseColor,
@@ -79,6 +85,7 @@ class GiatTopoWavePainter extends CustomPainter {
       oldDelegate.showBottomWaves != showBottomWaves ||
       oldDelegate.showBottomGradient != showBottomGradient ||
       oldDelegate.smallTopGradient != smallTopGradient ||
+      oldDelegate.authTopGradient != authTopGradient ||
       oldDelegate.baseColor != baseColor;
 }
 

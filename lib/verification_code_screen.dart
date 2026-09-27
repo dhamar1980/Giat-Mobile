@@ -373,35 +373,14 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Silakan masukkan kode verifikasi yang telah kami kirimkan ke alamat email Anda. Mohon periksa kotak masuk (inbox) atau folder spam/junk Anda.',
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            '12.00',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: Colors.white.withValues(alpha: 0.85),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.done_all_rounded,
-                              size: 14, color: Color(0xFF67E8F9)),
-                        ],
-                      ),
-                    ],
+                  child: Text(
+                    'Silakan masukkan kode verifikasi yang telah kami kirimkan ke alamat email Anda. Mohon periksa kotak masuk (inbox) atau folder spam/junk Anda.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                      height: 1.35,
+                    ),
                   ),
                 ),
               ),

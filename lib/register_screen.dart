@@ -380,7 +380,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                   color: _bubbleGreen,
                   text:
                       'Daftar untuk mulai menjaga kesehatan ginjal bersama GIAT.',
-                  time: '12.00',
                 ),
               ),
             ),
@@ -1190,12 +1189,10 @@ class _RegisterGiatLogoHeader extends StatelessWidget {
 class _RegisterRightChatBubble extends StatelessWidget {
   final Color color;
   final String text;
-  final String time;
 
   const _RegisterRightChatBubble({
     required this.color,
     required this.text,
-    required this.time,
   });
 
   @override
@@ -1208,42 +1205,16 @@ class _RegisterRightChatBubble extends StatelessWidget {
           left: 14,
           right: 18,
           top: 10,
-          bottom: 8,
+          bottom: 10,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 13.2,
-                fontWeight: FontWeight.w400,
-                color: Colors.white,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    time,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const _RegisterBlueDoubleCheck(size: 13),
-                ],
-              ),
-            ),
-          ],
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            fontSize: 13.2,
+            fontWeight: FontWeight.w400,
+            color: Colors.white,
+            height: 1.35,
+          ),
         ),
       ),
     );
@@ -1284,49 +1255,6 @@ class _RegisterLeftChatBubble extends StatelessWidget {
   }
 }
 
-class _RegisterBlueDoubleCheck extends StatelessWidget {
-  final double size;
-  const _RegisterBlueDoubleCheck({this.size = 14});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size * 1.3,
-      height: size,
-      child: CustomPaint(
-        painter: _RegisterDoubleCheckPainter(),
-      ),
-    );
-  }
-}
-
-class _RegisterDoubleCheckPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF38BDF8)
-      ..strokeWidth = 1.6
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path1 = Path()
-      ..moveTo(0, size.height * 0.52)
-      ..lineTo(size.width * 0.28, size.height * 0.88)
-      ..lineTo(size.width * 0.68, size.height * 0.12);
-
-    final path2 = Path()
-      ..moveTo(size.width * 0.32, size.height * 0.52)
-      ..lineTo(size.width * 0.60, size.height * 0.88)
-      ..lineTo(size.width * 1.0, size.height * 0.12);
-
-    canvas.drawPath(path1, paint);
-    canvas.drawPath(path2, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 class _RegisterRightBubbleShapePainter extends CustomPainter {
   final Color color;

@@ -384,35 +384,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Buat kata sandi baru yang aman namun tetap mudah Anda ingat. Pastikan kata sandi terdiri dari kombinasi huruf, angka, dan karakter khusus.',
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            '12.00',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: Colors.white.withValues(alpha: 0.85),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.done_all_rounded,
-                              size: 14, color: Color(0xFF67E8F9)),
-                        ],
-                      ),
-                    ],
+                  child: Text(
+                    'Buat kata sandi baru yang aman namun tetap mudah Anda ingat. Pastikan kata sandi terdiri dari kombinasi huruf, angka, dan karakter khusus.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                      height: 1.35,
+                    ),
                   ),
                 ),
               ),

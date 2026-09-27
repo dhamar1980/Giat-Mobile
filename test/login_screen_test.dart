@@ -27,7 +27,7 @@ void main() {
       find.text('Selamat datang kembali. Jaga kesehatan\nginjalmu bersama GIAT.✨✨'),
       findsOneWidget,
     );
-    expect(find.text('12.00'), findsOneWidget);
+    expect(find.text('12.00'), findsNothing);
     expect(find.text('Masuk ke GIAT'), findsOneWidget);
 
     // Verify Form Fields & Labels

@@ -23,6 +23,7 @@ class GiatBackground extends StatelessWidget {
   final bool showBottomWaves;
   final bool? showBottomGradient;
   final bool smallTopGradient;
+  final bool authTopGradient;
   final bool showGradient;
   final bool showLines;
   final Color baseColor;
@@ -34,6 +35,7 @@ class GiatBackground extends StatelessWidget {
     this.showBottomWaves = false,
     this.showBottomGradient,
     this.smallTopGradient = false,
+    this.authTopGradient = false,
     this.showGradient = true,
     this.showLines = true,
     this.baseColor = const Color(0xFFF6FAF7),
@@ -47,6 +49,7 @@ class GiatBackground extends StatelessWidget {
         showBottomWaves: showBottomWaves,
         showBottomGradient: showBottomGradient,
         smallTopGradient: smallTopGradient,
+        authTopGradient: authTopGradient,
         showGradient: showGradient,
         showLines: showLines,
         baseColor: baseColor,
@@ -62,6 +65,7 @@ class GiatBackgroundPainter extends CustomPainter {
   final bool showBottomWaves;
   final bool? showBottomGradient;
   final bool smallTopGradient;
+  final bool authTopGradient;
   final bool showGradient;
   final bool showLines;
   final Color baseColor;
@@ -71,6 +75,7 @@ class GiatBackgroundPainter extends CustomPainter {
     this.showBottomWaves = false,
     this.showBottomGradient,
     this.smallTopGradient = false,
+    this.authTopGradient = false,
     this.showGradient = true,
     this.showLines = true,
     this.baseColor = const Color(0xFFF6FAF7),
@@ -85,6 +90,7 @@ class GiatBackgroundPainter extends CustomPainter {
       showBottomWaves: showBottomWaves,
       showBottomGradient: showBottomGradient,
       smallTopGradient: smallTopGradient,
+      authTopGradient: authTopGradient,
       showGradient: showGradient,
       showLines: showLines,
       baseColor: baseColor,
@@ -100,6 +106,7 @@ class GiatBackgroundPainter extends CustomPainter {
     bool showBottomWaves = false,
     bool? showBottomGradient,
     bool smallTopGradient = false,
+    bool authTopGradient = false,
     bool showGradient = true,
     bool showLines = true,
     Color baseColor = const Color(0xFFF6FAF7),
@@ -165,6 +172,48 @@ class GiatBackgroundPainter extends CustomPainter {
           ),
           paint1Small,
         );
+      } else if (authTopGradient) {
+        // Auth screens top gradient: compact, shifted higher up (-Y) and more to the left (-X)
+        // so it gently illuminates the top bar/logo without encroaching on chat bubbles
+        final paint0Auth = Paint()
+          ..shader = ui.Gradient.linear(
+            const Offset(85.0, -420.0),
+            const Offset(85.0, -40.0),
+            [
+              const Color(0xEB35FF8A).withValues(alpha: 0.7 * 0.92549),
+              const Color(0xFF33915B).withValues(alpha: 0.7),
+            ],
+          )
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 50);
+
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: const Offset(85.0, -230.0),
+            width: 210.0 * 2,
+            height: 190.0 * 2,
+          ),
+          paint0Auth,
+        );
+
+        final paint1Auth = Paint()
+          ..shader = ui.Gradient.linear(
+            const Offset(15.0, -255.0),
+            const Offset(15.0, 15.0),
+            [
+              const Color(0xFF2ECC71).withValues(alpha: 0.7),
+              const Color(0xFF82F7D8).withValues(alpha: 0.7),
+            ],
+          )
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 35);
+
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: const Offset(15.0, -120.0),
+            width: 150.0 * 2,
+            height: 135.0 * 2,
+          ),
+          paint1Auth,
+        );
       } else {
         // Standard full top gradient
         // Ellipse 0: cx=155.649, cy=-195.924, rx=321.351, ry=302.076
@@ -212,28 +261,28 @@ class GiatBackgroundPainter extends CustomPainter {
         );
       }
 
-      // ── BOTTOM-RIGHT GRADIENT (Luminous Mint/Emerald Aura at Bottom-Right) ──
+      // ── BOTTOM-RIGHT GRADIENT (Luminous Mint/Emerald Aura at Bottom-Right for Welcome Screen) ──
       final hasBottomGradient = showBottomGradient ?? showBottomWaves;
       if (hasBottomGradient) {
         final screenH = h / scale;
 
-        // Bottom Right Ellipse 0
+        // Bottom Right Ellipse 0: compact & placed into the bottom-right corner
         final paintBR0 = Paint()
           ..shader = ui.Gradient.linear(
-            Offset(402.0 - 100.0, screenH + 200.0),
-            Offset(402.0 - 100.0, screenH - 220.0),
+            Offset(402.0 - 35.0, (screenH + 40.0) + 140.0),
+            Offset(402.0 - 35.0, (screenH + 40.0) - 140.0),
             [
               const Color(0xEB35FF8A).withValues(alpha: 0.65 * 0.92549),
               const Color(0xFF33915B).withValues(alpha: 0.65),
             ],
           )
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 70);
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 45);
 
         canvas.drawOval(
           Rect.fromCenter(
-            center: Offset(402.0 - 100.0, screenH - 20.0),
-            width: 240.0 * 2,
-            height: 220.0 * 2,
+            center: Offset(402.0 - 35.0, screenH + 40.0),
+            width: 155.0 * 2,
+            height: 140.0 * 2,
           ),
           paintBR0,
         );
@@ -241,20 +290,20 @@ class GiatBackgroundPainter extends CustomPainter {
         // Bottom Right Ellipse 1
         final paintBR1 = Paint()
           ..shader = ui.Gradient.linear(
-            Offset(402.0 - 30.0, screenH + 150.0),
-            Offset(402.0 - 30.0, screenH - 160.0),
+            Offset(402.0 - 5.0, (screenH + 70.0) + 100.0),
+            Offset(402.0 - 5.0, (screenH + 70.0) - 100.0),
             [
               const Color(0xFF2ECC71).withValues(alpha: 0.65),
               const Color(0xFF82F7D8).withValues(alpha: 0.65),
             ],
           )
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 55);
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 35);
 
         canvas.drawOval(
           Rect.fromCenter(
-            center: Offset(402.0 - 30.0, screenH + 20.0),
-            width: 180.0 * 2,
-            height: 160.0 * 2,
+            center: Offset(402.0 - 5.0, screenH + 70.0),
+            width: 115.0 * 2,
+            height: 100.0 * 2,
           ),
           paintBR1,
         );
@@ -388,6 +437,7 @@ class GiatBackgroundPainter extends CustomPainter {
       oldDelegate.showBottomWaves != showBottomWaves ||
       oldDelegate.showBottomGradient != showBottomGradient ||
       oldDelegate.smallTopGradient != smallTopGradient ||
+      oldDelegate.authTopGradient != authTopGradient ||
       oldDelegate.showGradient != showGradient ||
       oldDelegate.showLines != showLines ||
       oldDelegate.baseColor != baseColor;
