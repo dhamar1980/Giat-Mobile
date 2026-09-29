@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "100000000000",
+    "project_id": "giat-3ac67",
+    "storage_bucket": "giat-3ac67.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:100000000000:android:giatmobileapp3ac67",
+        "android_client_info": {
+          "package_name": "com.example.giat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "100000000000-android.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.giat",
+            "certificate_hash": ""
+          }
+        },
+        {
+          "client_id": "100000000000-web.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhJvTnhT_z-7zjD9ZEvteNb3cfdb2Sb84"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
