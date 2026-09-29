@@ -37,7 +37,8 @@ void main() {
     expect(find.text('Masukkan 16 digit NIK'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Masukkan email'), findsOneWidget);
-    expect(find.text('Selanjutnya'), findsOneWidget);
+    expect(find.text('Nomor Handphone / WhatsApp'), findsOneWidget);
+    expect(find.text('Jenis Kelamin'), findsOneWidget);
 
     // Fill Step 1 Valid Data
     await tester.enterText(
@@ -52,8 +53,13 @@ void main() {
       find.widgetWithText(TextFormField, 'Masukkan email'),
       'budi@gmail.com',
     );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Contoh: 081234567890'),
+      '081234567890',
+    );
 
-    // Tap Selanjutnya
+    // Scroll and Tap Selanjutnya
+    await tester.ensureVisible(find.text('Selanjutnya'));
     await tester.tap(find.text('Selanjutnya'));
     await tester.pumpAndSettle();
 

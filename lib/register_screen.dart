@@ -3,6 +3,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'master_layout.dart';
+import 'services/auth_service.dart';
 import 'widgets/giat_auth_background.dart';
 import 'syarat_ketentuan_screen.dart';
 import 'kebijakan_privasi_screen.dart';
@@ -25,6 +27,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _nameCtrl = TextEditingController();
   final _nikCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  String _jenisKelamin = 'L';
 
   // Step 2 Controllers & Keys
   final _step2FormKey = GlobalKey<FormState>();
@@ -94,6 +98,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     _nameCtrl.dispose();
     _nikCtrl.dispose();
     _emailCtrl.dispose();
+    _phoneCtrl.dispose();
     _addressCtrl.dispose();
     _passCtrl.dispose();
     _confirmPassCtrl.dispose();
@@ -134,15 +139,37 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
 
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1000));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
 
-    // Show success dialog
-    _showSuccessDialog();
+    try {
+      final result = await AuthService().registerPasien(
+        nama: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text,
+        noHp: _phoneCtrl.text.trim().isNotEmpty
+            ? _phoneCtrl.text.trim()
+            : '081234567890',
+        jenisKelamin: _jenisKelamin,
+        nik: _nikCtrl.text.trim(),
+        alamat: _addressCtrl.text.trim(),
+        role: 'pasien',
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (result.success) {
+        _showSuccessDialog(result.user?.nama ?? _nameCtrl.text.trim());
+      } else {
+        _showSnack(result.message, isError: true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showSnack('Terjadi kesalahan pendaftaran: $e', isError: true);
+    }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog([String userName = 'Pasien']) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -194,7 +221,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(ctx).pop(); // close dialog
-                    Navigator.of(context).pop(); // return to login
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => MasterLayout(userName: userName),
+                      ),
+                      (route) => false,
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _buttonDarkGreen,
@@ -685,7 +717,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             TextFormField(
               controller: _emailCtrl,
               keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.done,
+              textInputAction: TextInputAction.next,
               style: GoogleFonts.inter(
                 fontSize: 14.5,
                 color: const Color(0xFF1E293B),
@@ -704,6 +736,129 @@ class _RegisterScreenState extends State<RegisterScreen>
                 }
                 return null;
               },
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Field: Nomor HP / WhatsApp ──
+            _buildFieldLabel('Nomor Handphone / WhatsApp'),
+            const SizedBox(height: 7),
+            TextFormField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.done,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(15),
+              ],
+              style: GoogleFonts.inter(
+                fontSize: 14.5,
+                color: const Color(0xFF1E293B),
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: _inputDecoration(hint: 'Contoh: 081234567890'),
+              validator: (val) {
+                if (val == null || val.trim().isEmpty) {
+                  return 'Nomor HP tidak boleh kosong';
+                }
+                if (val.trim().length < 9) {
+                  return 'Nomor HP minimal 9 digit';
+                }
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Field: Jenis Kelamin ──
+            _buildFieldLabel('Jenis Kelamin'),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _jenisKelamin = 'L'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _jenisKelamin == 'L'
+                            ? _buttonDarkGreen
+                            : Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _jenisKelamin == 'L'
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.male_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Laki-laki',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _jenisKelamin = 'P'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _jenisKelamin == 'P'
+                            ? _buttonDarkGreen
+                            : Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _jenisKelamin == 'P'
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.female_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Perempuan',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 24),

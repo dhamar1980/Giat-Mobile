@@ -2,11 +2,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'config/api_config.dart';
 import 'master_layout.dart';
 import 'register_screen.dart';
 import 'screens/dokter/dokter_home_screen.dart';
 import 'screens/apotek/apoteker_home_screen.dart';
 import 'forgot_password_screen.dart';
+import 'services/auth_service.dart';
+import 'services/storage_service.dart';
 import 'widgets/giat_auth_background.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,6 +51,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   bool _obscurePass = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   // Animations
   late final AnimationController _animCtrl;
@@ -111,46 +115,204 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
 
-    final email = _emailCtrl.text.trim().toLowerCase();
+    final email = _emailCtrl.text.trim();
     final pass = _passCtrl.text.trim();
-    final match = _demoUsers.where(
-      (u) => u['email'] == email && u['password'] == pass,
-    );
 
-    setState(() => _isLoading = false);
+    try {
+      // 1. Coba login ke API Backend GIAT (Firebase + Sanctum)
+      final result = await AuthService().loginWithEmailPassword(
+        email: email,
+        password: pass,
+        role: 'pasien',
+      );
 
-    if (match.isEmpty) {
-      _showSnack('Email/Username atau kata sandi salah.', isError: true);
-      return;
+      if (!mounted) return;
+
+      if (result.success) {
+        setState(() => _isLoading = false);
+        _showSnack(result.message);
+
+        final role = (result.role ?? 'pasien').toLowerCase();
+        final name = result.user?.nama ?? 'Pasien';
+
+        Widget targetScreen;
+        if (role == 'dokter') {
+          targetScreen = DokterHomeScreen(doctorName: name);
+        } else if (role == 'apotek' || role == 'apoteker') {
+          targetScreen = ApotekerHomeScreen(apotekerName: name);
+        } else {
+          targetScreen = MasterLayout(userName: name);
+        }
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => targetScreen),
+          (route) => false,
+        );
+        return;
+      }
+
+      // 2. Jika gagal atau offline, periksa apakah input cocok dengan demo users
+      final demoEmail = email.toLowerCase();
+      final match = _demoUsers.where(
+        (u) => u['email'] == demoEmail && u['password'] == pass,
+      );
+
+      setState(() => _isLoading = false);
+
+      if (match.isNotEmpty) {
+        final user = match.first;
+        final role = user['role']!;
+        final name = user['name'] ?? 'Pengguna';
+
+        _showSnack('Masuk via Mode Demo: $role');
+
+        Widget targetScreen;
+        if (role == 'dokter') {
+          targetScreen = DokterHomeScreen(doctorName: name);
+        } else if (role == 'apotek' || role == 'apoteker') {
+          targetScreen = ApotekerHomeScreen(apotekerName: name);
+        } else {
+          targetScreen = MasterLayout(userName: name);
+        }
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => targetScreen),
+          (route) => false,
+        );
+        return;
+      }
+
+      _showSnack(result.message, isError: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showSnack('Terjadi kesalahan: $e', isError: true);
     }
-
-    final user = match.first;
-    final role = user['role'];
-    final name = user['name'] ?? 'Pengguna';
-
-    _showSnack('Berhasil masuk sebagai $role 🎉');
-
-    Widget targetScreen;
-    if (role == 'dokter') {
-      targetScreen = DokterHomeScreen(doctorName: name);
-    } else if (role == 'apoteker') {
-      targetScreen = ApotekerHomeScreen(apotekerName: name);
-    } else {
-      targetScreen = MasterLayout(userName: name);
-    }
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => targetScreen,
-      ),
-    );
   }
 
-  void _handleGoogleLogin() {
-    _showSnack('Google Sign-In akan segera tersedia.');
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _isGoogleLoading = true);
+    try {
+      final result = await AuthService().signInWithGoogle(role: 'pasien');
+      if (!mounted) return;
+
+      if (result.success) {
+        _showSnack(result.message);
+
+        final role = (result.role ?? 'pasien').toLowerCase();
+        final name = result.user?.nama ?? 'Pasien';
+
+        Widget targetScreen;
+        if (role == 'dokter') {
+          targetScreen = DokterHomeScreen(doctorName: name);
+        } else if (role == 'apotek' || role == 'apoteker') {
+          targetScreen = ApotekerHomeScreen(apotekerName: name);
+        } else {
+          targetScreen = MasterLayout(userName: name);
+        }
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => targetScreen),
+          (route) => false,
+        );
+      } else {
+        _showSnack(result.message, isError: true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Google Sign-In gagal: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleLoading = false);
+      }
+    }
+  }
+
+  void _showServerConfigDialog() {
+    final controller = TextEditingController(text: ApiConfig.baseUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.settings_outlined, color: _primaryDarkGreen),
+            const SizedBox(width: 8),
+            Text(
+              'Pengaturan Server Backend',
+              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Pilih atau masukkan Base URL API Laravel GIAT:',
+              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'Base URL API',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: GoogleFonts.inter(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ActionChip(
+                  label: const Text('Emulator (10.0.2.2)'),
+                  onPressed: () => controller.text = ApiConfig.emulatorBaseUrl,
+                ),
+                ActionChip(
+                  label: const Text('LAN (192.168.1.16)'),
+                  onPressed: () => controller.text = ApiConfig.lanBaseUrl,
+                ),
+                ActionChip(
+                  label: const Text('Localhost (127.0.0.1)'),
+                  onPressed: () => controller.text = ApiConfig.localhostBaseUrl,
+                ),
+                ActionChip(
+                  label: const Text('Cloudflare Tunnel'),
+                  onPressed: () => controller.text = ApiConfig.tunnelBaseUrl,
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _buttonDarkGreen,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final newUrl = controller.text.trim();
+              if (newUrl.isNotEmpty) {
+                await StorageService().saveBaseUrl(newUrl);
+                if (mounted) {
+                  _showSnack('Base URL diatur ke: $newUrl');
+                }
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleForgotPassword() {
@@ -270,8 +432,14 @@ class _LoginScreenState extends State<LoginScreen>
           // Logo GIAT | Ginjal Sehat
           FadeTransition(
             opacity: _fadeAnim,
-            child: const Center(
-              child: _GiatLogoHeader(),
+            child: Center(
+              child: GestureDetector(
+                onLongPress: _showServerConfigDialog,
+                child: Tooltip(
+                  message: 'Tekan lama untuk ubah Server URL',
+                  child: const _GiatLogoHeader(),
+                ),
+              ),
             ),
           ),
 
@@ -531,7 +699,7 @@ class _LoginScreenState extends State<LoginScreen>
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _handleGoogleLogin,
+                      onPressed: (_isLoading || _isGoogleLoading) ? null : _handleGoogleLogin,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF1F2937),
@@ -541,22 +709,31 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const _GoogleGLogo(size: 20),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Masuk dengan Google',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF1E293B),
+                      child: _isGoogleLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: _primaryDarkGreen,
+                              ),
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const _GoogleGLogo(size: 20),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Masuk dengan Google',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
 
