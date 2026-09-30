@@ -11,6 +11,7 @@ import 'screens/pasien/profile/profile_pasien_screen.dart';
 import 'screens/pasien/reminder/reminder_list_screen.dart';
 import 'screens/pasien/widgets/pasien_bottom_navbar.dart';
 import 'widgets/giat_background.dart';
+import 'widgets/app_brand_title.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER LAYOUT GIAT (Persistent TopBar, Content Switcher, & Navbar)
@@ -135,9 +136,10 @@ class _MasterLayoutState extends State<MasterLayout> {
             ),
           ),
 
-          // ── 2. TOPBAR: Tetap / Netap di pojok kanan atas ──
+          // ── 2. TOPBAR: Tetap / Netap di pojok atas (GINJAL SEHAT di kiri, Pill di kanan) ──
           Positioned(
             top: 0,
+            left: 0,
             right: 0,
             child: SafeArea(
               bottom: false,
@@ -155,11 +157,23 @@ class _MasterLayoutState extends State<MasterLayout> {
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildTopBar() {
     final hasUnread = _notifications.any((n) => n['isRead'] == false);
+    final showBrandTitle = _currentIndex != 2; // Hide only on PRAGI (tab 2) which has light bg
 
     return Padding(
-      padding: const EdgeInsets.only(top: 10, right: 20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.only(top: 8, left: 20, right: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 1. App Brand Title ("GINJAL SEHAT") di kiri, sejajar dengan pill di kanan
+          if (showBrandTitle)
+            const AppBrandTitle()
+          else
+            const SizedBox.shrink(),
+
+          // 2. Kapsul Notifikasi & Profil (Ukuran asli yang proporsional & nyaman dilihat)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(30),
@@ -173,6 +187,7 @@ class _MasterLayoutState extends State<MasterLayout> {
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // 1. Notifikasi (Lonceng di sisi kiri)
                 Stack(
@@ -181,10 +196,10 @@ class _MasterLayoutState extends State<MasterLayout> {
                       onLongPress: _showNotificationsModal,
                       child: IconButton(
                         constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(5),
                         icon: const Icon(
                           Icons.notifications_none_rounded,
-                          size: 22,
+                          size: 24,
                           color: Color(0xFF1F2937),
                         ),
                         tooltip: 'Reminder',
@@ -203,8 +218,8 @@ class _MasterLayoutState extends State<MasterLayout> {
                         right: 6,
                         top: 6,
                         child: Container(
-                          width: 8,
-                          height: 8,
+                          width: 8.5,
+                          height: 8.5,
                           decoration: const BoxDecoration(
                             color: Color(0xFFEF4444),
                             shape: BoxShape.circle,
@@ -226,18 +241,20 @@ class _MasterLayoutState extends State<MasterLayout> {
                     );
                   },
                   child: Container(
-                    width: 32,
-                    height: 32,
+                    width: 36,
+                    height: 36,
                     decoration: const BoxDecoration(
                       color: Color(0xFF044E2F),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                    child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
                   ),
                 ),
               ],
             ),
           ),
+        ],
+      ),
     );
   }
 

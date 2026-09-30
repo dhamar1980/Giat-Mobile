@@ -217,10 +217,11 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPadding + 78, 20, 32),
+            padding: EdgeInsets.fromLTRB(20, topPadding + 86, 20, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+
                 // Single Chat Bubble
                 Align(
                   alignment: Alignment.centerLeft,

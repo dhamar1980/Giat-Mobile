@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'konsultasi_chat_screen.dart';
@@ -7,6 +7,7 @@ import 'jadwalkan_konsultasi_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 import '../../../widgets/giat_background.dart';
+import '../../../widgets/app_brand_title.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI: DAFTAR DOKTER & KONSULTASI SAYA (Sesuai Desain Figma)
@@ -288,26 +289,29 @@ class _DokterListScreenState extends State<DokterListScreen> {
           Padding(
             padding: EdgeInsets.fromLTRB(
               20,
-              widget.isEmbedded ? (MediaQuery.of(context).padding.top + 78) : 12,
+              widget.isEmbedded
+                  ? (MediaQuery.of(context).padding.top + 86)
+                  : (MediaQuery.of(context).padding.top + 8),
               20,
-              18,
+              20,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Action Row (Notification & Profile) - hidden in embedded mode
                 if (!widget.isEmbedded) ...[
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      const AppBrandTitle(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: Colors.black.withValues(alpha: 0.12),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -315,15 +319,16 @@ class _DokterListScreenState extends State<DokterListScreen> {
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Stack(
                               children: [
                                 IconButton(
                                   constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.all(4),
+                                  padding: const EdgeInsets.all(5),
                                   icon: const Icon(
                                     Icons.notifications_none_rounded,
-                                    size: 22,
+                                    size: 24,
                                     color: Color(0xFF1F2937),
                                   ),
                                   onPressed: () {
@@ -336,10 +341,10 @@ class _DokterListScreenState extends State<DokterListScreen> {
                                   right: 6,
                                   top: 6,
                                   child: Container(
-                                    width: 8,
-                                    height: 8,
+                                    width: 8.5,
+                                    height: 8.5,
                                     decoration: const BoxDecoration(
-                                      color: Colors.redAccent,
+                                      color: Color(0xFFEF4444),
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -357,13 +362,13 @@ class _DokterListScreenState extends State<DokterListScreen> {
                                 );
                               },
                               child: Container(
-                                width: 32,
-                                height: 32,
+                                width: 36,
+                                height: 36,
                                 decoration: const BoxDecoration(
                                   color: Color(0xFF044E2F),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                                child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
                               ),
                             ),
                           ],

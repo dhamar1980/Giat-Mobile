@@ -16,20 +16,27 @@ import 'widgets/giat_auth_background.dart';
 // Demo credentials — untuk simulasi login
 // ─────────────────────────────────────────────────────────────────────────────
 const _demoUsers = [
-  // 1. Pasien (email "pasien", password "pasien")
+  // 1. Pasien
   {'email': 'pasien', 'password': 'pasien', 'role': 'pasien', 'name': 'Pasien'},
   {'email': 'pasien@giat.id', 'password': 'pasien', 'role': 'pasien', 'name': 'Pasien'},
   {'email': 'pasien@giat.id', 'password': '123456', 'role': 'pasien', 'name': 'Pasien'},
+  {'email': 'siti.aisyah@gmail.com', 'password': 'password123', 'role': 'pasien', 'name': 'Siti Aisyah'},
 
-  // 2. Dokter (email "dokter", password "dokter")
+  // 2. Dokter
   {'email': 'dokter', 'password': 'dokter', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
   {'email': 'dokter@giat.id', 'password': 'dokter', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
   {'email': 'dokter@giat.id', 'password': '123456', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
+  {'email': 'dr.ahmad@gmail.com', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Ahmad Pratama'},
+  {'email': 'dr.siti@gmail.com', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Siti Rahmawati, Sp.PD'},
+  {'email': 'dr.budi@gmail.com', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH'},
 
-  // 3. Apoteker (email "apoteker", password "apoteker")
+  // 3. Apoteker
   {'email': 'apoteker', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
   {'email': 'apoteker@giat.id', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
   {'email': 'apoteker@giat.id', 'password': '123456', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
+  {'email': 'kf.dago@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek Kimia Farma Dago'},
+  {'email': 'k24.buahbatu@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek K-24 Buah Batu'},
+  {'email': 'mandiri.medika@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek Mandiri Medika Pasteur'},
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -124,7 +131,6 @@ class _LoginScreenState extends State<LoginScreen>
       final result = await AuthService().loginWithEmailPassword(
         email: email,
         password: pass,
-        role: 'pasien',
       );
 
       if (!mounted) return;
@@ -133,8 +139,8 @@ class _LoginScreenState extends State<LoginScreen>
         setState(() => _isLoading = false);
         _showSnack(result.message);
 
-        final role = (result.role ?? 'pasien').toLowerCase();
-        final name = result.user?.nama ?? 'Pasien';
+        final role = (result.role ?? result.user?.role ?? 'pasien').toLowerCase();
+        final name = result.user?.nama ?? 'Pengguna';
 
         Widget targetScreen;
         if (role == 'dokter') {
@@ -269,19 +275,8 @@ class _LoginScreenState extends State<LoginScreen>
               runSpacing: 6,
               children: [
                 ActionChip(
-                  label: const Text('Emulator (10.0.2.2)'),
-                  onPressed: () => controller.text = ApiConfig.emulatorBaseUrl,
-                ),
-                ActionChip(
-                  label: const Text('LAN (192.168.1.16)'),
-                  onPressed: () => controller.text = ApiConfig.lanBaseUrl,
-                ),
-                ActionChip(
-                  label: const Text('Localhost (127.0.0.1)'),
-                  onPressed: () => controller.text = ApiConfig.localhostBaseUrl,
-                ),
-                ActionChip(
-                  label: const Text('Cloudflare Tunnel'),
+                  avatar: const Icon(Icons.cloud_outlined, size: 16),
+                  label: const Text('Reset ke Cloudflare Tunnel'),
                   onPressed: () => controller.text = ApiConfig.tunnelBaseUrl,
                 ),
               ],

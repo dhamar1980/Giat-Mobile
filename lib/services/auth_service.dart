@@ -102,36 +102,51 @@ class AuthService {
     }
   }
 
-  /// 2. Native Firebase Login (Email & Password)
-  /// Endpoint: POST /auth/firebase/login
+  /// 2. Native Login (Email & Password)
+  /// Endpoint: POST /auth/firebase/login dengan fallback POST /auth/login
   Future<AuthResult> loginWithEmailPassword({
     required String email,
     required String password,
-    String role = 'pasien',
+    String? role,
   }) async {
     try {
-      final response = await _apiClient.dio.post(
-        '/auth/firebase/login',
-        data: {
-          'email': email.trim().toLowerCase(),
-          'password': password,
-          'role': role,
-        },
-      );
+      final Map<String, dynamic> payload = {
+        'email': email.trim().toLowerCase(),
+        'password': password,
+      };
+      if (role != null && role.isNotEmpty) {
+        payload['role'] = role;
+      }
+
+      dynamic response;
+      try {
+        response = await _apiClient.dio.post(
+          '/auth/firebase/login',
+          data: payload,
+        );
+      } catch (fbErr) {
+        // Fallback langsung ke API auth Laravel standar /auth/login jika Firebase bermasalah
+        debugPrint('Firebase login notice, trying standard /auth/login: $fbErr');
+        response = await _apiClient.dio.post(
+          '/auth/login',
+          data: payload,
+        );
+      }
 
       final data = response.data;
       if (data != null && data['success'] == true) {
         final resultData = data['data'] as Map<String, dynamic>;
         final String token = resultData['access_token'] ?? '';
-        final String resolvedRole = resultData['role'] ?? role;
+        final String backendRole = (resultData['role'] as String?)?.toLowerCase() ?? (role ?? 'pasien');
         final userData = resultData['user'] as Map<String, dynamic>? ?? {};
 
-        final user = UserModel.fromJson(userData, defaultRole: resolvedRole);
+        final user = UserModel.fromJson(userData, defaultRole: backendRole);
+        final String finalRole = user.role;
 
         // Simpan ke storage aman
         await _storage.saveToken(token);
         await _storage.saveUser(user);
-        await _storage.saveRole(resolvedRole);
+        await _storage.saveRole(finalRole);
 
         // Opsional: sinkronkan sesi FirebaseAuth lokal
         try {
@@ -146,7 +161,7 @@ class AuthService {
           message: data['message'] ?? 'Login berhasil.',
           user: user,
           token: token,
-          role: resolvedRole,
+          role: finalRole,
         );
       } else {
         return AuthResult(
@@ -296,6 +311,7 @@ class AuthService {
 
         final user = UserModel.fromJson(userData, defaultRole: role);
         await _storage.saveUser(user);
+        await _storage.saveRole(user.role);
         return user;
       }
     } catch (e) {

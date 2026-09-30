@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -12,6 +12,7 @@ import 'profile/dokter_profile_screen.dart';
 import 'resep/dokter_review_resep_sheet.dart';
 import '../../login_screen.dart';
 import '../../widgets/giat_background.dart';
+import '../../widgets/app_brand_title.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOKTER HOME SCREEN (Figma Node: 1008-17556)
@@ -184,6 +185,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           if (_selectedIndex != 4)
             Positioned(
               top: 0,
+              left: 0,
               right: 0,
               child: SafeArea(
                 bottom: false,
@@ -197,62 +199,78 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   }
 
   Widget _buildTopBar() {
+    final showBrandTitle = _selectedIndex == 0; // Tab 0 is Home Dokter
+
     return Padding(
-      padding: const EdgeInsets.only(top: 10, right: 20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              constraints: const BoxConstraints(),
-              padding: const EdgeInsets.all(4),
-              icon: const Icon(
-                Icons.notifications_none_rounded,
-                size: 22,
-                color: Color(0xFF1F2937),
-              ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedIndex = 4;
-                  _isTopBarVisible = true;
-                });
-              },
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF044E2F),
-                  shape: BoxShape.circle,
+      padding: const EdgeInsets.only(top: 8, left: 20, right: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 1. App Brand Title ("GINJAL SEHAT") di kiri, sejajar dengan pill di kanan
+          if (showBrandTitle)
+            const AppBrandTitle()
+          else
+            const SizedBox.shrink(),
+
+          // 2. Kapsul Notifikasi & Profil (Ukuran asli yang proporsional)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  size: 20,
-                  color: Colors.white,
-                ),
-              ),
+              ],
             ),
-          ],
-        ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                IconButton(
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(5),
+                  icon: const Icon(
+                    Icons.notifications_none_rounded,
+                    size: 24,
+                    color: Color(0xFF1F2937),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedIndex = 4;
+                      _isTopBarVisible = true;
+                    });
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF044E2F),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_rounded,
+                      size: 22,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -414,7 +432,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPadding + 78, 20, 18),
+            padding: EdgeInsets.fromLTRB(20, topPadding + 86, 20, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

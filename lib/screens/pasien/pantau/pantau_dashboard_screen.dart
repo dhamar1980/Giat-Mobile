@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 import 'catat_kondisi_screen.dart';
 import 'riwayat_pemantauan_screen.dart';
 import '../../../widgets/giat_background.dart';
+import '../../../widgets/app_brand_title.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA PENCATATAN BERAT BADAN
@@ -280,10 +281,6 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
   // 1. TOP HEADER BANNER (Gradient, Organic Curves & 1 Chat Bubble)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildHeaderSection() {
-    final topPadding = widget.isEmbedded
-        ? (MediaQuery.of(context).padding.top + 78)
-        : (MediaQuery.of(context).padding.top + 16);
-
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -311,23 +308,31 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
           ),
 
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPadding, 20, 36),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              widget.isEmbedded
+                  ? (MediaQuery.of(context).padding.top + 86)
+                  : (MediaQuery.of(context).padding.top + 8),
+              20,
+              20,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Standalone top action pill (bell & profile)
                 if (!widget.isEmbedded) ...[
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      const AppBrandTitle(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
+                              color: Colors.black.withValues(alpha: 0.12),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -335,13 +340,14 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             IconButton(
                               constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.all(5),
                               icon: const Icon(
                                 Icons.notifications_none_rounded,
-                                size: 22,
+                                size: 24,
                                 color: Color(0xFF1F2937),
                               ),
                               tooltip: 'Notifikasi',
@@ -362,13 +368,13 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                                 );
                               },
                               child: Container(
-                                width: 32,
-                                height: 32,
+                                width: 36,
+                                height: 36,
                                 decoration: const BoxDecoration(
                                   color: Color(0xFF044E2F),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                                child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
                               ),
                             ),
                           ],

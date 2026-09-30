@@ -35,7 +35,18 @@ class UserModel {
         json['id'] ??
         0;
 
-    final String resolvedRole = (json['role'] as String?)?.toLowerCase() ?? defaultRole;
+    String resolvedRole = (json['role'] as String?)?.toLowerCase() ?? '';
+    if (resolvedRole.isEmpty || resolvedRole == 'pasien') {
+      if (json['id_apotek'] != null || json.containsKey('lokasi_apotek') || json.containsKey('jam_operasional')) {
+        resolvedRole = 'apotek';
+      } else if (json['id_dokter'] != null || json.containsKey('no_str') || json.containsKey('spesialisasi')) {
+        resolvedRole = 'dokter';
+      } else if (json['id_pasien'] != null) {
+        resolvedRole = 'pasien';
+      } else if (resolvedRole.isEmpty) {
+        resolvedRole = defaultRole.toLowerCase();
+      }
+    }
 
     return UserModel(
       id: parsedId,

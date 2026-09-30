@@ -1,4 +1,4 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
@@ -185,10 +185,11 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPadding + 78, 20, 32),
+            padding: EdgeInsets.fromLTRB(20, topPadding + 86, 20, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+
                 // Single Chat Bubble
                 Align(
                   alignment: Alignment.centerLeft,

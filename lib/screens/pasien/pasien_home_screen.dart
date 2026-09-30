@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'reminder/reminder_list_screen.dart';
@@ -8,6 +8,7 @@ import 'edukasi/edukasi_detail_screen.dart';
 import 'widgets/pasien_bottom_navbar.dart';
 import '../../master_layout.dart';
 import '../../widgets/giat_background.dart';
+import '../../widgets/app_brand_title.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PASIEN HOME SCREEN (Figma Node: 771-5845)
@@ -189,27 +190,29 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
             padding: EdgeInsets.fromLTRB(
               20,
               widget.isEmbedded
-                  ? (MediaQuery.of(context).padding.top + 78)
-                  : (MediaQuery.of(context).padding.top + 16),
+                  ? (MediaQuery.of(context).padding.top + 86)
+                  : (MediaQuery.of(context).padding.top + 8),
               20,
-              36,
+              20,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Action Pill (Bell & Profile) - hidden in embedded MasterLayout mode
+                // Top Row: App Brand ("GINJAL SEHAT") on Left, Action Pill on Right (only in standalone mode)
                 if (!widget.isEmbedded) ...[
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      const AppBrandTitle(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: Colors.black.withValues(alpha: 0.12),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -217,13 +220,14 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Stack(
                               children: [
                                 IconButton(
                                   constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.all(4),
-                                  icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF1F2937)),
+                                  padding: const EdgeInsets.all(5),
+                                  icon: const Icon(Icons.notifications_none_rounded, size: 24, color: Color(0xFF1F2937)),
                                   onPressed: () {
                                     Navigator.push(
                                       context,
@@ -237,10 +241,10 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                                   right: 6,
                                   top: 6,
                                   child: Container(
-                                    width: 8,
-                                    height: 8,
+                                    width: 8.5,
+                                    height: 8.5,
                                     decoration: const BoxDecoration(
-                                      color: Colors.redAccent,
+                                      color: Color(0xFFEF4444),
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -258,13 +262,13 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                                 );
                               },
                               child: Container(
-                                width: 32,
-                                height: 32,
+                                width: 36,
+                                height: 36,
                                 decoration: const BoxDecoration(
                                   color: Color(0xFF044E2F),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                                child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
                               ),
                             ),
                           ],
@@ -394,20 +398,14 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
             ),
           ),
 
-          // 2. Skrining Resiko Penyakit CKD
+          // 2. Skrining Risiko Penyakit CKD
           Expanded(
             child: _QuickMenuRoundedItem(
-              label: 'Skrining Resiko\nPenyakit CKD',
-              iconWidget: Image.asset(
-                'assets/images/pragi.png',
-                width: 56,
-                height: 56,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.smart_toy_rounded,
-                  color: _darkGreen,
-                  size: 27,
-                ),
+              label: 'Skrining Risiko\nPenyakit CKD',
+              iconWidget: const Icon(
+                Icons.smart_toy_rounded,
+                color: _darkGreen,
+                size: 27,
               ),
               onTap: () => _navigateToTab(2),
             ),
