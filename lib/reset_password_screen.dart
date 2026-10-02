@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'login_screen.dart';
 import 'widgets/giat_auth_background.dart';
+import 'services/auth_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RESET PASSWORD SCREEN (Figma Node: 1018:5551)
@@ -10,10 +11,14 @@ import 'widgets/giat_auth_background.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
+  final String? otp;
+  final String? resetToken;
 
   const ResetPasswordScreen({
     super.key,
     required this.email,
+    this.otp,
+    this.resetToken,
   });
 
   @override
@@ -89,11 +94,29 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
 
   Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 750));
+
+    final result = await AuthService().resetPassword(
+      email: widget.email,
+      password: _newPassCtrl.text,
+      passwordConfirmation: _confirmPassCtrl.text,
+      otp: widget.otp,
+      resetToken: widget.resetToken,
+    );
     if (!mounted) return;
     setState(() => _isLoading = false);
+
+    if (result['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Gagal mengubah kata sandi.'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
 
     showDialog(
       context: context,

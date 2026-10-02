@@ -1,5 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../onboarding_screen.dart';
+import '../../../services/auth_service.dart';
 import '../models/dokter_models.dart';
 import 'dokter_informasi_profile_screen.dart';
 import 'dokter_pengaturan_notifikasi_screen.dart';
@@ -52,12 +54,18 @@ class DokterProfileScreen extends StatelessWidget {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
               if (onLogout != null) {
                 onLogout!();
               } else {
-                Navigator.of(context).pop();
+                await AuthService().logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+                    (route) => false,
+                  );
+                }
               }
             },
             child: Text('Keluar', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),

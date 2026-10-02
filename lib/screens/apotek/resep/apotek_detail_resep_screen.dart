@@ -1,8 +1,9 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
 import '../notifikasi/apotek_notifikasi_screen.dart';
+import '../../../services/apotek_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DETAIL RESEP DOKTER APOTEK (Revisi Sesuai Screenshot 2)
@@ -31,11 +32,13 @@ class _ApotekDetailResepScreenState extends State<ApotekDetailResepScreen> {
   static const _buttonDarkGreen = Color(0xFF044E2F);
   static const _bgColor = Color(0xFFF8FAF9);
   static const _cardBorder = Color(0xFFE2E8F0);
-  static const _innerBorder = Color(0xFFCBD5E1);
 
   void _handleAcceptRecipe() {
     final newOrder = ApotekMockData.acceptRecipeAndCreateOrder(widget.recipe);
     widget.onStatusChanged?.call();
+
+    // Sync to Backend POST /apotek/resep/{id}/validasi
+    ApotekApiService().validasiDanTerimaResep(widget.recipe.id);
 
     if (!mounted) return;
 

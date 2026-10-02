@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'verification_code_screen.dart';
 import 'widgets/giat_auth_background.dart';
+import 'services/auth_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LUPA KATA SANDI SCREEN (Figma Node: 1018-5399)
@@ -82,40 +83,49 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    // Logika 1: Kirimkan kode verifikasi ke email sesuai yang diinputkan user
-    await Future.delayed(const Duration(milliseconds: 650));
+    final email = _emailCtrl.text.trim();
+    final result = await AuthService().forgotPassword(email);
     if (!mounted) return;
 
     setState(() => _isLoading = false);
-    final email = _emailCtrl.text.trim();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.mark_email_read_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Kode verifikasi telah dikirimkan ke $email',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+    if (result['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.mark_email_read_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  result['message'] ?? 'Kode verifikasi telah dikirimkan ke $email',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: _darkGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
         ),
-        backgroundColor: _darkGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      );
 
-    // Logika 2: Langsung membuka halaman kode verifikasi
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VerificationCodeScreen(email: email),
-      ),
-    );
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VerificationCodeScreen(email: email),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Gagal mengirim kode verifikasi.'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   @override

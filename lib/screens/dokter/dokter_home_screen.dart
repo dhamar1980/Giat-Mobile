@@ -10,7 +10,8 @@ import 'pasien/dokter_pasien_screen.dart';
 import 'jadwal/dokter_jadwal_screen.dart';
 import 'profile/dokter_profile_screen.dart';
 import 'resep/dokter_review_resep_sheet.dart';
-import '../../login_screen.dart';
+import '../../onboarding_screen.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
 
@@ -76,45 +77,14 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     super.dispose();
   }
 
-  void _handleLogout() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Keluar dari Akun Dokter',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
-        content: Text(
-          'Apakah Anda yakin ingin keluar dari akun Dokter?',
-          style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF4B5563)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.inter(color: Colors.grey[600], fontWeight: FontWeight.w600),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            child: Text('Keluar', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
+  Future<void> _handleLogout() async {
+    await AuthService().logout();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        (route) => false,
+      );
+    }
   }
 
   void _navigateToChat(String patientId) {
@@ -176,7 +146,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                 ),
                 DokterProfileScreen(
                   doctorName: widget.doctorName,
-                  onLogout: () => Navigator.of(context).pop(),
+                  onLogout: _handleLogout,
                 ),
               ],
             ),
@@ -209,7 +179,13 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
         children: [
           // 1. App Brand Title ("GINJAL SEHAT") di kiri, sejajar dengan pill di kanan
           if (showBrandTitle)
-            const AppBrandTitle()
+            const Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: AppBrandTitle(),
+              ),
+            )
           else
             const SizedBox.shrink(),
 

@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../onboarding_screen.dart';
+import '../../../services/auth_service.dart';
 import '../../../syarat_ketentuan_screen.dart';
 import '../../../kebijakan_privasi_screen.dart';
-import '../../../login_screen.dart';
 import 'kata_sandi_keamanan_screen.dart';
 import 'edit_informasi_pribadi_screen.dart';
 import '../../../widgets/giat_background.dart';
@@ -410,7 +411,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
     }
   }
 
-  void _handleLogout(BuildContext context) {
+  void _handleLogout() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -444,8 +445,9 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
+              AuthService().logout();
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                MaterialPageRoute(builder: (_) => const OnboardingScreen()),
                 (route) => false,
               );
             },
@@ -1176,7 +1178,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: () => _handleLogout(context),
+              onTap: _handleLogout,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: Row(

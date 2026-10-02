@@ -28,7 +28,7 @@ void main() {
 
     // Verify 4 items exist
     expect(find.text('Konsultasi'), findsOneWidget);
-    expect(find.text('Skrining Resiko\nPenyakit CKD'), findsOneWidget);
+    expect(find.text('Skrining Risiko\nPenyakit CKD'), findsOneWidget);
     expect(find.text('Pantau'), findsOneWidget);
     expect(find.text('Obat'), findsOneWidget);
 
@@ -37,8 +37,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(selectedTab, 1);
 
-    // Tap Skrining Resiko Penyakit CKD
-    await tester.tap(find.text('Skrining Resiko\nPenyakit CKD'));
+    // Tap Skrining Risiko Penyakit CKD
+    await tester.tap(find.text('Skrining Risiko\nPenyakit CKD'));
     await tester.pumpAndSettle();
     expect(selectedTab, 2);
 
@@ -70,7 +70,7 @@ void main() {
 
     // Initially at Home (Tab 0)
     expect(find.text('Konsultasi'), findsNWidgets(2)); // in quick menu and bottom navbar
-    expect(find.text('Skrining Resiko\nPenyakit CKD'), findsOneWidget);
+    expect(find.text('Skrining Risiko\nPenyakit CKD'), findsOneWidget);
 
     // Tap Konsultasi in quick menu
     await tester.tap(find.text('Konsultasi').first);

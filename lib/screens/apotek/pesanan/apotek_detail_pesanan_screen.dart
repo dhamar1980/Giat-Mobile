@@ -1,8 +1,9 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
 import '../notifikasi/apotek_notifikasi_screen.dart';
+import '../../../services/apotek_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DETAIL PESANAN APOTEK (Revisi Sesuai 4 Screenshot Desain GIAT)
@@ -34,6 +35,10 @@ class _ApotekDetailPesananScreenState extends State<ApotekDetailPesananScreen> {
       widget.order.status = ApotekOrderStatus.diproses;
     });
     widget.onStatusChanged?.call();
+
+    // Sync to Backend POST /apotek/pesanan/{id}/proses
+    ApotekApiService().prosesPesanan(widget.order.id);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Pesanan ${widget.order.id} mulai diproses.'),
@@ -49,6 +54,10 @@ class _ApotekDetailPesananScreenState extends State<ApotekDetailPesananScreen> {
       widget.order.progressStep = 5;
     });
     widget.onStatusChanged?.call();
+
+    // Sync to Backend POST /apotek/pesanan/{id}/selesai
+    ApotekApiService().selesaikanPesanan(widget.order.id);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Pesanan ${widget.order.id} telah diselesaikan.'),

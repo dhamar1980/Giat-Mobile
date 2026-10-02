@@ -1,6 +1,7 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GANTI KATA SANDI DOKTER (Figma Node: 1008-18794)
@@ -35,21 +36,42 @@ class _DokterGantiKataSandiScreenState extends State<DokterGantiKataSandiScreen>
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Kata sandi berhasil diperbarui!',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+    final res = await DokterApiService().updatePassword({
+      'current_password': _oldPassCtrl.text,
+      'password': _newPassCtrl.text,
+      'password_confirmation': _confirmPassCtrl.text,
+    });
+
+    if (!mounted) return;
+    if (res.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            res.message.isNotEmpty ? res.message : 'Kata sandi berhasil diperbarui!',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: _darkGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        backgroundColor: _darkGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-    Navigator.of(context).pop();
+      );
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            res.message,
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'edukasi_detail_screen.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUSAT EDUKASI KESEHATAN GINJAL (ARTIKEL & TIPS NUTRISI)
@@ -17,7 +18,7 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
   String _selectedCat = 'Semua';
   static const _darkGreen = Color(0xFF065A37);
 
-  final List<Map<String, dynamic>> _articles = [
+  List<Map<String, dynamic>> _articles = [
     {
       'id': '1',
       'title': 'Kenali Tanda-Tanda Penyakit Ginjal Sejak Dini',
@@ -43,6 +44,37 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
       'content': 'Hipertensi dan kesehatan ginjal memiliki hubungan timbal balik yang sangat erat. Tekanan darah yang tinggi dapat merusak pembuluh darah kapiler halus (glomerulus) di dalam ginjal sehingga kemampuan menyaring racun menurun drastis.\n\nPastikan untuk meminum obat antihipertensi pelindung ginjal sesuai resep dokter, kurangi stres, tidur cukup 7-8 jam, dan lakukan olahraga ringan seperti jalan santai 30 menit setiap hari.',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEdukasiFromApi();
+  }
+
+  Future<void> _loadEdukasiFromApi() async {
+    final res = await PasienApiService().getEdukasiList(kategori: _selectedCat);
+    if (res.success && res.data != null && res.data!.isNotEmpty) {
+      if (!mounted) return;
+      setState(() {
+        final apiArticles = res.data!.map((item) {
+          if (item is Map<String, dynamic>) {
+            return {
+              'id': item['id']?.toString() ?? '1',
+              'title': item['judul']?.toString() ?? item['title']?.toString() ?? 'Artikel Ginjal',
+              'category': item['kategori']?.toString() ?? item['category']?.toString() ?? 'Info CKD',
+              'date': item['tanggal']?.toString() ?? item['date']?.toString() ?? 'Hari ini',
+              'image': item['gambar']?.toString() ?? item['image']?.toString() ?? 'assets/images/kidneys.jpg',
+              'content': item['konten']?.toString() ?? item['content']?.toString() ?? '',
+            };
+          }
+          return <String, dynamic>{};
+        }).where((m) => m.isNotEmpty).toList();
+        if (apiArticles.isNotEmpty) {
+          _articles = apiArticles;
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

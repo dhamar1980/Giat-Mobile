@@ -1,7 +1,8 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'konsultasi_video_call_screen.dart';
+import '../../../services/konsultasi_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI CHAT SCREEN (Sesuai Desain Figma)
@@ -11,12 +12,14 @@ class KonsultasiChatScreen extends StatefulWidget {
   final String doctorName;
   final String specialty;
   final String avatarUrl;
+  final String consultationId;
 
   const KonsultasiChatScreen({
     super.key,
     this.doctorName = 'Dr. Budi Santoso',
     this.specialty = 'Spesialis Ginjal & Hipertensi',
     this.avatarUrl = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
+    this.consultationId = '1',
   });
 
   @override
@@ -74,8 +77,14 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
 
     _scrollToBottom();
 
-    // Auto reply simulation after 1.5s
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    // Kirim pesan ke API backend
+    () async {
+      try {
+        await KonsultasiApiService().sendMessage(widget.consultationId, pesan: text);
+      } catch (_) {}
+
+      // Auto reply simulation after 1.5s
+      await Future.delayed(const Duration(milliseconds: 1500));
       if (!mounted) return;
       setState(() {
         _messages.add({
@@ -85,7 +94,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
         });
       });
       _scrollToBottom();
-    });
+    }();
   }
 
   void _scrollToBottom() {

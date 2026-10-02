@@ -1,7 +1,8 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCREEN: CATAT KONDISI KESEHATAN (Figma Mockup: Catat Kondisi)
@@ -96,15 +97,20 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
     final parsedWeight = double.tryParse(_weightCtrl.text.replaceAll(',', '.')) ?? widget.currentWeight;
     final parsedHeight = double.tryParse(_heightCtrl.text.replaceAll(',', '.')) ?? widget.heightCm;
 
-    Navigator.pop(context, {
+    final data = {
       'weight': parsedWeight,
       'height': parsedHeight,
+      'berat_badan': parsedWeight,
+      'tinggi_badan': parsedHeight,
       'kondisi': _selectedKondisi,
       'keluhan': _selectedKeluhan == 'Tidak Ada Keluhan'
           ? 'Tidak Ada'
           : (_detailKeluhanCtrl.text.trim().isNotEmpty ? _detailKeluhanCtrl.text.trim() : _selectedKeluhan),
       'detailKeluhan': _detailKeluhanCtrl.text.trim(),
-    });
+    };
+
+    PasienApiService().storePantau(data);
+    Navigator.pop(context, data);
   }
 
   @override

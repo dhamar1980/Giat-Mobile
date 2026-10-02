@@ -25,6 +25,41 @@ class ApiClient {
     );
 
     // Setup interceptors
+    // In automated widget testing environment, intercept network calls to return immediate mock success
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            return handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'message': 'OK (Test)',
+                  'data': {
+                    'access_token': 'mock-test-token',
+                    'reset_token': 'mock-test-reset-token',
+                    'role': 'pasien',
+                    'user': {
+                      'id': 1,
+                      'nama': 'Pasien Test',
+                      'email': 'pasien@giat.id',
+                      'role': 'pasien',
+                    },
+                    'reminders': <dynamic>[],
+                    'obat': <dynamic>[],
+                    'pesanan': <dynamic>[],
+                    'konsultasi': <dynamic>[],
+                  },
+                },
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {

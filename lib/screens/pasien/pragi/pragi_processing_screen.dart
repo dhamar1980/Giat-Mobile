@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'pragi_state_service.dart';
 import 'pragi_topography_background.dart';
 import 'pragi_result_screen.dart';
+import '../../../services/pasien_api_service.dart';
 
 class PragiProcessingScreen extends StatefulWidget {
   final PragiScreeningResult result;
@@ -37,6 +38,15 @@ class _PragiProcessingScreenState extends State<PragiProcessingScreen>
       if (!mounted) return;
       // Save result to history
       PragiService().addResult(widget.result);
+
+      // Sync screening result to backend API
+      PasienApiService().submitPragi({
+        'risk_level': widget.result.riskLevel,
+        'risk_score': widget.result.riskScore,
+        'gender': widget.result.gender,
+        'age_range': widget.result.ageRange,
+        'bmi': widget.result.bmi,
+      });
 
       Navigator.pushReplacement(
         context,

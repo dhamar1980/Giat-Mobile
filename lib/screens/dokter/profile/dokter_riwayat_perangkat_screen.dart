@@ -1,7 +1,8 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RIWAYAT PERANGKAT / SESI AKTIF (Figma Node: 1008-18892 / Screenshot 3)
@@ -25,12 +26,38 @@ class _DokterRiwayatPerangkatScreenState extends State<DokterRiwayatPerangkatScr
   void initState() {
     super.initState();
     _devices = List.from(DokterMockData.devices);
+    _loadDevicesFromApi();
+  }
+
+  Future<void> _loadDevicesFromApi() async {
+    final res = await DokterApiService().getLoginDevices();
+    if (res.success && res.data != null && res.data!.isNotEmpty) {
+      if (!mounted) return;
+      setState(() {
+        final apiDevs = res.data!.map((item) {
+          if (item is Map<String, dynamic>) {
+            return DokterDeviceSession(
+              id: item['id']?.toString() ?? '1',
+              deviceName: item['device_name']?.toString() ?? item['name']?.toString() ?? 'Perangkat',
+              lastActive: item['last_active']?.toString() ?? 'Baru saja',
+              location: item['location']?.toString() ?? 'Lokasi: Indonesia',
+              isCurrent: item['is_current'] == true || item['is_current'] == 1,
+            );
+          }
+          return null;
+        }).whereType<DokterDeviceSession>().toList();
+        if (apiDevs.isNotEmpty) {
+          _devices = apiDevs;
+        }
+      });
+    }
   }
 
   void _removeDevice(String id, String deviceName) {
     setState(() {
       _devices.removeWhere((d) => d.id == id);
     });
+    DokterApiService().revokeDevice(id);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

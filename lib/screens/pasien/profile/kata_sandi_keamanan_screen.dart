@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'ubah_nomor_telepon_screen.dart';
 import 'ubah_email_screen.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KATA SANDI & KEAMANAN SCREEN
@@ -45,12 +46,78 @@ class _KataSandiKeamananScreenState extends State<KataSandiKeamananScreen> {
     _email = widget.initialEmail;
   }
 
+  bool _isUpdatingPassword = false;
+
   @override
   void dispose() {
     _currentPassCtrl.dispose();
     _newPassCtrl.dispose();
     _confirmPassCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleUpdatePassword() async {
+    final cur = _currentPassCtrl.text;
+    final newP = _newPassCtrl.text;
+    final conf = _confirmPassCtrl.text;
+
+    if (cur.isEmpty || newP.isEmpty || conf.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Silakan lengkapi seluruh kolom kata sandi'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    if (newP.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kata sandi baru minimal 8 karakter'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    if (newP != conf) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Konfirmasi kata sandi baru tidak cocok'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isUpdatingPassword = true);
+    final res = await PasienApiService().updatePassword(
+      currentPassword: cur,
+      newPassword: newP,
+      confirmPassword: conf,
+    );
+    if (!mounted) return;
+    setState(() => _isUpdatingPassword = false);
+
+    if (res.success) {
+      _currentPassCtrl.clear();
+      _newPassCtrl.clear();
+      _confirmPassCtrl.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message.isNotEmpty ? res.message : 'Kata sandi berhasil diperbarui!'),
+          backgroundColor: _primaryGreen,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    }
   }
 
   void _handleLogoutAllDevices() {
@@ -330,6 +397,37 @@ class _KataSandiKeamananScreenState extends State<KataSandiKeamananScreen> {
             controller: _confirmPassCtrl,
             isObscured: _obscureConfirm,
             onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+          ),
+
+          const SizedBox(height: 18),
+
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              onPressed: _isUpdatingPassword ? null : _handleUpdatePassword,
+              child: _isUpdatingPassword
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      'Perbarui Kata Sandi',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+            ),
           ),
         ],
       ),

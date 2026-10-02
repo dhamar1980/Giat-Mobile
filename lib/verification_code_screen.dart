@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'reset_password_screen.dart';
 import 'widgets/giat_auth_background.dart';
+import 'services/auth_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VERIFICATION CODE SCREEN (Figma Node: 1018:5472)
@@ -105,13 +106,15 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
     });
   }
 
-  void _handleResendCode() {
+  Future<void> _handleResendCode() async {
     if (!_canResend) return;
     _startCountdown();
+    final res = await AuthService().resendOtp(widget.email);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Kode baru telah dikirimkan ke ${widget.email}'),
-        backgroundColor: _darkGreen,
+        content: Text(res['message'] ?? 'Kode baru telah dikirimkan ke ${widget.email}'),
+        backgroundColor: res['success'] == true ? _darkGreen : const Color(0xFFEF4444),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -149,16 +152,31 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
     }
 
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 650));
+    final result = await AuthService().verifyOtp(email: widget.email, otp: otp);
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    // Navigasi ke Buat Password Baru
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ResetPasswordScreen(email: widget.email),
-      ),
-    );
+    if (result['success'] == true) {
+      final resetToken = result['token'] as String?;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ResetPasswordScreen(
+            email: widget.email,
+            otp: otp,
+            resetToken: resetToken,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Kode verifikasi salah atau kedaluwarsa.'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   @override

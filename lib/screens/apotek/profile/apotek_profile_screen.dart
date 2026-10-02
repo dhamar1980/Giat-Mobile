@@ -1,7 +1,9 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../onboarding_screen.dart';
+import '../../../services/auth_service.dart';
 import 'apotek_status_layanan_screen.dart';
 import 'apotek_jam_operasional_screen.dart';
 import 'apotek_area_layanan_screen.dart';
@@ -377,12 +379,18 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
               if (widget.onLogout != null) {
                 widget.onLogout!();
               } else {
-                Navigator.of(context).pop();
+                await AuthService().logout();
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+                    (route) => false,
+                  );
+                }
               }
             },
             child: Text('Keluar', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),

@@ -1,6 +1,6 @@
 /// Configuration for GIAT Backend API
 class ApiConfig {
-  static const String tunnelBaseUrl = 'https://fair-what-fingers-places.trycloudflare.com/api';
+  static const String tunnelBaseUrl = 'https://interests-hunt-viewer-deals.trycloudflare.com/api';
 
   /// Default Base URL
   static String get defaultBaseUrl => tunnelBaseUrl;

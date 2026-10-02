@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRAGI AI ASSISTANT CHAT SCREEN (Prajurit Ginjal)
@@ -70,11 +70,24 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
 
     _scrollToBottom();
 
-    // AI Response Simulation
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      if (!mounted) return;
+    // Request to AI PRAGI Backend with graceful fallback
+    () async {
+      String aiReply = '';
+      try {
+        final apiResp = await PasienApiService().chatPragi(userText);
+        if (apiResp.success && apiResp.data != null) {
+          aiReply = apiResp.data!['reply']?.toString() ??
+              apiResp.data!['response']?.toString() ??
+              apiResp.data!['message']?.toString() ??
+              '';
+        }
+      } catch (_) {}
 
-      String aiReply = _generatePragiResponse(userText);
+      if (aiReply.isEmpty) {
+        aiReply = _generatePragiResponse(userText);
+      }
+
+      if (!mounted) return;
       final respNow = DateTime.now();
       final respTimeStr = '${respNow.hour.toString().padLeft(2, '0')}:${respNow.minute.toString().padLeft(2, '0')}';
 
@@ -88,7 +101,7 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
       });
 
       _scrollToBottom();
-    });
+    }();
   }
 
   String _generatePragiResponse(String query) {

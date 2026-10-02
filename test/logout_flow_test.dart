@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:giat/login_screen.dart';
+import 'package:giat/onboarding_screen.dart';
 import 'package:giat/screens/pasien/profile/profile_pasien_screen.dart';
 
 void main() {
-  testWidgets('Logout from ProfilePasienScreen successfully redirects to LoginScreen', (tester) async {
+  testWidgets('Logout from ProfilePasienScreen successfully redirects to OnboardingScreen', (tester) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -39,9 +39,8 @@ void main() {
     await tester.tap(dialogKeluarBtn);
     await tester.pumpAndSettle();
 
-    // Verify redirected to LoginScreen
-    expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.text('Email'), findsOneWidget);
-    expect(find.text('Masuk'), findsOneWidget);
+    // Verify redirected to OnboardingScreen (Welcome Screen)
+    expect(find.byType(OnboardingScreen), findsOneWidget);
+    expect(find.text('Mulai Sekarang'), findsOneWidget);
   });
 }
