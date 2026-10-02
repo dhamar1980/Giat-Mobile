@@ -7,6 +7,7 @@ import 'models/user_model.dart';
 import 'onboarding_screen.dart';
 import 'screens/apotek/apoteker_home_screen.dart';
 import 'screens/dokter/dokter_home_screen.dart';
+import 'screens/dokter/models/dokter_models.dart';
 import 'services/auth_service.dart';
 import 'services/storage_service.dart';
 
@@ -44,6 +45,17 @@ void main() async {
         savedUser = user;
       }
     } catch (_) {}
+  }
+
+  if (savedUser != null && savedUser.role.toLowerCase() == 'dokter') {
+    DokterProfileState.instance.syncFromUser(
+      name: savedUser.nama,
+      spec: savedUser.spesialisasi,
+      inst: savedUser.instansi,
+      str: savedUser.noStr,
+      sip: savedUser.noSip,
+      avatar: savedUser.fotoProfile,
+    );
   }
 
   runApp(GiatApp(initialUser: savedUser));

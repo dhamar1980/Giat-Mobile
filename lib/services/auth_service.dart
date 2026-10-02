@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -158,12 +159,14 @@ class AuthService {
         await _storage.saveRole(finalRole);
 
         // Opsional: sinkronkan sesi FirebaseAuth lokal
-        try {
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
-            email: email.trim().toLowerCase(),
-            password: password,
-          );
-        } catch (_) {}
+        if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+          try {
+            await FirebaseAuth.instance.signInWithEmailAndPassword(
+              email: email.trim().toLowerCase(),
+              password: password,
+            );
+          } catch (_) {}
+        }
 
         return AuthResult(
           success: true,

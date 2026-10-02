@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,6 +22,21 @@ class StorageService {
   );
 
   SharedPreferences? _prefs;
+  final Map<String, String> _testMemoryStorage = {};
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// Synchronous user access for test environment interceptors
+  UserModel? get testUser {
+    if (!_isTest) return null;
+    final data = _testMemoryStorage[_userKey];
+    if (data != null && data.isNotEmpty) {
+      try {
+        return UserModel.fromJsonString(data);
+      } catch (_) {}
+    }
+    return null;
+  }
 
   static const String _tokenKey = 'giat_access_token';
   static const String _userKey = 'giat_user_data';
@@ -29,6 +45,7 @@ class StorageService {
 
   /// Initialize local preferences and restore base URL if previously saved
   Future<void> init() async {
+    if (_isTest) return;
     try {
       _prefs = await SharedPreferences.getInstance();
       final savedUrl = await getBaseUrl();
@@ -42,6 +59,10 @@ class StorageService {
 
   /// Save Sanctum access token
   Future<void> saveToken(String token) async {
+    if (_isTest) {
+      _testMemoryStorage[_tokenKey] = token;
+      return;
+    }
     try {
       await _secureStorage.write(key: _tokenKey, value: token);
     } catch (_) {
@@ -51,6 +72,7 @@ class StorageService {
 
   /// Retrieve Sanctum access token
   Future<String?> getToken() async {
+    if (_isTest) return _testMemoryStorage[_tokenKey];
     try {
       final token = await _secureStorage.read(key: _tokenKey);
       if (token != null && token.isNotEmpty) return token;
@@ -60,6 +82,10 @@ class StorageService {
 
   /// Delete Sanctum access token
   Future<void> deleteToken() async {
+    if (_isTest) {
+      _testMemoryStorage.remove(_tokenKey);
+      return;
+    }
     try {
       await _secureStorage.delete(key: _tokenKey);
     } catch (_) {}
@@ -69,6 +95,11 @@ class StorageService {
   /// Save logged-in user profile
   Future<void> saveUser(UserModel user) async {
     final userJson = user.toJsonString();
+    if (_isTest) {
+      _testMemoryStorage[_userKey] = userJson;
+      _testMemoryStorage[_roleKey] = user.role;
+      return;
+    }
     try {
       await _secureStorage.write(key: _userKey, value: userJson);
     } catch (_) {
@@ -79,6 +110,15 @@ class StorageService {
 
   /// Get logged-in user profile
   Future<UserModel?> getUser() async {
+    if (_isTest) {
+      final data = _testMemoryStorage[_userKey];
+      if (data != null && data.isNotEmpty) {
+        try {
+          return UserModel.fromJsonString(data);
+        } catch (_) {}
+      }
+      return null;
+    }
     try {
       final data = await _secureStorage.read(key: _userKey);
       if (data != null && data.isNotEmpty) {
@@ -97,6 +137,10 @@ class StorageService {
 
   /// Save user role
   Future<void> saveRole(String role) async {
+    if (_isTest) {
+      _testMemoryStorage[_roleKey] = role;
+      return;
+    }
     try {
       await _secureStorage.write(key: _roleKey, value: role);
     } catch (_) {}
@@ -105,6 +149,7 @@ class StorageService {
 
   /// Get user role
   Future<String?> getRole() async {
+    if (_isTest) return _testMemoryStorage[_roleKey];
     try {
       final role = await _secureStorage.read(key: _roleKey);
       if (role != null && role.isNotEmpty) return role;
@@ -115,16 +160,25 @@ class StorageService {
   /// Save custom Base URL
   Future<void> saveBaseUrl(String url) async {
     ApiConfig.setBaseUrl(url);
+    if (_isTest) {
+      _testMemoryStorage[_baseUrlKey] = url;
+      return;
+    }
     await _prefs?.setString(_baseUrlKey, url);
   }
 
   /// Get saved custom Base URL
   Future<String?> getBaseUrl() async {
+    if (_isTest) return _testMemoryStorage[_baseUrlKey];
     return _prefs?.getString(_baseUrlKey);
   }
 
   /// Clear all authentication session data
   Future<void> clearAuth() async {
+    if (_isTest) {
+      _testMemoryStorage.clear();
+      return;
+    }
     try {
       await _secureStorage.delete(key: _tokenKey);
       await _secureStorage.delete(key: _userKey);

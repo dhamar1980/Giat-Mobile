@@ -57,6 +57,8 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
+    DokterProfileState.instance.syncFromUser(name: widget.doctorName);
+    DokterProfileState.instance.loadProfile(fallbackName: widget.doctorName);
     _animCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -68,6 +70,14 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
 
     _animCtrl.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant DokterHomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.doctorName != widget.doctorName) {
+      DokterProfileState.instance.syncFromUser(name: widget.doctorName);
+    }
   }
 
   @override
@@ -439,13 +449,21 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              'Selamat Datang Kembali, ${widget.doctorName} 👏🏻',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF065A37),
-                              ),
+                            ListenableBuilder(
+                              listenable: DokterProfileState.instance,
+                              builder: (context, _) {
+                                final displayName = DokterProfileState.instance.doctorName.isNotEmpty
+                                    ? DokterProfileState.instance.doctorName
+                                    : widget.doctorName;
+                                return Text(
+                                  'Selamat Datang Kembali, $displayName 👏🏻',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF065A37),
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 4),
                             Text(

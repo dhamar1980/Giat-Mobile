@@ -13,6 +13,12 @@ class UserModel {
   final String? firebaseUid;
   final String? authProvider;
   final String role;
+  final String? spesialisasi;
+  final String? instansi;
+  final String? noStr;
+  final String? noSip;
+  final String? tanggalLahir;
+  final String? golonganDarah;
 
   UserModel({
     required this.id,
@@ -26,6 +32,12 @@ class UserModel {
     this.firebaseUid,
     this.authProvider,
     required this.role,
+    this.spesialisasi,
+    this.instansi,
+    this.noStr,
+    this.noSip,
+    this.tanggalLahir,
+    this.golonganDarah,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, {String defaultRole = 'pasien'}) {
@@ -60,6 +72,12 @@ class UserModel {
       firebaseUid: json['firebase_uid'] as String?,
       authProvider: json['auth_provider'] as String?,
       role: resolvedRole,
+      spesialisasi: json['spesialisasi'] as String?,
+      instansi: json['instansi'] as String?,
+      noStr: json['no_str'] as String?,
+      noSip: json['no_sip'] as String?,
+      tanggalLahir: json['tanggal_lahir'] as String?,
+      golonganDarah: json['golongan_darah'] as String?,
     );
   }
 
@@ -76,6 +94,12 @@ class UserModel {
       'firebase_uid': firebaseUid,
       'auth_provider': authProvider,
       'role': role,
+      'spesialisasi': spesialisasi,
+      'instansi': instansi,
+      'no_str': noStr,
+      'no_sip': noSip,
+      'tanggal_lahir': tanggalLahir,
+      'golongan_darah': golonganDarah,
     };
   }
 

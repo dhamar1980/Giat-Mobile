@@ -12,20 +12,48 @@ import '../../../widgets/giat_background.dart';
 // PROFIL DOKTER UTAMA (Figma Node: 1008-19649)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class DokterProfileScreen extends StatelessWidget {
-  final String doctorName;
-  final String specialty;
+class DokterProfileScreen extends StatefulWidget {
+  final String? doctorName;
+  final String? specialty;
   final VoidCallback? onLogout;
 
   const DokterProfileScreen({
     super.key,
-    this.doctorName = 'Dr. Andi Pratama',
-    this.specialty = 'Spesialis Penyakti Dalam / Ginjal',
+    this.doctorName,
+    this.specialty,
     this.onLogout,
   });
 
+  @override
+  State<DokterProfileScreen> createState() => _DokterProfileScreenState();
+}
+
+class _DokterProfileScreenState extends State<DokterProfileScreen> {
   static const _darkGreen = Color(0xFF065A37);
   static const _border = Color(0xFFE2E8F0);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.doctorName != null && widget.doctorName!.isNotEmpty) {
+      DokterProfileState.instance.syncFromUser(
+        name: widget.doctorName,
+        spec: widget.specialty,
+      );
+    }
+    DokterProfileState.instance.loadProfile(fallbackName: widget.doctorName);
+  }
+
+  @override
+  void didUpdateWidget(covariant DokterProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.doctorName != null && widget.doctorName != oldWidget.doctorName) {
+      DokterProfileState.instance.syncFromUser(
+        name: widget.doctorName,
+        spec: widget.specialty,
+      );
+    }
+  }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -56,8 +84,10 @@ class DokterProfileScreen extends StatelessWidget {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              if (onLogout != null) {
-                onLogout!();
+              DokterProfileState.instance.resetAvatar();
+              DokterProfileState.instance.syncFromUser(name: '', spec: '');
+              if (widget.onLogout != null) {
+                widget.onLogout!();
               } else {
                 await AuthService().logout();
                 if (context.mounted) {
@@ -82,8 +112,8 @@ class DokterProfileScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: profileState,
       builder: (context, _) {
-        final currentName = profileState.doctorName.isNotEmpty ? profileState.doctorName : doctorName;
-        final currentSpecialty = profileState.specialty.isNotEmpty ? profileState.specialty : specialty;
+        final currentName = profileState.doctorName;
+        final currentSpecialty = profileState.specialty;
 
         return Scaffold(
           backgroundColor: const Color(0xFFF7FAF8),

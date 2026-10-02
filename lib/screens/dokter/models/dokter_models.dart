@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../services/storage_service.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA DOKTER (Berdasarkan Desain & Alur Figma GIAT)
@@ -455,16 +457,174 @@ class DokterProfileState extends ChangeNotifier {
   factory DokterProfileState() => instance;
   DokterProfileState._internal();
 
-  String doctorName = 'Dr. Andi Pratama';
-  String specialty = 'Spesialis Penyakti Dalam / Ginjal';
+  String _doctorName = '';
+  String _specialty = '';
+  String _strNumber = '1234567890123456';
+  String _sipNumber = 'SIP/123/456/2023';
+  String _institution = 'RS Medika Utama';
+  String _practiceAddress = 'Jl. Sehat No. 12, Jember';
+  String _practiceSchedule = 'Senin - Jumat, 09:00 - 17:00';
+
   String avatarType = 'asset'; // 'asset', 'network', 'default'
   String avatarPath = 'assets/images/dokter_apoteker.jpg';
 
-  String strNumber = '1234567890123456';
-  String sipNumber = 'SIP/123/456/2023';
-  String institution = 'RS Medika Utama';
-  String practiceAddress = 'Jl. Sehat No. 12, Jember';
-  String practiceSchedule = 'Senin - Jumat, 09:00 - 17:00';
+  String get doctorName => _doctorName.isNotEmpty ? _doctorName : 'Dr. Andi Pratama';
+  set doctorName(String val) {
+    if (_doctorName != val) {
+      _doctorName = val;
+      notifyListeners();
+    }
+  }
+
+  String get specialty => _specialty.isNotEmpty ? _specialty : 'Spesialis Penyakit Dalam / Ginjal';
+  set specialty(String val) {
+    if (_specialty != val) {
+      _specialty = val;
+      notifyListeners();
+    }
+  }
+
+  String get strNumber => _strNumber;
+  set strNumber(String val) {
+    if (_strNumber != val) {
+      _strNumber = val;
+      notifyListeners();
+    }
+  }
+
+  String get sipNumber => _sipNumber;
+  set sipNumber(String val) {
+    if (_sipNumber != val) {
+      _sipNumber = val;
+      notifyListeners();
+    }
+  }
+
+  String get institution => _institution;
+  set institution(String val) {
+    if (_institution != val) {
+      _institution = val;
+      notifyListeners();
+    }
+  }
+
+  String get practiceAddress => _practiceAddress;
+  set practiceAddress(String val) {
+    if (_practiceAddress != val) {
+      _practiceAddress = val;
+      notifyListeners();
+    }
+  }
+
+  String get practiceSchedule => _practiceSchedule;
+  set practiceSchedule(String val) {
+    if (_practiceSchedule != val) {
+      _practiceSchedule = val;
+      notifyListeners();
+    }
+  }
+
+  void syncFromUser({
+    String? name,
+    String? spec,
+    String? str,
+    String? sip,
+    String? inst,
+    String? address,
+    String? schedule,
+    String? avatar,
+  }) {
+    bool changed = false;
+    if (name != null && name.trim().isNotEmpty && _doctorName != name.trim()) {
+      _doctorName = name.trim();
+      changed = true;
+    }
+    if (spec != null && spec.trim().isNotEmpty && _specialty != spec.trim()) {
+      _specialty = spec.trim();
+      changed = true;
+    }
+    if (str != null && str.trim().isNotEmpty && _strNumber != str.trim()) {
+      _strNumber = str.trim();
+      changed = true;
+    }
+    if (sip != null && sip.trim().isNotEmpty && _sipNumber != sip.trim()) {
+      _sipNumber = sip.trim();
+      changed = true;
+    }
+    if (inst != null && inst.trim().isNotEmpty && _institution != inst.trim()) {
+      _institution = inst.trim();
+      changed = true;
+    }
+    if (address != null && address.trim().isNotEmpty && _practiceAddress != address.trim()) {
+      _practiceAddress = address.trim();
+      changed = true;
+    }
+    if (schedule != null && schedule.trim().isNotEmpty && _practiceSchedule != schedule.trim()) {
+      _practiceSchedule = schedule.trim();
+      changed = true;
+    }
+    if (avatar != null && avatar.trim().isNotEmpty) {
+      if (avatar.startsWith('http')) {
+        avatarType = 'network';
+        avatarPath = avatar.trim();
+      } else {
+        avatarType = 'asset';
+        avatarPath = avatar.trim();
+      }
+      changed = true;
+    }
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
+  /// Sinkronkan profil dokter dari StorageService dan API Backend
+  Future<void> loadProfile({String? fallbackName}) async {
+    try {
+      final savedUser = await StorageService().getUser();
+      if (savedUser != null && savedUser.nama.isNotEmpty) {
+        syncFromUser(
+          name: savedUser.nama,
+          spec: savedUser.spesialisasi,
+          str: savedUser.noStr,
+          sip: savedUser.noSip,
+          inst: savedUser.instansi,
+          avatar: savedUser.fotoProfile,
+        );
+      } else if (fallbackName != null && fallbackName.isNotEmpty) {
+        syncFromUser(name: fallbackName);
+      }
+    } catch (_) {}
+
+    try {
+      final res = await DokterApiService().getProfile();
+      if (res.success && res.data != null) {
+        final data = res.data!;
+        final userObj = data['user'] as Map<String, dynamic>?;
+        final docObj = data['dokter'] as Map<String, dynamic>? ?? data;
+
+        final fetchedName = userObj?['nama'] ?? docObj['nama'] ?? docObj['name'] ?? fallbackName;
+        final fetchedSpec = docObj['spesialisasi'] ?? docObj['specialty'];
+        final fetchedStr = docObj['no_str'] ?? docObj['str'];
+        final fetchedSip = docObj['no_sip'] ?? docObj['sip'];
+        final fetchedInst = docObj['instansi'] ?? docObj['institution'];
+        final fetchedAlamat = docObj['alamat_praktik'] ?? docObj['alamat'];
+        final fetchedJadwal = docObj['jadwal_praktik'] ?? docObj['jam_operasional'];
+        final fetchedAvatar = userObj?['foto_profile'] ?? docObj['foto_profile'];
+
+        syncFromUser(
+          name: fetchedName?.toString(),
+          spec: fetchedSpec?.toString(),
+          str: fetchedStr?.toString(),
+          sip: fetchedSip?.toString(),
+          inst: fetchedInst?.toString(),
+          address: fetchedAlamat?.toString(),
+          schedule: fetchedJadwal?.toString(),
+          avatar: fetchedAvatar?.toString(),
+        );
+      }
+    } catch (_) {}
+  }
 
   final List<Map<String, String>> presetAvatars = [
     {

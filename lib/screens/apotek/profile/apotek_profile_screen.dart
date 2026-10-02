@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../onboarding_screen.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/storage_service.dart';
+import '../../../services/apotek_api_service.dart';
 import 'apotek_status_layanan_screen.dart';
 import 'apotek_jam_operasional_screen.dart';
 import 'apotek_area_layanan_screen.dart';
@@ -36,8 +38,50 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   static const _bgColor = Color(0xFFF7FAF8);
   static const _border = Color(0xFFE2E8F0);
 
+  late String _nama;
   String _avatarType = 'asset'; // 'asset', 'network', 'default'
   String _avatarPath = 'assets/images/dokter_apoteker.jpg';
+
+  @override
+  void initState() {
+    super.initState();
+    _nama = widget.apotekerName.isNotEmpty ? widget.apotekerName : 'Apt. Aminah, S.Farm';
+    _loadProfile();
+  }
+
+  @override
+  void didUpdateWidget(covariant ApotekProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.apotekerName != oldWidget.apotekerName && widget.apotekerName.isNotEmpty) {
+      setState(() => _nama = widget.apotekerName);
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final user = await StorageService().getUser();
+      if (user != null && mounted) {
+        setState(() {
+          if (user.nama.isNotEmpty) _nama = user.nama;
+          if (user.fotoProfile != null && user.fotoProfile!.isNotEmpty) {
+            _avatarType = user.fotoProfile!.startsWith('http') ? 'network' : 'asset';
+            _avatarPath = user.fotoProfile!;
+          }
+        });
+      }
+    } catch (_) {}
+
+    try {
+      final res = await ApotekApiService().getProfile();
+      if (res.success && res.data != null && mounted) {
+        final d = res.data!;
+        final fetchedName = d['nama'] ?? d['nama_apotek'] ?? d['name'];
+        if (fetchedName != null && fetchedName.toString().isNotEmpty) {
+          setState(() => _nama = fetchedName.toString());
+        }
+      }
+    } catch (_) {}
+  }
 
   final List<Map<String, String>> _presetAvatars = [
     {
@@ -631,7 +675,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
 
                     // Name
                     Text(
-                      widget.apotekerName,
+                      _nama,
                       style: GoogleFonts.inter(
                         fontSize: 19.5,
                         fontWeight: FontWeight.w700,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../onboarding_screen.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/storage_service.dart';
+import '../../../services/pasien_api_service.dart';
 import '../../../syarat_ketentuan_screen.dart';
 import '../../../kebijakan_privasi_screen.dart';
 import 'kata_sandi_keamanan_screen.dart';
@@ -76,6 +78,47 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
     _jenisKelamin = 'Perempuan';
     _golonganDarah = 'O Positif (O+)';
     _alamat = 'Jl. Merdeka No. 123, Jakarta\nSelatan';
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final user = await StorageService().getUser();
+      if (user != null && mounted) {
+        setState(() {
+          if (user.nama.isNotEmpty) _nama = user.nama;
+          if (user.email.isNotEmpty) _email = user.email;
+          if (user.alamat != null && user.alamat!.isNotEmpty) _alamat = user.alamat!;
+          if (user.jenisKelamin != null && user.jenisKelamin!.isNotEmpty) _jenisKelamin = user.jenisKelamin!;
+          if (user.tanggalLahir != null && user.tanggalLahir!.isNotEmpty) _tanggalLahir = user.tanggalLahir!;
+          if (user.golonganDarah != null && user.golonganDarah!.isNotEmpty) _golonganDarah = user.golonganDarah!;
+          if (user.fotoProfile != null && user.fotoProfile!.isNotEmpty) {
+            _avatarType = user.fotoProfile!.startsWith('http') ? 'network' : 'asset';
+            _avatarPath = user.fotoProfile!;
+          }
+        });
+      }
+    } catch (_) {}
+
+    try {
+      final res = await PasienApiService().getProfile();
+      if (res.success && res.data != null && mounted) {
+        final d = res.data!;
+        setState(() {
+          if (d['nama'] != null && d['nama'].toString().isNotEmpty) _nama = d['nama'].toString();
+          if (d['email'] != null && d['email'].toString().isNotEmpty) _email = d['email'].toString();
+          if (d['alamat'] != null && d['alamat'].toString().isNotEmpty) _alamat = d['alamat'].toString();
+          if (d['jenis_kelamin'] != null && d['jenis_kelamin'].toString().isNotEmpty) _jenisKelamin = d['jenis_kelamin'].toString();
+          if (d['tanggal_lahir'] != null && d['tanggal_lahir'].toString().isNotEmpty) _tanggalLahir = d['tanggal_lahir'].toString();
+          if (d['golongan_darah'] != null && d['golongan_darah'].toString().isNotEmpty) _golonganDarah = d['golongan_darah'].toString();
+          if (d['foto_profile'] != null && d['foto_profile'].toString().isNotEmpty) {
+            final f = d['foto_profile'].toString();
+            _avatarType = f.startsWith('http') ? 'network' : 'asset';
+            _avatarPath = f;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _navigateToEditInformasiPribadi() async {

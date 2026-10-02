@@ -1,4 +1,4 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
@@ -521,7 +521,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => DokterProfileScreen(
-                      doctorName: 'Dr. Andi Pratama',
+                      doctorName: DokterProfileState.instance.doctorName,
                       onLogout: () => Navigator.of(context).pop(),
                     ),
                   ),

@@ -1,4 +1,4 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
@@ -8,13 +8,13 @@ import '../models/dokter_models.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DokterInformasiProfileScreen extends StatefulWidget {
-  final String doctorName;
-  final String specialty;
+  final String? doctorName;
+  final String? specialty;
 
   const DokterInformasiProfileScreen({
     super.key,
-    this.doctorName = 'Dr. Andi Pratama',
-    this.specialty = 'Spesialis Penyakti Dalam / Ginjal',
+    this.doctorName,
+    this.specialty,
   });
 
   @override
@@ -24,6 +24,18 @@ class DokterInformasiProfileScreen extends StatefulWidget {
 class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScreen> {
   static const _darkGreen = Color(0xFF065A37);
   static const _border = Color(0xFFE2E8F0);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.doctorName != null && widget.doctorName!.isNotEmpty) {
+      DokterProfileState.instance.syncFromUser(
+        name: widget.doctorName,
+        spec: widget.specialty,
+      );
+    }
+    DokterProfileState.instance.loadProfile(fallbackName: widget.doctorName);
+  }
 
   void _showChangeProfilePhotoModal(BuildContext context) {
     final profileState = DokterProfileState.instance;
@@ -279,8 +291,8 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
     return ListenableBuilder(
       listenable: profileState,
       builder: (context, _) {
-        final currentName = profileState.doctorName.isNotEmpty ? profileState.doctorName : widget.doctorName;
-        final currentSpecialty = profileState.specialty.isNotEmpty ? profileState.specialty : widget.specialty;
+        final currentName = profileState.doctorName;
+        final currentSpecialty = profileState.specialty;
 
         return Scaffold(
           backgroundColor: const Color(0xFFF7FAF8),
@@ -323,7 +335,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                     _buildFieldBlock(
                       label: 'Spesialisasi',
                       content: Text(
-                        'Penyakit Dalam / Ginjal',
+                        currentSpecialty,
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,

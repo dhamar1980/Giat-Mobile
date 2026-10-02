@@ -30,6 +30,40 @@ class ApiClient {
       dio.interceptors.add(
         InterceptorsWrapper(
           onRequest: (options, handler) {
+            final reqData = options.data is Map ? options.data as Map : {};
+            final email = (reqData['email'] ?? '').toString().toLowerCase();
+            final path = options.path.toLowerCase();
+            final savedUser = StorageService().testUser;
+
+            final bool isDokter = email.contains('dokter') ||
+                email.contains('budi') ||
+                path.contains('dokter') ||
+                savedUser?.role == 'dokter';
+            final bool isApotek = email.contains('apotek') ||
+                email.contains('aminah') ||
+                path.contains('apotek') ||
+                savedUser?.role == 'apotek' ||
+                savedUser?.role == 'apoteker';
+
+            final role = savedUser?.role ?? (isDokter ? 'dokter' : (isApotek ? 'apotek' : 'pasien'));
+
+            String name;
+            String? spec;
+            if (savedUser != null && savedUser.nama.isNotEmpty) {
+              name = savedUser.nama;
+              spec = savedUser.spesialisasi;
+            } else if (email.contains('budi')) {
+              name = 'dr. Budi Santoso, Sp.PD-KGH';
+              spec = 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)';
+            } else if (isDokter) {
+              name = 'Dr. Andi Pratama';
+              spec = 'Spesialis Penyakit Dalam / Ginjal';
+            } else if (isApotek) {
+              name = 'Apt. Aminah, S.Farm';
+            } else {
+              name = 'Pasien Test';
+            }
+
             return handler.resolve(
               Response(
                 requestOptions: options,
@@ -40,13 +74,26 @@ class ApiClient {
                   'data': {
                     'access_token': 'mock-test-token',
                     'reset_token': 'mock-test-reset-token',
-                    'role': 'pasien',
+                    'role': role,
                     'user': {
-                      'id': 1,
-                      'nama': 'Pasien Test',
-                      'email': 'pasien@giat.id',
-                      'role': 'pasien',
+                      'id': isDokter ? 2 : (isApotek ? 3 : 1),
+                      'nama': name,
+                      'email': email.isNotEmpty ? email : (isDokter ? 'dr.budi@gmail.com' : (isApotek ? 'aminah@giat.id' : 'test@giat.id')),
+                      'role': role,
+                      'spesialisasi': spec,
                     },
+                    'dokter': isDokter
+                        ? {
+                            'id': 2,
+                            'nama': name,
+                            'spesialisasi': spec ?? 'Spesialis Penyakit Dalam / Ginjal',
+                            'no_str': '1234567890123456',
+                            'no_sip': 'SIP/123/456/2023',
+                            'instansi': 'RS Medika Utama',
+                            'alamat_praktik': 'Jl. Sehat No. 12, Jember',
+                            'jadwal_praktik': 'Senin - Jumat, 09:00 - 17:00',
+                          }
+                        : null,
                     'reminders': <dynamic>[],
                     'obat': <dynamic>[],
                     'pesanan': <dynamic>[],

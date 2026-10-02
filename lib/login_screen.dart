@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'config/api_config.dart';
 import 'master_layout.dart';
+import 'models/user_model.dart';
 import 'register_screen.dart';
 import 'screens/dokter/dokter_home_screen.dart';
+import 'screens/dokter/models/dokter_models.dart';
 import 'screens/apotek/apoteker_home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'services/auth_service.dart';
@@ -21,6 +23,8 @@ const _demoUsers = [
   {'email': 'pasien@giat.id', 'password': 'pasien', 'role': 'pasien', 'name': 'Pasien'},
   {'email': 'pasien@giat.id', 'password': '123456', 'role': 'pasien', 'name': 'Pasien'},
   {'email': 'siti.aisyah@gmail.com', 'password': 'password123', 'role': 'pasien', 'name': 'Siti Aisyah'},
+  {'email': 'siti', 'password': 'pasien', 'role': 'pasien', 'name': 'Siti Aisyah'},
+  {'email': 'siti', 'password': 'password123', 'role': 'pasien', 'name': 'Siti Aisyah'},
 
   // 2. Dokter
   {'email': 'dokter', 'password': 'dokter', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
@@ -28,12 +32,25 @@ const _demoUsers = [
   {'email': 'dokter@giat.id', 'password': '123456', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
   {'email': 'dr.ahmad@gmail.com', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Ahmad Pratama'},
   {'email': 'dr.siti@gmail.com', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Siti Rahmawati, Sp.PD'},
-  {'email': 'dr.budi@gmail.com', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH'},
+  {'email': 'dr.budi@gmail.com', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'dr.budi@gmail.com', 'password': 'dokter', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'dr.budi@gmail.com', 'password': '123456', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'dr.budi', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'dr.budi', 'password': 'dokter', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'dr.budi', 'password': '123456', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'dr budi', 'password': 'dokter', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'dr budi', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'dr budi', 'password': '123456', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'budi', 'password': 'budi', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'budi', 'password': 'dokter', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
+  {'email': 'budi', 'password': '123456', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
 
   // 3. Apoteker
   {'email': 'apoteker', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
   {'email': 'apoteker@giat.id', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
   {'email': 'apoteker@giat.id', 'password': '123456', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
+  {'email': 'aminah', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
+  {'email': 'aminah', 'password': 'password123', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
   {'email': 'kf.dago@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek Kimia Farma Dago'},
   {'email': 'k24.buahbatu@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek K-24 Buah Batu'},
   {'email': 'mandiri.medika@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek Mandiri Medika Pasteur'},
@@ -142,6 +159,17 @@ class _LoginScreenState extends State<LoginScreen>
         final role = (result.role ?? result.user?.role ?? 'pasien').toLowerCase();
         final name = result.user?.nama ?? 'Pengguna';
 
+        if (role == 'dokter') {
+          DokterProfileState.instance.syncFromUser(
+            name: name,
+            spec: result.user?.spesialisasi,
+            str: result.user?.noStr,
+            sip: result.user?.noSip,
+            inst: result.user?.instansi,
+            avatar: result.user?.fotoProfile,
+          );
+        }
+
         Widget targetScreen;
         if (role == 'dokter') {
           targetScreen = DokterHomeScreen(doctorName: name);
@@ -170,6 +198,25 @@ class _LoginScreenState extends State<LoginScreen>
         final user = match.first;
         final role = user['role']!;
         final name = user['name'] ?? 'Pengguna';
+
+        final demoUser = UserModel(
+          id: role == 'dokter' ? 2 : (role == 'pasien' ? 1 : 3),
+          nama: name,
+          email: demoEmail,
+          role: role,
+          spesialisasi: user['specialty'],
+          instansi: user['institution'],
+        );
+        await StorageService().saveUser(demoUser);
+        await StorageService().saveRole(role);
+
+        if (role == 'dokter') {
+          DokterProfileState.instance.syncFromUser(
+            name: name,
+            spec: user['specialty'],
+            inst: user['institution'],
+          );
+        }
 
         _showSnack('Masuk via Mode Demo: $role');
 
@@ -208,6 +255,15 @@ class _LoginScreenState extends State<LoginScreen>
 
         final role = (result.role ?? 'pasien').toLowerCase();
         final name = result.user?.nama ?? 'Pasien';
+
+        if (role == 'dokter') {
+          DokterProfileState.instance.syncFromUser(
+            name: name,
+            spec: result.user?.spesialisasi,
+            inst: result.user?.instansi,
+            avatar: result.user?.fotoProfile,
+          );
+        }
 
         Widget targetScreen;
         if (role == 'dokter') {
