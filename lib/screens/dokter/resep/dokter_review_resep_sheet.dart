@@ -1,9 +1,10 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
 import 'dokter_tambah_obat_dialog.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REVIEW RESEP DOKTER (Sesuai Desain Buat Resep)
@@ -70,6 +71,21 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
       );
       return;
     }
+
+    // Kirim data resep elektronik ke REST API Dokter Laravel Sanctum
+    DokterApiService().createResep({
+      'pasien_id': widget.patient.id,
+      'pasien_nama': widget.patient.name,
+      'items': _prescriptions.map((p) => {
+        'nama_obat': p.medicineName,
+        'dosis': p.dose,
+        'aturan_pakai': p.frequency,
+        'waktu_minum': p.usageTime,
+        'jumlah': p.quantity,
+        'durasi': p.duration,
+        'catatan': p.specialNotes,
+      }).toList(),
+    });
 
     widget.onPrescriptionPublished?.call(_prescriptions);
 

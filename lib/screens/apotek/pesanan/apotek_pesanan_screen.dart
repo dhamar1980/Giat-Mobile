@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
 import '../notifikasi/apotek_notifikasi_screen.dart';
 import 'apotek_detail_pesanan_screen.dart';
+import '../../../services/apotek_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PESANAN APOTEK (Revisi Sesuai 5 Screenshot Desain GIAT)
@@ -42,6 +43,13 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
   void initState() {
     super.initState();
     _selectedTabIndex = widget.initialTabIndex;
+    _fetchLiveOrders();
+  }
+
+  Future<void> _fetchLiveOrders() async {
+    try {
+      await ApotekApiService().getPesananList();
+    } catch (_) {}
   }
 
   @override

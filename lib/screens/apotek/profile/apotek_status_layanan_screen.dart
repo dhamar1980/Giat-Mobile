@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'apotek_jam_operasional_screen.dart';
 import 'apotek_area_layanan_screen.dart';
+import '../../../services/apotek_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STATUS LAYANAN APOTEK (Figma Node: 1100-26664)
@@ -130,6 +131,9 @@ class _ApotekStatusLayananScreenState extends State<ApotekStatusLayananScreen> {
                         ),
                         onChanged: (val) {
                           setState(() => _isServiceActive = val);
+                          // Sinkronisasi status layanan apotek ke REST API Backend Laravel
+                          ApotekApiService().toggleStatusLayanan({'is_active': val});
+
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(

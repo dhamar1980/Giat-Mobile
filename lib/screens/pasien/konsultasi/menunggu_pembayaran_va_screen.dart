@@ -1,9 +1,10 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import 'pembayaran_berhasil_konsultasi_screen.dart';
+import '../../../services/konsultasi_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN MENUNGGU PEMBAYARAN VIRTUAL ACCOUNT (Sesuai Referensi UI GIAT)
@@ -1075,6 +1076,17 @@ class _MenungguPembayaranVaScreenState extends State<MenungguPembayaranVaScreen>
                 ),
               ),
               onPressed: () async {
+                // Konfirmasi status pembayaran VA ke REST API backend
+                final docId = widget.doctor['id'] ?? '1';
+                KonsultasiApiService().bayarKonsultasi(docId, {
+                  'metode': 'va',
+                  'bank': widget.bankName,
+                  'nomor_va': widget.vaNumber,
+                  'biaya': widget.price,
+                  'status': 'berhasil',
+                });
+                KonsultasiApiService().cekStatusPembayaran(docId);
+
                 final success = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(

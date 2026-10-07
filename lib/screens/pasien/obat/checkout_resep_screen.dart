@@ -1,4 +1,4 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'detail_resep_screen.dart';
@@ -6,6 +6,7 @@ import '../profile/profile_pasien_screen.dart';
 import 'pembayaran_model.dart';
 import 'pembayaran_qris_screen.dart';
 import 'pembayaran_transfer_bank_screen.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN CHECKOUT RESEP DOKTER (Sesuai Desain Figma / 3 Screenshot Checkout)
@@ -1326,6 +1327,17 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
       recipientAddress: _recipientAddress,
       estimatedArrival: 'Hari ini, 16:30 - 17:00 WIB',
     );
+
+    // Kirim konfirmasi tebus resep ke REST API Pasien Laravel Sanctum
+    PasienApiService().beliObatResep({
+      'resep_id': rxNumber,
+      'metode_pengambilan': _metodePengambilan,
+      'metode_pembayaran': _metodePembayaran,
+      'penerima': _recipientName,
+      'nomor_telepon': _recipientPhone,
+      'alamat_pengiriman': _recipientAddress,
+      'total_biaya': _totalPembayaran,
+    });
 
     if (_metodePembayaran == 'qris') {
       Navigator.push(

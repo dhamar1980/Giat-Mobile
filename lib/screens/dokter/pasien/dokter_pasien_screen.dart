@@ -5,6 +5,7 @@ import '../models/dokter_models.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../profile/dokter_profile_screen.dart';
 import 'dokter_detail_pasien_screen.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DAFTAR PASIEN DOKTER (Sesuai Desain Figma: Node 1008-18310)
@@ -34,6 +35,18 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
   bool _isTopBarVisible = true;
 
   bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLivePatients();
+  }
+
+  Future<void> _fetchLivePatients() async {
+    try {
+      await DokterApiService().getPasienList();
+    } catch (_) {}
+  }
 
   @override
   void dispose() {

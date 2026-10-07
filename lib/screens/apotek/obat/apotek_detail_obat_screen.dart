@@ -1,6 +1,7 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/apotek_api_service.dart';
 import '../models/apotek_models.dart';
 import '../notifikasi/apotek_notifikasi_screen.dart';
 import '../profile/apotek_profile_screen.dart';
@@ -35,7 +36,7 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
   final TextEditingController _qtyCtrl = TextEditingController(text: '50');
   final TextEditingController _buyPriceCtrl = TextEditingController();
   final TextEditingController _sellPriceCtrl = TextEditingController();
-  final TextEditingController _batchCtrl = TextEditingController(text: 'BATCH-2026-X89');
+  final TextEditingController _batchCtrl = TextEditingController();
   final TextEditingController _expCtrl = TextEditingController(text: '14 Okt 2026');
   late String _selectedUnit;
 
@@ -45,6 +46,23 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
     _selectedUnit = widget.medicine.stockUnit;
     _buyPriceCtrl.text = _formatRupiah(widget.medicine.buyPrice);
     _sellPriceCtrl.text = _formatRupiah(widget.medicine.sellPrice);
+    _batchCtrl.text = _generateBatchNo();
+  }
+
+  String _generateBatchNo() {
+    final year = DateTime.now().year;
+    int maxSeq = widget.medicine.batches.length;
+    for (final b in widget.medicine.batches) {
+      final match = RegExp(r'BATCH-\d{4}-N(\d+)').firstMatch(b.batchNo);
+      if (match != null) {
+        final seq = int.tryParse(match.group(1) ?? '0') ?? 0;
+        if (seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    }
+    final nextSeq = (maxSeq + 1).toString().padLeft(2, '0');
+    return 'BATCH-$year-N$nextSeq';
   }
 
   @override
@@ -110,7 +128,7 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
     final buy = _parsePrice(_buyPriceCtrl.text, widget.medicine.buyPrice);
     final sell = _parsePrice(_sellPriceCtrl.text, widget.medicine.sellPrice);
     final batchNo = _batchCtrl.text.trim().isEmpty
-        ? 'BATCH-${DateTime.now().year}-N${widget.medicine.batches.length + 1}'
+        ? _generateBatchNo()
         : _batchCtrl.text.trim();
     final expDate = _expCtrl.text.trim().isEmpty ? '14 Okt 2026' : _expCtrl.text.trim();
 
@@ -125,6 +143,19 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
 
     widget.medicine.buyPrice = buy;
     widget.medicine.sellPrice = sell;
+
+    // Sinkronisasi data ke REST API Backend Laravel Apotek jika tersedia
+    ApotekApiService().updateStock({
+      'obat_id': widget.medicine.id,
+      'nomor_batch': batchNo,
+      'jumlah': qty,
+      'tanggal_kadaluarsa': expDate,
+      'harga_beli': buy,
+      'harga_jual': sell,
+    });
+
+    // Otomatis refresh batch number berikutnya
+    _batchCtrl.text = _generateBatchNo();
 
     setState(() {});
     widget.onStockUpdated?.call();
@@ -447,7 +478,44 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Jumlah Tambahan*
+                          // 1. Nomor Batch Baru (Paling Atas - Otomatis Terisi & Terkunci by Sistem)
+                          _buildFieldLabel('Nomor Batch Baru'),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _batchCtrl,
+                            readOnly: true,
+                            enableInteractiveSelection: false,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF334155),
+                            ),
+                            decoration: _buildInputDecoration(
+                              hint: 'BATCH-2026-N01',
+                              prefixIcon: const Icon(Icons.tag_rounded, size: 20, color: Color(0xFF64748B)),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.lock_rounded, size: 14, color: Color(0xFF64748B)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Sistem',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                              ),
+                              readOnly: true,
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // 2. Jumlah Tambahan*
                           _buildFieldLabel('Jumlah Tambahan'),
                           const SizedBox(height: 6),
                           TextFormField(
@@ -460,7 +528,7 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
 
                           const SizedBox(height: 14),
 
-                          // Satuan*
+                          // 3. Satuan*
                           _buildFieldLabel('Satuan'),
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
@@ -478,7 +546,7 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
 
                           const SizedBox(height: 14),
 
-                          // Harga Beli Satuan*
+                          // 4. Harga Beli Satuan*
                           _buildFieldLabel('Harga Beli Satuan'),
                           const SizedBox(height: 6),
                           TextFormField(
@@ -491,7 +559,7 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
 
                           const SizedBox(height: 14),
 
-                          // Harga Jual Satuan*
+                          // 5. Harga Jual Satuan*
                           _buildFieldLabel('Harga Jual Satuan'),
                           const SizedBox(height: 6),
                           TextFormField(
@@ -504,7 +572,7 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
 
                           const SizedBox(height: 14),
 
-                          // Tanggal Kadaluwarsa Batch Baru*
+                          // 6. Tanggal Kadaluwarsa Batch Baru*
                           _buildFieldLabel('Tanggal Kadaluwarsa Batch Baru'),
                           const SizedBox(height: 6),
                           GestureDetector(
@@ -519,21 +587,6 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
                                 ),
                               ),
                             ),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          // Nomor Batch Baru*
-                          _buildFieldLabel('Nomor Batch Baru'),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _batchCtrl,
-                            style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF0F172A)),
-                            decoration: _buildInputDecoration(
-                              hint: 'BATCH-2026-X89',
-                              prefixIcon: const Icon(Icons.tag_rounded, size: 20, color: Color(0xFF0F172A)),
-                            ),
-                            validator: (v) => (v == null || v.isEmpty) ? 'Wajib diisi' : null,
                           ),
 
                           const SizedBox(height: 20),
@@ -644,13 +697,19 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
     );
   }
 
-  InputDecoration _buildInputDecoration({required String hint, Widget? prefixIcon}) {
+  InputDecoration _buildInputDecoration({
+    required String hint,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+    bool readOnly = false,
+  }) {
     return InputDecoration(
       hintText: hint,
       hintStyle: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF94A3B8)),
       prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
       filled: true,
-      fillColor: const Color(0xFFF8FAF9),
+      fillColor: readOnly ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAF9),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -660,9 +719,16 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _darkGreen, width: 1.3),
+        borderSide: BorderSide(
+          color: readOnly ? const Color(0xFFE2E8F0) : _darkGreen,
+          width: 1.3,
+        ),
       ),
     );
   }

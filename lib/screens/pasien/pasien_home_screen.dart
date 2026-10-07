@@ -9,6 +9,7 @@ import 'widgets/pasien_bottom_navbar.dart';
 import '../../master_layout.dart';
 import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
+import '../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PASIEN HOME SCREEN (Figma Node: 771-5845)
@@ -57,6 +58,13 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
 
     _animCtrl.forward();
+    _fetchLiveHome();
+  }
+
+  Future<void> _fetchLiveHome() async {
+    try {
+      await PasienApiService().getHome();
+    } catch (_) {}
   }
 
   @override

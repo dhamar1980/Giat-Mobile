@@ -1,10 +1,11 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import 'menunggu_pembayaran_qris_screen.dart';
 import 'menunggu_pembayaran_va_screen.dart';
+import '../../../services/konsultasi_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PEMBAYARAN KONSULTASI (Sesuai Referensi UI GIAT)
@@ -924,6 +925,16 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
             ),
           ),
           onPressed: () async {
+            // Sinkronisasi pemesanan konsultasi ke REST API Konsultasi Laravel Sanctum
+            KonsultasiApiService().bookingDokter({
+              'dokter_id': widget.doctor['id'],
+              'dokter_nama': widget.doctor['name'],
+              'tanggal': widget.selectedDate,
+              'jam': widget.selectedTime,
+              'biaya': widget.price,
+              'metode_pembayaran': _selectedMethod,
+            });
+
             bool? result;
             if (_selectedMethod == 'qris') {
               result = await Navigator.push<bool>(

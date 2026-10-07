@@ -8,6 +8,7 @@ import '../profile/profile_pasien_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
+import '../../../services/konsultasi_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI: DAFTAR DOKTER & KONSULTASI SAYA (Sesuai Desain Figma)
@@ -44,7 +45,27 @@ class _DokterListScreenState extends State<DokterListScreen> {
     'Dokter Ginjal',
   ];
 
+  List<Map<String, dynamic>> _apiDoctors = [];
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiveDoctors();
+  }
+
+  Future<void> _fetchLiveDoctors() async {
+    try {
+      final res = await KonsultasiApiService().getDokterList();
+      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+        setState(() {
+          _apiDoctors = res.data!.map<Map<String, dynamic>>((d) {
+            if (d is Map<String, dynamic>) return d;
+            return Map<String, dynamic>.from(d as Map);
+          }).toList();
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -159,11 +180,22 @@ class _DokterListScreenState extends State<DokterListScreen> {
       },
     ];
 
-    List<Map<String, dynamic>> combinedList = [anisaPutri, budiSantoso];
-    if (_selectedCategory == 'Semua Dokter') {
-      combinedList.addAll(otherDoctors);
-    } else {
-      combinedList.addAll(otherDoctors.where((d) => d['category'] == _selectedCategory));
+    List<Map<String, dynamic>> combinedList = [];
+    if (_apiDoctors.isNotEmpty) {
+      if (_selectedCategory == 'Semua Dokter' || _selectedCategory == 'Konsultasi Saya') {
+        combinedList.addAll(_apiDoctors);
+      } else {
+        combinedList.addAll(_apiDoctors.where((d) =>
+            (d['kategori'] ?? d['specialty'] ?? '').toString().toLowerCase().contains(_selectedCategory.toLowerCase())));
+      }
+    }
+    if (combinedList.isEmpty) {
+      combinedList = [anisaPutri, budiSantoso];
+      if (_selectedCategory == 'Semua Dokter') {
+        combinedList.addAll(otherDoctors);
+      } else {
+        combinedList.addAll(otherDoctors.where((d) => d['category'] == _selectedCategory));
+      }
     }
 
     final query = _searchCtrl.text.toLowerCase().trim();

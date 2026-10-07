@@ -6,6 +6,7 @@ import '../konsultasi/dokter_room_chat_screen.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../pasien/dokter_detail_pasien_screen.dart';
 import '../profile/dokter_profile_screen.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // JADWAL PRAKTIK & PASIEN DOKTER (Sesuai Desain Mockup GIAT)
@@ -43,6 +44,18 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
     'Jumat, 05 Agu',
     'Sabtu, 06 Agu',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiveJadwal();
+  }
+
+  Future<void> _fetchLiveJadwal() async {
+    try {
+      await DokterApiService().getJadwal();
+    } catch (_) {}
+  }
 
   DokterPatient _findPatient(String patientId) {
     return DokterMockData.patients.firstWhere(

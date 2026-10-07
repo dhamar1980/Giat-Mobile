@@ -1,10 +1,11 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'detail_obat_screen.dart';
 import 'checkout_resep_screen.dart';
 import 'keranjang_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PEMBELIAN OBAT (KATALOG OBAT - Sesuai Gambar 1 & 2)
@@ -37,6 +38,7 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchLiveMedicines();
     _allMedicines = [
       // 1. Antasida Doen
       const ObatCatalogItem(
@@ -142,6 +144,12 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
         ],
       ),
     ];
+  }
+
+  Future<void> _fetchLiveMedicines() async {
+    try {
+      await PasienApiService().getObatList();
+    } catch (_) {}
   }
 
   List<ObatCatalogItem> get _filteredMedicines {

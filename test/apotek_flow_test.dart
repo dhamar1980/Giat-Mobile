@@ -246,6 +246,23 @@ void main() {
     expect(find.text('Simpan Tambahan Stok'), findsOneWidget);
     expect(find.text('Riwayat Batch Terakhir'), findsOneWidget);
 
+    // Verify Nomor Batch Baru is at the top of the form, filled and readOnly
+    final batchLabelFinder = find.byWidgetPredicate(
+      (w) => w is RichText && w.text.toPlainText().contains('Nomor Batch Baru'),
+    );
+    final qtyLabelFinder = find.byWidgetPredicate(
+      (w) => w is RichText && w.text.toPlainText().contains('Jumlah Tambahan'),
+    );
+    expect(batchLabelFinder, findsOneWidget);
+    expect(qtyLabelFinder, findsOneWidget);
+    expect(tester.getTopLeft(batchLabelFinder).dy, lessThan(tester.getTopLeft(qtyLabelFinder).dy));
+
+    final batchTextFieldFinder = find.byWidgetPredicate(
+      (w) => w is TextField && w.readOnly == true && (w.controller?.text.startsWith('BATCH-') ?? false),
+    );
+    expect(batchTextFieldFinder, findsOneWidget);
+    expect(find.text('Sistem'), findsOneWidget);
+
     await tester.ensureVisible(find.text('Simpan Tambahan Stok'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Simpan Tambahan Stok'));

@@ -1,9 +1,10 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
 import '../notifikasi/apotek_notifikasi_screen.dart';
 import '../profile/apotek_profile_screen.dart';
+import '../../../services/apotek_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAMBAH OBAT BARU APOTEK (Revisi Sesuai Screenshot 3 & 4)
@@ -168,6 +169,23 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
 
     ApotekMockData.addMedicine(med);
     widget.onMedicineAdded?.call();
+
+    // Sinkronisasi data ke REST API Backend Laravel Apotek
+    ApotekApiService().tambahObat({
+      'kode_obat': newId,
+      'nama_obat': name,
+      'kategori': category,
+      'bentuk': _selectedForm,
+      'dosis': dose,
+      'satuan_kemasan': package,
+      'stok': stock,
+      'satuan_stok': _selectedForm,
+      'harga_beli': buy,
+      'harga_jual': sell,
+      'tanggal_kadaluarsa': exp,
+      'nomor_batch': batchNo,
+      'aturan_pakai': notes,
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

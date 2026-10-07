@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
@@ -6,6 +7,7 @@ import 'catat_kondisi_screen.dart';
 import 'riwayat_pemantauan_screen.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA PENCATATAN BERAT BADAN
@@ -64,6 +66,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchLivePantauData();
     _weightRecords = [
       const WeightRecord(date: '01 Sep', weight: 65.0, note: 'Normal'),
       const WeightRecord(date: '05 Sep', weight: 65.5, note: 'Pola makan teratur'),
@@ -100,6 +103,30 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
         keluhan: 'Tidak ada keluhan',
       ),
     ];
+  }
+
+  Future<void> _fetchLivePantauData() async {
+    if (Platform.environment.containsKey('FLUTTER_TEST')) return;
+    try {
+      final summaryRes = await PasienApiService().getPantauSummary();
+      if (summaryRes.success && summaryRes.data != null && mounted) {
+        final d = summaryRes.data!;
+        setState(() {
+          if (d['berat_badan'] != null) {
+            _currentWeight = double.tryParse(d['berat_badan'].toString()) ?? _currentWeight;
+          }
+          if (d['tinggi_badan'] != null) {
+            _heightCm = double.tryParse(d['tinggi_badan'].toString()) ?? _heightCm;
+          }
+          if (d['kondisi_tubuh'] != null) {
+            _kondisiTubuh = d['kondisi_tubuh'].toString();
+          }
+          if (d['keluhan'] != null) {
+            _keluhan = d['keluhan'].toString();
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   // Calculate IMT

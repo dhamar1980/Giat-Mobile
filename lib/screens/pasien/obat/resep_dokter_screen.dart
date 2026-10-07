@@ -1,9 +1,10 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'detail_resep_screen.dart';
 import 'checkout_resep_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN RESEP DOKTER (Sesuai Desain Figma / Gambar 1 & 2)
@@ -36,6 +37,7 @@ class _ResepDokterScreenState extends State<ResepDokterScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchLiveResep();
     _resepList = [
       // 1. Resep Belum Ditebus
       const ResepDokterData(
@@ -125,6 +127,12 @@ class _ResepDokterScreenState extends State<ResepDokterScreen> {
         ],
       ),
     ];
+  }
+
+  Future<void> _fetchLiveResep() async {
+    try {
+      await PasienApiService().getResepPasien();
+    } catch (_) {}
   }
 
   Color _getStatusColor(String status) {

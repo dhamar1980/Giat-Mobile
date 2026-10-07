@@ -405,9 +405,9 @@ class ApotekApiService {
   }
 
   /// PATCH /apotek/status-layanan
-  Future<ApiResponse<Map<String, dynamic>>> toggleStatusLayanan() async {
+  Future<ApiResponse<Map<String, dynamic>>> toggleStatusLayanan([Map<String, dynamic>? data]) async {
     try {
-      final response = await _client.dio.patch('/apotek/status-layanan');
+      final response = await _client.dio.patch('/apotek/status-layanan', data: data);
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Status layanan apotek berhasil diubah.',
         data: response.data?['data'] as Map<String, dynamic>?,

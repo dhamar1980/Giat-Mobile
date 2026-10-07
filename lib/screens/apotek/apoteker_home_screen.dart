@@ -12,6 +12,7 @@ import '../../onboarding_screen.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
+import '../../services/apotek_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // APOTEKER HOME SCREEN (Figma Node: 1100-18253)
@@ -63,6 +64,13 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
 
     _animCtrl.forward();
+    _fetchLiveDashboard();
+  }
+
+  Future<void> _fetchLiveDashboard() async {
+    try {
+      await ApotekApiService().getDashboard();
+    } catch (_) {}
   }
 
   @override

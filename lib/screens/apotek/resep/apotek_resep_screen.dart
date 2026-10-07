@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
 import '../notifikasi/apotek_notifikasi_screen.dart';
 import 'apotek_detail_resep_screen.dart';
+import '../../../services/apotek_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DAFTAR RESEP MASUK APOTEK (Revisi Sesuai Screenshot Desain GIAT)
@@ -39,6 +40,18 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
 
   bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _internalIsTopBarVisible;
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiveResep();
+  }
+
+  Future<void> _fetchLiveResep() async {
+    try {
+      await ApotekApiService().getPesananResep();
+    } catch (_) {}
+  }
+
   List<ApotekRecipe> _getIncomingRecipes() {
     final all = ApotekMockData.recipes;
     if (_showAllHistory) return all;
@@ -60,6 +73,9 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
   }
 
   void _handleAcceptRecipe(ApotekRecipe recipe) {
+    // Sinkronisasi status validasi resep ke REST API Apotek
+    ApotekApiService().validasiDanTerimaResep(recipe.id);
+
     final newOrder = ApotekMockData.acceptRecipeAndCreateOrder(recipe);
     setState(() {});
 

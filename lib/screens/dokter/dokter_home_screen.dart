@@ -14,6 +14,7 @@ import '../../onboarding_screen.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
+import '../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOKTER HOME SCREEN (Figma Node: 1008-17556)
@@ -70,6 +71,13 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
 
     _animCtrl.forward();
+    _fetchLiveDashboard();
+  }
+
+  Future<void> _fetchLiveDashboard() async {
+    try {
+      await DokterApiService().getDashboard();
+    } catch (_) {}
   }
 
   @override

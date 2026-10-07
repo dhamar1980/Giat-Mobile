@@ -305,14 +305,20 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                 ),
               ),
 
-              SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                padding: const EdgeInsets.only(bottom: 50),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Organic Curved Green Header with Kembali & Yellow Edit buttons (Screenshot 3 & 4)
-                    _buildHeader(context, currentName, currentSpecialty, profileState),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Organic Curved Green Header with Kembali & Yellow Edit buttons (Fixed at top, does not scroll)
+                  _buildHeader(context, currentName, currentSpecialty, profileState),
+
+                  // Scrollable content below pinned header
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      padding: const EdgeInsets.only(bottom: 50),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
 
                     const SizedBox(height: 20),
 
@@ -545,8 +551,11 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                         ],
                       ),
                     ),
-                  ],
-                ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -593,8 +602,6 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
   }
 
   Widget _buildHeader(BuildContext context, String name, String specialty, DokterProfileState profileState) {
-    final topPadding = MediaQuery.of(context).padding.top;
-
     return ClipPath(
       clipper: _ProfileHeaderOrganicClipper(),
       child: Container(
