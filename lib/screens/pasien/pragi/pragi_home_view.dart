@@ -84,8 +84,7 @@ class _PragiHomeViewState extends State<PragiHomeView> {
     final bodyContent = ValueListenableBuilder<List<PragiScreeningResult>>(
       valueListenable: PragiService().historyNotifier,
       builder: (context, history, _) {
-        final latest = history.isNotEmpty ? history.first : null;
-        final pastHistory = history.length > 1 ? history.sublist(1).take(3).toList() : <PragiScreeningResult>[];
+        final recentHistory = history.take(3).toList();
 
         return Column(
           children: [
@@ -263,29 +262,6 @@ class _PragiHomeViewState extends State<PragiHomeView> {
 
                             const SizedBox(height: 24),
 
-                            // Section: Hasil Skrining Terakhir
-                            Text(
-                              'Hasil Skrining Terakhir',
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0F172A),
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            if (latest != null)
-                              _buildScreeningCard(
-                                context: context,
-                                result: latest,
-                                isLatest: true,
-                              )
-                            else
-                              _buildEmptyPlaceholder('Belum ada skrining sebelumnya'),
-
-                            const SizedBox(height: 24),
-
                             // Section: Riwayat Skrining (Maksimal 3 riwayat terakhir)
                             Text(
                               'Riwayat Skrining',
@@ -298,17 +274,16 @@ class _PragiHomeViewState extends State<PragiHomeView> {
 
                             const SizedBox(height: 12),
 
-                            if (pastHistory.isNotEmpty)
-                              ...pastHistory.map((item) => Padding(
+                            if (recentHistory.isNotEmpty)
+                              ...recentHistory.map((item) => Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
                                     child: _buildScreeningCard(
                                       context: context,
                                       result: item,
-                                      isLatest: false,
                                     ),
                                   ))
                             else
-                              _buildEmptyPlaceholder('Tidak ada riwayat tambahan'),
+                              _buildEmptyPlaceholder('Belum ada riwayat skrining'),
 
                             const SizedBox(height: 24),
                           ],
@@ -437,7 +412,7 @@ class _PragiHomeViewState extends State<PragiHomeView> {
   Widget _buildScreeningCard({
     required BuildContext context,
     required PragiScreeningResult result,
-    required bool isLatest,
+    bool isLatest = false,
   }) {
     return GestureDetector(
       onTap: () {
