@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'config/api_config.dart';
+import 'constants/api_constants.dart';
 import 'master_layout.dart';
 import 'models/user_model.dart';
 import 'register_screen.dart';
@@ -27,6 +28,7 @@ const _demoUsers = [
   {'email': 'siti', 'password': 'password123', 'role': 'pasien', 'name': 'Siti Aisyah'},
 
   // 2. Dokter
+  {'email': 'dr.budi.santoso@giat.id', 'password': 'password123', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD', 'specialty': 'Dokter Spesialis Penyakit Dalam', 'institution': 'RS Medika Utama'},
   {'email': 'dokter', 'password': 'dokter', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
   {'email': 'dokter@giat.id', 'password': 'dokter', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
   {'email': 'dokter@giat.id', 'password': '123456', 'role': 'dokter', 'name': 'Dr. Andi Pratama'},
@@ -46,6 +48,7 @@ const _demoUsers = [
   {'email': 'budi', 'password': '123456', 'role': 'dokter', 'name': 'dr. Budi Santoso, Sp.PD-KGH', 'specialty': 'Spesialis Penyakit Dalam / Konsultan Ginjal Hipertensi (Sp.PD-KGH)', 'institution': 'RS Medika Utama'},
 
   // 3. Apoteker
+  {'email': 'apotek.dago@kimiafarma.co.id', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek Kimia Farma Dago'},
   {'email': 'apoteker', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
   {'email': 'apoteker@giat.id', 'password': 'apoteker', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
   {'email': 'apoteker@giat.id', 'password': '123456', 'role': 'apoteker', 'name': 'Apt. Aminah, S.Farm'},
@@ -140,14 +143,44 @@ class _LoginScreenState extends State<LoginScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final email = _emailCtrl.text.trim();
-    final pass = _passCtrl.text.trim();
+    // Pastikan ApiConfig langsung sinkron ke URL tunnel terkini dari ApiConstants
+    final currentHost = Uri.tryParse(ApiConstants.serverUrl)?.host ?? '';
+    final activeHost = Uri.tryParse(ApiConfig.baseUrl)?.host ?? '';
+    if (activeHost.contains('trycloudflare.com') && activeHost != currentHost) {
+      debugPrint('🔄 Mengalihkan Base URL dari $activeHost ke $currentHost');
+      ApiConfig.setBaseUrl(ApiConstants.defaultBaseUrl);
+      StorageService().saveBaseUrl(ApiConstants.defaultBaseUrl);
+    }
+
+    final rawEmail = _emailCtrl.text.trim();
+    final rawPass = _passCtrl.text.trim();
+
+    // Pemetaan shortcut alias ke akun resmi database Supabase / Laravel
+    String targetEmail = rawEmail.toLowerCase();
+    String targetPass = rawPass;
+
+    if (targetEmail == 'pasien' || targetEmail == 'siti') {
+      targetEmail = 'siti.aisyah@gmail.com';
+      if (targetPass == 'pasien') targetPass = 'password123';
+    } else if (targetEmail == 'dokter' ||
+        targetEmail == 'dr.budi' ||
+        targetEmail == 'dr.budi@gmail.com' ||
+        targetEmail == 'budi' ||
+        targetEmail == 'dr budi') {
+      targetEmail = 'dr.budi.santoso@giat.id';
+      if (targetPass == 'dokter') targetPass = 'password123';
+    } else if (targetEmail == 'apoteker' ||
+        targetEmail == 'apotek' ||
+        targetEmail == 'aminah') {
+      targetEmail = 'apotek.dago@kimiafarma.co.id';
+      if (targetPass == 'apoteker') targetPass = 'password123';
+    }
 
     try {
-      // 1. Coba login ke API Backend GIAT (Firebase + Sanctum)
+      // 1. Coba login ke API Backend GIAT (Laravel + Supabase)
       final result = await AuthService().loginWithEmailPassword(
-        email: email,
-        password: pass,
+        email: targetEmail,
+        password: targetPass,
       );
 
       if (!mounted) return;
@@ -187,9 +220,11 @@ class _LoginScreenState extends State<LoginScreen>
       }
 
       // 2. Jika gagal atau offline, periksa apakah input cocok dengan demo users
-      final demoEmail = email.toLowerCase();
+      final demoEmail = rawEmail.toLowerCase();
       final match = _demoUsers.where(
-        (u) => u['email'] == demoEmail && u['password'] == pass,
+        (u) =>
+            (u['email'] == demoEmail || u['email'] == targetEmail) &&
+            (u['password'] == rawPass || u['password'] == targetPass),
       );
 
       setState(() => _isLoading = false);
@@ -202,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen>
         final demoUser = UserModel(
           id: role == 'dokter' ? 2 : (role == 'pasien' ? 1 : 3),
           nama: name,
-          email: demoEmail,
+          email: targetEmail.contains('@') ? targetEmail : demoEmail,
           role: role,
           spesialisasi: user['specialty'],
           instansi: user['institution'],
@@ -219,7 +254,7 @@ class _LoginScreenState extends State<LoginScreen>
           );
         }
 
-        _showSnack('Masuk via Mode Demo: $role');
+        _showSnack('Server offline / fallback demo: $role');
 
         Widget targetScreen;
         if (role == 'dokter') {

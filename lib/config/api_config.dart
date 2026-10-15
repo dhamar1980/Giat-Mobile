@@ -12,10 +12,24 @@ class ApiConfig {
   /// Default Base URL
   static String get defaultBaseUrl => ApiConstants.defaultBaseUrl.trim();
 
-  /// Active Base URL in memory
-  static String _activeBaseUrl = defaultBaseUrl;
+  /// Active Base URL override in memory
+  static String? _customBaseUrl;
 
-  static String get baseUrl => _activeBaseUrl.trim();
+  static String get baseUrl {
+    if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty) {
+      final customHost = Uri.tryParse(_customBaseUrl!)?.host ?? '';
+      final constantHost = Uri.tryParse(ApiConstants.serverUrl)?.host ?? '';
+      // If the override is an outdated trycloudflare tunnel that differs from the code, discard it
+      if (customHost.contains('trycloudflare.com') &&
+          constantHost.isNotEmpty &&
+          customHost != constantHost) {
+        _customBaseUrl = null;
+        return defaultBaseUrl;
+      }
+      return _customBaseUrl!.trim();
+    }
+    return defaultBaseUrl;
+  }
 
   static void setBaseUrl(String url) {
     String cleanUrl = url.trim();
@@ -26,6 +40,10 @@ class ApiConfig {
     if (!cleanUrl.endsWith('/api')) {
       cleanUrl = '$cleanUrl/api';
     }
-    _activeBaseUrl = cleanUrl;
+    _customBaseUrl = cleanUrl;
+  }
+
+  static void resetToDefault() {
+    _customBaseUrl = null;
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
+import '../constants/api_constants.dart';
 import '../models/user_model.dart';
 
 /// Storage Service managing authentication tokens, user info, and local settings.
@@ -50,7 +51,20 @@ class StorageService {
       _prefs = await SharedPreferences.getInstance();
       final savedUrl = await getBaseUrl();
       if (savedUrl != null && savedUrl.isNotEmpty) {
-        ApiConfig.setBaseUrl(savedUrl);
+        // Jika savedUrl adalah tunnel Cloudflare lama yang sudah diganti di ApiConstants,
+        // otomatis perbarui SharedPreferences ke URL tunnel yang baru
+        final currentHost = Uri.tryParse(ApiConstants.serverUrl)?.host ?? '';
+        final savedHost = Uri.tryParse(savedUrl)?.host ?? '';
+        if (savedHost.contains('trycloudflare.com') &&
+            currentHost.isNotEmpty &&
+            savedHost != currentHost) {
+          debugPrint('🔄 Sinkronisasi URL tunnel lama ($savedHost) -> URL baru ($currentHost)');
+          await saveBaseUrl(ApiConstants.defaultBaseUrl);
+        } else {
+          ApiConfig.setBaseUrl(savedUrl);
+        }
+      } else {
+        ApiConfig.setBaseUrl(ApiConstants.defaultBaseUrl);
       }
     } catch (e) {
       debugPrint('StorageService init error: $e');

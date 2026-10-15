@@ -109,13 +109,13 @@ class AuthService {
   Future<AuthResult> loginWithEmailPassword({
     required String email,
     required String password,
-    String? role = 'pasien',
+    String? role,
   }) async {
     try {
       final Map<String, dynamic> payload = {
         'email': email.trim().toLowerCase(),
         'password': password,
-        'role': role ?? 'pasien',
+        if (role != null && role.isNotEmpty) 'role': role,
       };
 
       dynamic response;
