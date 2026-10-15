@@ -40,9 +40,11 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
   // Colors based on Figma design
   static const _darkGreen = Color(0xFF065A37);
   static const _chatBubbleGreen = Color(0xFF006D37);
-  static const _chatBubbleCheckBlue = Color(0xFF34A0FF);
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
+
+  Map<String, dynamic>? _homeData;
+  int _unreadCount = 0;
 
   @override
   void initState() {
@@ -63,7 +65,21 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
 
   Future<void> _fetchLiveHome() async {
     try {
-      await PasienApiService().getHome();
+      final res = await PasienApiService().getHome();
+      if (res.success && res.data != null && mounted) {
+        setState(() {
+          _homeData = res.data;
+        });
+      }
+    } catch (_) {}
+
+    try {
+      final countRes = await PasienApiService().getNotifikasiUnreadCount();
+      if (countRes.success && mounted) {
+        setState(() {
+          _unreadCount = countRes.data ?? 0;
+        });
+      }
     } catch (_) {}
   }
 
@@ -231,6 +247,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Stack(
+                              clipBehavior: Clip.none,
                               children: [
                                 IconButton(
                                   constraints: const BoxConstraints(),
@@ -245,18 +262,29 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                                     );
                                   },
                                 ),
-                                Positioned(
-                                  right: 6,
-                                  top: 6,
-                                  child: Container(
-                                    width: 8.5,
-                                    height: 8.5,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFEF4444),
-                                      shape: BoxShape.circle,
+                                if (_unreadCount > 0)
+                                  Positioned(
+                                    right: 2,
+                                    top: 2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFEF4444),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          _unreadCount > 9 ? '9+' : '$_unreadCount',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
                               ],
                             ),
                             const SizedBox(width: 8),
@@ -449,10 +477,22 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
     );
   }
 
+
   // ───────────────────────────────────────────────────────────────────────────
   // REMINDERS SECTION (Figma Node 771:5845)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildReminderSection() {
+    List<dynamic> activeReminders = [];
+    if (_homeData != null) {
+      if (_homeData!['reminders'] is List) {
+        activeReminders = _homeData!['reminders'] as List;
+      } else if (_homeData!['reminder_hari_ini'] is List) {
+        activeReminders = _homeData!['reminder_hari_ini'] as List;
+      }
+    }
+
+    final displayReminders = activeReminders.take(3).toList();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -497,39 +537,56 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
           ),
           const SizedBox(height: 12),
 
-          // Card 1: Minum Obat
-          _buildReminderCard(
-            icon: Icons.medication_rounded,
-            iconBg: const Color(0xFF065A37),
-            title: 'Minum Obat',
-            time: '08:00 WIB',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ReminderListScreen(),
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: 10),
-
-          // Card 2: Kontrol Kesehatan
-          _buildReminderCard(
-            icon: Icons.calendar_month_rounded,
-            iconBg: const Color(0xFF065A37),
-            title: 'Kontrol Kesehatan',
-            time: 'Besok, 10:00 WIB',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ReminderListScreen(),
-                ),
-              );
-            },
-          ),
+          if (displayReminders.isNotEmpty) ...[
+            for (var rem in displayReminders) ...[
+              _buildReminderCard(
+                icon: Icons.medication_rounded,
+                iconBg: const Color(0xFF065A37),
+                title: rem['nama']?.toString() ?? rem['title']?.toString() ?? 'Minum Obat',
+                time: rem['waktu']?.toString() ?? rem['time']?.toString() ?? '08:00 WIB',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ReminderListScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ] else ...[
+            // Default 2 cards fallback
+            _buildReminderCard(
+              icon: Icons.medication_rounded,
+              iconBg: const Color(0xFF065A37),
+              title: 'Minum Obat (Amlodipine)',
+              time: '08:00 WIB',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ReminderListScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildReminderCard(
+              icon: Icons.calendar_month_rounded,
+              iconBg: const Color(0xFF065A37),
+              title: 'Kontrol Kesehatan Ginjal',
+              time: 'Besok, 10:00 WIB',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ReminderListScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );

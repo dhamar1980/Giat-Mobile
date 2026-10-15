@@ -2,7 +2,6 @@ import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'detail_obat_screen.dart';
-import 'checkout_resep_screen.dart';
 import 'keranjang_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../../../services/pasien_api_service.dart';
@@ -33,7 +32,7 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
   int _cartCount = 2;
   String _searchQuery = '';
 
-  late final List<ObatCatalogItem> _allMedicines;
+  late List<ObatCatalogItem> _allMedicines;
 
   @override
   void initState() {
@@ -148,7 +147,48 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
 
   Future<void> _fetchLiveMedicines() async {
     try {
-      await PasienApiService().getObatList();
+      final res = await PasienApiService().getObatList(search: _searchQuery.isNotEmpty ? _searchQuery : null);
+      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+        final List<ObatCatalogItem> apiItems = [];
+        for (var item in res.data!) {
+          if (item is Map) {
+            final id = item['id']?.toString() ?? 'obat-${item['nama']}';
+            final name = item['nama']?.toString() ?? item['name']?.toString() ?? 'Obat';
+            final cat = item['kategori']?.toString() ?? item['category']?.toString() ?? 'Obat Bebas';
+            final price = double.tryParse(item['harga']?.toString() ?? item['price']?.toString() ?? '0') ?? 0.0;
+            final formattedPrice = 'Rp ${price.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+            final desc = item['deskripsi']?.toString() ?? item['description']?.toString() ?? '';
+            final bool perluResep = item['perlu_resep'] == true || item['is_resep'] == 1 || item['resep'] == true;
+            final img = item['gambar']?.toString() ?? item['image']?.toString() ?? 'assets/images/paracetamol_strip.jpg';
+            apiItems.add(ObatCatalogItem(
+              id: id,
+              name: name,
+              category: cat,
+              badgeText: perluResep ? 'Resep Dokter' : 'Bebas',
+              badgeColor: perluResep ? const Color(0xFFDC2626) : const Color(0xFF065A37),
+              packageInfo: item['kemasan']?.toString() ?? '1 Strip',
+              price: price.toInt(),
+              priceFormatted: formattedPrice,
+              imagePath: img,
+              perluResep: perluResep,
+              bpomBadge: item['bpom']?.toString() ?? 'Katalog Resmi BPOM',
+              ginjalWarning: item['peringatan_ginjal']?.toString() ?? 'Gunakan sesuai petunjuk dokter atau apoteker.',
+              shortDesc: desc,
+              indications: const [
+                {'icon': Icons.medical_services_outlined, 'label': 'Kesehatan Ginjal'},
+              ],
+              dosageRules: const [
+                {'num': '1', 'title': 'Aturan Pakai', 'desc': 'Sesuai petunjuk dokter / apoteker.'},
+              ],
+            ));
+          }
+        }
+        if (apiItems.isNotEmpty) {
+          setState(() {
+            _allMedicines = apiItems;
+          });
+        }
+      }
     } catch (_) {}
   }
 

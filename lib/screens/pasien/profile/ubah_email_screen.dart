@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UBAH ALAMAT EMAIL SCREEN
@@ -69,6 +70,9 @@ class _UbahEmailScreenState extends State<UbahEmailScreen> {
       );
       return;
     }
+
+    // Call API PUT /pasien/profile/email
+    PasienApiService().updateEmail(newEmail);
 
     showDialog(
       context: context,

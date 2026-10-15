@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../services/konsultasi_api_service.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RUANG VIDEO CALL PASIEN - DOKTER (Telemedicine Video Call Experience)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11,12 +13,14 @@ class KonsultasiVideoCallScreen extends StatefulWidget {
   final String doctorName;
   final String specialty;
   final String avatarUrl;
+  final dynamic consultationId;
 
   const KonsultasiVideoCallScreen({
     super.key,
     required this.doctorName,
     this.specialty = 'Dokter Spesialis',
     this.avatarUrl = '',
+    this.consultationId,
   });
 
   @override
@@ -45,6 +49,15 @@ class _KonsultasiVideoCallScreenState extends State<KonsultasiVideoCallScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    _fetchRoomInfo();
+  }
+
+  Future<void> _fetchRoomInfo() async {
+    if (widget.consultationId != null) {
+      try {
+        await KonsultasiApiService().getVideoCall(widget.consultationId);
+      } catch (_) {}
+    }
   }
 
   void _startTimer() {
@@ -794,6 +807,11 @@ class _KonsultasiVideoCallScreenState extends State<KonsultasiVideoCallScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () {
+              final durasi = (_secondsElapsed / 60).ceil();
+              if (widget.consultationId != null) {
+                KonsultasiApiService().endVideoCall(widget.consultationId, durasiMenit: durasi);
+                KonsultasiApiService().selesaikanKonsultasi(widget.consultationId);
+              }
               Navigator.pop(dialogCtx);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(

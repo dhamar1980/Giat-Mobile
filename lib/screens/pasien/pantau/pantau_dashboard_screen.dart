@@ -112,19 +112,74 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
       if (summaryRes.success && summaryRes.data != null && mounted) {
         final d = summaryRes.data!;
         setState(() {
-          if (d['berat_badan'] != null) {
-            _currentWeight = double.tryParse(d['berat_badan'].toString()) ?? _currentWeight;
+          if (d['berat_badan'] != null || d['bb'] != null) {
+            _currentWeight = double.tryParse((d['berat_badan'] ?? d['bb']).toString()) ?? _currentWeight;
           }
-          if (d['tinggi_badan'] != null) {
-            _heightCm = double.tryParse(d['tinggi_badan'].toString()) ?? _heightCm;
+          if (d['tinggi_badan'] != null || d['tb'] != null) {
+            _heightCm = double.tryParse((d['tinggi_badan'] ?? d['tb']).toString()) ?? _heightCm;
           }
-          if (d['kondisi_tubuh'] != null) {
-            _kondisiTubuh = d['kondisi_tubuh'].toString();
+          if (d['kondisi_tubuh'] != null || d['kondisi'] != null) {
+            _kondisiTubuh = (d['kondisi_tubuh'] ?? d['kondisi']).toString();
           }
           if (d['keluhan'] != null) {
             _keluhan = d['keluhan'].toString();
           }
         });
+      }
+    } catch (_) {}
+
+    try {
+      final chartRes = await PasienApiService().getPantauChart(limit: 14);
+      if (chartRes.success && chartRes.data != null && mounted) {
+        final d = chartRes.data!;
+        if (d['labels'] is List && d['berat_badan'] is List) {
+          final labels = d['labels'] as List;
+          final weights = d['berat_badan'] as List;
+          final List<WeightRecord> chartRecords = [];
+          for (int i = 0; i < labels.length && i < weights.length; i++) {
+            chartRecords.add(WeightRecord(
+              date: labels[i].toString(),
+              weight: double.tryParse(weights[i].toString()) ?? 65.0,
+              note: '',
+            ));
+          }
+          if (chartRecords.isNotEmpty) {
+            setState(() {
+              _weightRecords = chartRecords;
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final historyRes = await PasienApiService().getPantauHistory();
+      if (historyRes.success && historyRes.data != null && mounted) {
+        final List<PemantauanRecord> historyList = [];
+        for (int i = 0; i < historyRes.data!.length; i++) {
+          final item = historyRes.data![i];
+          if (item is Map) {
+            final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
+            final dateStr = dt != null
+                ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} • ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WIB'
+                : (item['tanggal']?.toString() ?? 'Hari ini');
+            historyList.add(PemantauanRecord(
+              id: item['id'],
+              dateStr: dateStr,
+              badgeText: i == 0 ? 'Terbaru' : '$i hari lalu',
+              imt: double.tryParse((item['imt'] ?? item['bmi'])?.toString() ?? '22.5') ?? 22.5,
+              heightCm: int.tryParse((item['tb'] ?? item['tinggi_badan'])?.toString() ?? '170') ?? 170,
+              weightKg: double.tryParse((item['bb'] ?? item['berat_badan'])?.toString() ?? '65.0') ?? 65.0,
+              kondisiTubuh: (item['kondisi'] ?? item['kondisi_tubuh'])?.toString() ?? 'Baik',
+              keluhan: item['keluhan']?.toString() ?? 'Tidak ada keluhan',
+            ));
+          }
+        }
+        if (historyList.isNotEmpty) {
+          setState(() {
+            _allHistoryRecords = historyList;
+          });
+        }
       }
     } catch (_) {}
   }

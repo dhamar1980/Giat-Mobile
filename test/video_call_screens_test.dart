@@ -46,6 +46,9 @@ void main() {
     await tester.tap(find.text('Video'));
     await tester.pump();
     expect(find.text('Video Off'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 
   testWidgets('DokterVideoCallScreen (Dokter) renders full video call controls, PiP, and status', (tester) async {
@@ -89,5 +92,8 @@ void main() {
     await tester.tap(find.text('Video'));
     await tester.pump();
     expect(find.text('Video Off'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 }

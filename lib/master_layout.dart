@@ -12,6 +12,7 @@ import 'screens/pasien/reminder/reminder_list_screen.dart';
 import 'screens/pasien/widgets/pasien_bottom_navbar.dart';
 import 'widgets/giat_background.dart';
 import 'widgets/app_brand_title.dart';
+import 'services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER LAYOUT GIAT (Persistent TopBar, Content Switcher, & Navbar)
@@ -37,8 +38,8 @@ class _MasterLayoutState extends State<MasterLayout> {
   static const _darkGreen = Color(0xFF065A37);
   static const _bgColor = Color(0xFFF6FAF7);
 
-  // Simulated notification data
-  final List<Map<String, dynamic>> _notifications = [
+  // Notification data
+  List<Map<String, dynamic>> _notifications = [
     {
       'title': 'Waktunya Minum Obat',
       'body': 'Candesartan 8 mg (1 tablet) sesudah makan.',
@@ -65,12 +66,56 @@ class _MasterLayoutState extends State<MasterLayout> {
     },
   ];
 
+  int _unreadCount = 0;
   bool _isTopBarVisible = true;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _fetchNotificationState();
+  }
+
+  Future<void> _fetchNotificationState() async {
+    try {
+      final countRes = await PasienApiService().getNotifikasiUnreadCount();
+      if (countRes.success && mounted) {
+        setState(() {
+          _unreadCount = countRes.data ?? 0;
+        });
+      }
+    } catch (_) {}
+
+    try {
+      final notifRes = await PasienApiService().getNotifikasi();
+      if (notifRes.success && notifRes.data != null && mounted) {
+        final List<Map<String, dynamic>> parsedList = [];
+        for (var e in notifRes.data!) {
+          if (e is Map) {
+            final id = e['id'];
+            final title = e['judul'] ?? e['title'] ?? 'Notifikasi GIAT';
+            final body = e['pesan'] ?? e['body'] ?? e['message'] ?? '';
+            final isRead = e['is_read'] == true || e['read_at'] != null || e['is_read'] == 1;
+            final dt = e['created_at'] != null ? DateTime.tryParse(e['created_at'].toString()) : null;
+            final timeStr = dt != null ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}' : 'Baru saja';
+            parsedList.add({
+              'id': id,
+              'title': title,
+              'body': body,
+              'time': timeStr,
+              'isRead': isRead,
+              'icon': Icons.notifications_rounded,
+              'color': const Color(0xFF065A37),
+            });
+          }
+        }
+        if (parsedList.isNotEmpty) {
+          setState(() {
+            _notifications = parsedList;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _onTabSelected(int index) {
@@ -79,6 +124,7 @@ class _MasterLayoutState extends State<MasterLayout> {
         _currentIndex = index;
         _isTopBarVisible = true;
       });
+      _fetchNotificationState();
     }
   }
 
@@ -191,38 +237,39 @@ class _MasterLayoutState extends State<MasterLayout> {
               children: [
                 // 1. Notifikasi (Lonceng di sisi kiri)
                 Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    GestureDetector(
-                      onLongPress: _showNotificationsModal,
-                      child: IconButton(
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(5),
-                        icon: const Icon(
-                          Icons.notifications_none_rounded,
-                          size: 24,
-                          color: Color(0xFF1F2937),
-                        ),
-                        tooltip: 'Reminder',
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ReminderListScreen(),
-                            ),
-                          );
-                        },
+                    IconButton(
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(5),
+                      icon: const Icon(
+                        Icons.notifications_none_rounded,
+                        size: 24,
+                        color: Color(0xFF1F2937),
                       ),
+                      tooltip: 'Notifikasi',
+                      onPressed: _showNotificationsModal,
                     ),
-                    if (hasUnread)
+                    if (_unreadCount > 0 || hasUnread)
                       Positioned(
-                        right: 6,
-                        top: 6,
+                        right: 2,
+                        top: 2,
                         child: Container(
-                          width: 8.5,
-                          height: 8.5,
+                          padding: const EdgeInsets.all(3),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                           decoration: const BoxDecoration(
                             color: Color(0xFFEF4444),
                             shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              _unreadCount > 9 ? '9+' : (_unreadCount > 0 ? '$_unreadCount' : ''),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -319,13 +366,17 @@ class _MasterLayoutState extends State<MasterLayout> {
                           ),
                         ),
                         TextButton(
-                          onPressed: () {
+                          onPressed: () async {
+                            await PasienApiService().markAllNotificationsRead();
                             setModalState(() {
                               for (var item in _notifications) {
                                 item['isRead'] = true;
                               }
+                              _unreadCount = 0;
                             });
-                            setState(() {});
+                            setState(() {
+                              _unreadCount = 0;
+                            });
                           },
                           child: Text(
                             'Tandai Semua Dibaca',
@@ -350,20 +401,31 @@ class _MasterLayoutState extends State<MasterLayout> {
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final notif = _notifications[index];
-                        final isRead = notif['isRead'] as bool;
-
-                        return Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: isRead ? Colors.white : const Color(0xFFF0FDF4),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: isRead ? const Color(0xFFE2E8F0) : const Color(0xFFBBF7D0),
+                        final bool isRead = notif['isRead'] == true;
+                        return GestureDetector(
+                          onTap: () async {
+                            if (!isRead && notif['id'] != null) {
+                              await PasienApiService().markNotificationRead(notif['id']);
+                              setModalState(() {
+                                notif['isRead'] = true;
+                              });
+                              setState(() {
+                                if (_unreadCount > 0) _unreadCount--;
+                              });
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isRead ? Colors.white : const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isRead ? const Color(0xFFE2E8F0) : const Color(0xFFBBF7D0),
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                               Container(
                                 width: 40,
                                 height: 40,
@@ -418,8 +480,9 @@ class _MasterLayoutState extends State<MasterLayout> {
                               ),
                             ],
                           ),
-                        );
-                      },
+                        ),
+                      );
+                    },
                     ),
                   ),
                 ],

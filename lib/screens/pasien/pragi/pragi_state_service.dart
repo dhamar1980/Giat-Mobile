@@ -18,6 +18,7 @@ class PragiScreeningResult {
   final bool hasMobilityDifficulty;
   final String riskLevel; // 'Rendah' | 'Sedang' | 'Tinggi'
   final String riskScore; // e.g. 'Skor 12 / 100'
+  final String? rekomendasiDokter;
 
   PragiScreeningResult({
     required this.id,
@@ -36,6 +37,7 @@ class PragiScreeningResult {
     required this.hasMobilityDifficulty,
     this.riskLevel = 'Rendah',
     this.riskScore = 'Risiko Rendah',
+    this.rekomendasiDokter,
   });
 }
 

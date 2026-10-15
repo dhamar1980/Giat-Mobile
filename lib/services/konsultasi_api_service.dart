@@ -36,12 +36,14 @@ class KonsultasiApiService {
     }
   }
 
-  /// GET /konsultasi/dokter
-  Future<ApiResponse<List<dynamic>>> getDokterList({String? kategori, String? search}) async {
+  /// GET /konsultasi/dokter (Bisa kirim query ?spesialisasi=... atau ?search=... atau ?kategori=...)
+  Future<ApiResponse<List<dynamic>>> getDokterList({String? kategori, String? spesialisasi, String? search}) async {
     try {
       final Map<String, dynamic> qParams = {};
-      if (kategori != null && kategori.isNotEmpty && kategori != 'Semua') {
-        qParams['kategori'] = kategori;
+      final spec = spesialisasi ?? (kategori != 'Semua' ? kategori : null);
+      if (spec != null && spec.isNotEmpty) {
+        qParams['spesialisasi'] = spec;
+        qParams['kategori'] = spec;
       }
       if (search != null && search.isNotEmpty) {
         qParams['search'] = search;
@@ -79,6 +81,7 @@ class KonsultasiApiService {
   }
 
   /// POST /konsultasi/booking
+  /// Body: {"id_dokter": "...", "tanggal_konsultasi": "...", "isi_konsultasi": "..."}
   Future<ApiResponse<Map<String, dynamic>>> bookingDokter(Map<String, dynamic> payload) async {
     try {
       final response = await _client.dio.post('/konsultasi/booking', data: payload);
@@ -107,6 +110,7 @@ class KonsultasiApiService {
   }
 
   /// POST /konsultasi/{id}/bayar
+  /// Body: {"metode_pembayaran": "qris"}
   Future<ApiResponse<Map<String, dynamic>>> bayarKonsultasi(dynamic id, Map<String, dynamic> payload) async {
     try {
       final response = await _client.dio.post('/konsultasi/$id/bayar', data: payload);
@@ -135,7 +139,7 @@ class KonsultasiApiService {
   }
 
   // =========================================================================
-  // 2. CHAT KONSULTASI REALTIME & VIDEO CALL
+  // 2. CHAT KONSULTASI & VIDEO CALL
   // =========================================================================
 
   /// GET /konsultasi/{id}/pesan
@@ -160,6 +164,7 @@ class KonsultasiApiService {
   }
 
   /// POST /konsultasi/{id}/pesan
+  /// Body: {"pesan": "...", "attachment": null}
   Future<ApiResponse<Map<String, dynamic>>> sendMessage(
     dynamic id, {
     required String pesan,
@@ -208,6 +213,24 @@ class KonsultasiApiService {
     }
   }
 
+  /// POST /konsultasi/{id}/video-call/end
+  /// Body: {"durasi_menit": 15}
+  Future<ApiResponse<Map<String, dynamic>>> endVideoCall(dynamic id, {int durasiMenit = 15}) async {
+    try {
+      final response = await _client.dio.post(
+        '/konsultasi/$id/video-call/end',
+        data: {'durasi_menit': durasiMenit},
+      );
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Sesi video call telah diakhiri.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
   /// POST /konsultasi/{id}/selesai
   Future<ApiResponse<Map<String, dynamic>>> selesaikanKonsultasi(dynamic id) async {
     try {
@@ -222,14 +245,76 @@ class KonsultasiApiService {
     }
   }
 
+  /// POST /konsultasi/{id}/batal
+  /// Body: {"alasan": "..."}
+  Future<ApiResponse<Map<String, dynamic>>> batalkanKonsultasi(dynamic id, {required String alasan}) async {
+    try {
+      final response = await _client.dio.post(
+        '/konsultasi/$id/batal',
+        data: {'alasan': alasan},
+      );
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Sesi konsultasi berhasil dibatalkan.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// POST /konsultasi/{id}/rating
+  /// Body: {"rating": 5, "ulasan": "..."}
+  Future<ApiResponse<Map<String, dynamic>>> beriRating(dynamic id, {required int rating, String? ulasan}) async {
+    try {
+      final response = await _client.dio.post(
+        '/konsultasi/$id/rating',
+        data: {
+          'rating': rating,
+          'ulasan': ulasan ?? '',
+        },
+      );
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Ulasan dan rating berhasil dikirim.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// GET /konsultasi/{id}/resep
+  Future<ApiResponse<Map<String, dynamic>>> getResepKonsultasi(dynamic id) async {
+    try {
+      final response = await _client.dio.get('/konsultasi/$id/resep');
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Berhasil memuat resep hasil konsultasi.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
   // =========================================================================
-  // 3. RIWAYAT KONSULTASI PER PENGGUNA
+  // 3. RIWAYAT KONSULTASI
   // =========================================================================
 
-  /// GET /konsultasi/riwayat/pasien
+  /// GET /pasien/konsultasi/riwayat (fallback GET /konsultasi/riwayat/pasien)
   Future<ApiResponse<List<dynamic>>> getRiwayatPasien() async {
     try {
-      final response = await _client.dio.get('/konsultasi/riwayat/pasien');
+      dynamic response;
+      try {
+        response = await _client.dio.get('/pasien/konsultasi/riwayat');
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 404) {
+          response = await _client.dio.get('/konsultasi/riwayat/pasien');
+        } else {
+          rethrow;
+        }
+      }
       final raw = response.data;
       List<dynamic> list = [];
       if (raw?['data'] is List) {

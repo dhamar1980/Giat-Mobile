@@ -1,14 +1,21 @@
+import '../constants/api_constants.dart';
+
 /// Configuration for GIAT Backend API
 class ApiConfig {
-  static const String tunnelBaseUrl = 'https://paradise-availability-com-order.trycloudflare.com/api';
+  static const String serverUrl = ApiConstants.serverUrl;
+  static const String emulatorUrl = ApiConstants.emulatorUrl;
+  static const String localhostUrl = ApiConstants.localhostUrl;
+
+  /// Compatibility getter
+  static String get tunnelBaseUrl => serverUrl;
 
   /// Default Base URL
-  static String get defaultBaseUrl => tunnelBaseUrl;
+  static String get defaultBaseUrl => ApiConstants.defaultBaseUrl.trim();
 
   /// Active Base URL in memory
   static String _activeBaseUrl = defaultBaseUrl;
 
-  static String get baseUrl => _activeBaseUrl;
+  static String get baseUrl => _activeBaseUrl.trim();
 
   static void setBaseUrl(String url) {
     String cleanUrl = url.trim();

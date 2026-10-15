@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../onboarding_screen.dart';
+import '../../../login_screen.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/pasien_api_service.dart';
@@ -154,10 +154,19 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
         }
       });
 
+      // Synchronize changes to backend API: PUT /pasien/profile
+      PasienApiService().updateProfile({
+        'nama': _nama,
+        'alamat': _alamat,
+        'jenis_kelamin': _jenisKelamin == 'Perempuan' ? 'P' : 'L',
+        'tanggal_lahir': _tanggalLahir,
+        'gol_darah': _golonganDarah,
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Informasi pribadi & kesehatan berhasil disimpan!',
+            'Informasi pribadi & kesehatan berhasil disimpan ke server!',
             style: GoogleFonts.inter(fontWeight: FontWeight.w600),
           ),
           backgroundColor: _darkGreen,
@@ -486,16 +495,80 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              AuthService().logout();
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-                (route) => false,
-              );
+              await AuthService().logout();
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
             },
             child: Text(
               'Keluar',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 26),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Hapus Akun Pengguna?',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Tindakan ini tidak dapat dibatalkan. Seluruh data rekam medis, pemantauan ginjal, dan akun Anda akan dihapus permanen dari server GIAT.',
+          style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF4B5563), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Batal',
+              style: GoogleFonts.inter(color: Colors.grey[600], fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final res = await AuthService().deleteAccount();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(res['message'] ?? 'Akun berhasil dihapus.'),
+                    backgroundColor: const Color(0xFFDC2626),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+            child: Text(
+              'Hapus Akun',
               style: GoogleFonts.inter(fontWeight: FontWeight.w600),
             ),
           ),
@@ -1238,6 +1311,53 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFFDC2626),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // 4. Hapus Akun Card
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFFEE2E2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _handleDeleteAccount,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.delete_forever_rounded,
+                      color: Color(0xFFB91C1C),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      'Hapus Akun Pengguna',
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFB91C1C),
                       ),
                     ),
                   ],

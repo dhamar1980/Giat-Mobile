@@ -98,15 +98,19 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
     final parsedHeight = double.tryParse(_heightCtrl.text.replaceAll(',', '.')) ?? widget.heightCm;
 
     final data = {
+      'bb': parsedWeight,
+      'tb': parsedHeight,
       'weight': parsedWeight,
       'height': parsedHeight,
       'berat_badan': parsedWeight,
       'tinggi_badan': parsedHeight,
       'kondisi': _selectedKondisi,
+      'kondisi_tubuh': _selectedKondisi,
       'keluhan': _selectedKeluhan == 'Tidak Ada Keluhan'
           ? 'Tidak Ada'
           : (_detailKeluhanCtrl.text.trim().isNotEmpty ? _detailKeluhanCtrl.text.trim() : _selectedKeluhan),
-      'detailKeluhan': _detailKeluhanCtrl.text.trim(),
+      'detail_keluhan': _detailKeluhanCtrl.text.trim(),
+      'catatan': _detailKeluhanCtrl.text.trim(),
     };
 
     PasienApiService().storePantau(data);

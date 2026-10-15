@@ -50,6 +50,36 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
         'time': '12.00',
       },
     ];
+    _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final res = await KonsultasiApiService().getMessages(widget.consultationId);
+      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+        final List<Map<String, dynamic>> loaded = [];
+        for (var item in res.data!) {
+          if (item is Map) {
+            final sender = item['role'] ?? item['sender'] ?? 'doctor';
+            final text = item['pesan'] ?? item['message'] ?? item['text'] ?? '';
+            final time = item['created_at'] != null
+                ? item['created_at'].toString().split('T').last.substring(0, 5)
+                : '12.00';
+            loaded.add({
+              'sender': sender == 'pasien' || sender == 'patient' ? 'patient' : 'doctor',
+              'text': text.toString(),
+              'time': time,
+            });
+          }
+        }
+        if (loaded.isNotEmpty) {
+          setState(() {
+            _messages = loaded;
+          });
+          _scrollToBottom();
+        }
+      }
+    } catch (_) {}
   }
 
   @override

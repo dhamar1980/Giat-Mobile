@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UBAH NOMOR TELEPON SCREEN
@@ -48,6 +49,10 @@ class _UbahNomorTeleponScreenState extends State<UbahNomorTeleponScreen> {
       );
       return;
     }
+
+    // Call API PUT /pasien/profile/nohp
+    final formattedPhone = phone.startsWith('0') ? phone : '0$phone';
+    PasienApiService().updateNoHp(formattedPhone);
 
     final methodText = _selectedMethod == 'whatsapp' ? 'WhatsApp' : 'SMS';
     showDialog(

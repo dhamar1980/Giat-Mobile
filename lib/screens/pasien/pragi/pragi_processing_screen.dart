@@ -33,14 +33,28 @@ class _PragiProcessingScreenState extends State<PragiProcessingScreen>
       duration: const Duration(seconds: 2),
     )..repeat();
 
-    // Auto-navigate to Result Screen after 2.5 seconds
-    _transitionTimer = Timer(const Duration(milliseconds: 2600), () {
-      if (!mounted) return;
-      // Save result to history
-      PragiService().addResult(widget.result);
+    _submitAndTransition();
+  }
 
-      // Sync screening result to backend API
-      PasienApiService().submitPragi({
+  Future<void> _submitAndTransition() async {
+    final Map<String, dynamic> jawaban = {
+      "1": widget.result.gender == 'Laki-laki' ? 'L' : 'P',
+      "2": widget.result.ageRange,
+      "3": '${widget.result.heightCm}/${widget.result.weightKg}',
+      "4": widget.result.hasHeartDisease ? 'ya' : 'tidak',
+      "5": widget.result.hasStroke ? 'ya' : 'tidak',
+      "6": widget.result.diabetesStatus,
+      "7": widget.result.hasPhysicalActivity ? 'ya' : 'tidak',
+      "8": widget.result.hasSmokingHistory ? 'ya' : 'tidak',
+      "9": widget.result.hasExcessiveAlcohol ? 'ya' : 'tidak',
+      "10": widget.result.hasMobilityDifficulty ? 'ya' : 'tidak',
+    };
+
+    PragiScreeningResult finalResult = widget.result;
+
+    try {
+      final apiResp = await PasienApiService().submitPragi({
+        'jawaban': jawaban,
         'risk_level': widget.result.riskLevel,
         'risk_score': widget.result.riskScore,
         'gender': widget.result.gender,
@@ -48,13 +62,46 @@ class _PragiProcessingScreenState extends State<PragiProcessingScreen>
         'bmi': widget.result.bmi,
       });
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PragiResultScreen(result: widget.result),
-        ),
-      );
-    });
+      if (apiResp.success && apiResp.data != null) {
+        final data = apiResp.data!;
+        final serverRisk = data['kategori_risiko'] ?? data['risk_level'] ?? widget.result.riskLevel;
+        final serverScore = data['total_skor']?.toString() ?? data['risk_score'] ?? widget.result.riskScore;
+        final serverRekomendasi = data['rekomendasi_dokter'] ?? data['rekomendasi'] ?? '';
+
+        finalResult = PragiScreeningResult(
+          id: data['id']?.toString() ?? widget.result.id,
+          date: widget.result.date,
+          gender: widget.result.gender,
+          ageRange: widget.result.ageRange,
+          heightCm: widget.result.heightCm,
+          weightKg: widget.result.weightKg,
+          bmi: widget.result.bmi,
+          hasHeartDisease: widget.result.hasHeartDisease,
+          diabetesStatus: widget.result.diabetesStatus,
+          hasStroke: widget.result.hasStroke,
+          hasPhysicalActivity: widget.result.hasPhysicalActivity,
+          hasSmokingHistory: widget.result.hasSmokingHistory,
+          hasExcessiveAlcohol: widget.result.hasExcessiveAlcohol,
+          hasMobilityDifficulty: widget.result.hasMobilityDifficulty,
+          riskLevel: serverRisk.toString(),
+          riskScore: serverScore.toString(),
+          rekomendasiDokter: serverRekomendasi.toString(),
+        );
+      }
+    } catch (_) {}
+
+    PragiService().addResult(finalResult);
+
+    // Keep smooth visual loading experience
+    await Future.delayed(const Duration(milliseconds: 1600));
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PragiResultScreen(result: finalResult),
+      ),
+    );
   }
 
   @override

@@ -17,11 +17,13 @@ class _ChatMessage {
   final String text;
   final bool isUser;
   final String time;
+  final String? saranTindakan;
 
   _ChatMessage({
     required this.text,
     required this.isUser,
     required this.time,
+    this.saranTindakan,
   });
 }
 
@@ -41,6 +43,47 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
       time: '12:00',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadChatHistory();
+  }
+
+  Future<void> _loadChatHistory() async {
+    try {
+      final res = await PasienApiService().getPragiChatHistory();
+      if (res.success && res.data != null && res.data!.isNotEmpty) {
+        final List<_ChatMessage> loaded = [];
+        for (var item in res.data!) {
+          if (item is Map) {
+            final sender = item['role'] ?? item['sender'] ?? 'user';
+            final bool isUser = sender == 'user' || sender == 'pasien';
+            final text = item['pesan'] ?? item['message'] ?? item['text'] ?? '';
+            final time = item['created_at'] != null
+                ? item['created_at'].toString().split('T').last.substring(0, 5)
+                : '12:00';
+            final saran = item['saran_tindakan']?.toString();
+            if (text.toString().isNotEmpty) {
+              loaded.add(_ChatMessage(
+                text: text.toString(),
+                isUser: isUser,
+                time: time,
+                saranTindakan: saran,
+              ));
+            }
+          }
+        }
+        if (loaded.isNotEmpty && mounted) {
+          setState(() {
+            _messages.clear();
+            _messages.addAll(loaded);
+          });
+          _scrollToBottom();
+        }
+      }
+    } catch (_) {}
+  }
 
   final List<String> _quickSuggestions = [
     '💧 Berapa asupan air yang aman?',
@@ -73,13 +116,18 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
     // Request to AI PRAGI Backend with graceful fallback
     () async {
       String aiReply = '';
+      String? saranTindakan;
       try {
         final apiResp = await PasienApiService().chatPragi(userText);
         if (apiResp.success && apiResp.data != null) {
           aiReply = apiResp.data!['reply']?.toString() ??
               apiResp.data!['response']?.toString() ??
+              apiResp.data!['pesan']?.toString() ??
               apiResp.data!['message']?.toString() ??
               '';
+          saranTindakan = apiResp.data!['saran_tindakan']?.toString() ??
+              apiResp.data!['saran']?.toString() ??
+              apiResp.data!['rekomendasi']?.toString();
         }
       } catch (_) {}
 
@@ -97,6 +145,7 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
           text: aiReply,
           isUser: false,
           time: respTimeStr,
+          saranTindakan: saranTindakan,
         ));
       });
 
@@ -202,18 +251,9 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF64748B)),
-            tooltip: 'Bersihkan Sesi',
-            onPressed: () {
-              setState(() {
-                _messages.clear();
-                _messages.add(_ChatMessage(
-                  text: 'Halo! Sesi obrolan baru telah dimulai. Ada yang ingin Anda tanyakan seputar ginjal?',
-                  isUser: false,
-                  time: '12:00',
-                ));
-              });
-            },
+            icon: const Icon(Icons.delete_sweep_rounded, color: Color(0xFF64748B)),
+            tooltip: 'Hapus Riwayat Chat',
+            onPressed: _confirmClearChat,
           ),
         ],
       ),
@@ -400,6 +440,48 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
                       fontWeight: isUser ? FontWeight.w500 : FontWeight.w400,
                     ),
                   ),
+                  if (!isUser && msg.saranTindakan != null && msg.saranTindakan!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.tips_and_updates_rounded, size: 16, color: Color(0xFF16A34A)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Saran Tindakan:',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF166534),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  msg.saranTindakan!,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFF1E293B),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Align(
                     alignment: Alignment.bottomRight,
@@ -418,5 +500,55 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmClearChat() async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Hapus Riwayat Chat',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus seluruh riwayat percakapan dengan PRAGI AI?',
+          style: GoogleFonts.inter(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Batal', style: GoogleFonts.inter(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Hapus', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await PasienApiService().deletePragiChatHistory();
+      if (!mounted) return;
+      setState(() {
+        _messages.clear();
+        _messages.add(_ChatMessage(
+          text: 'Halo! Sesi obrolan baru telah dimulai. Ada yang ingin Anda tanyakan seputar ginjal?',
+          isUser: false,
+          time: '12:00',
+        ));
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Riwayat obrolan berhasil dihapus.'),
+          backgroundColor: Color(0xFF065A37),
+        ),
+      );
+    }
   }
 }

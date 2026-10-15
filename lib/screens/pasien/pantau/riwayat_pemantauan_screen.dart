@@ -1,13 +1,16 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA RIWAYAT PEMANTAUAN
 // ─────────────────────────────────────────────────────────────────────────────
 
 class PemantauanRecord {
+  final dynamic id;
   final String dateStr;
   final String badgeText;
   final double imt;
@@ -17,6 +20,7 @@ class PemantauanRecord {
   final String keluhan;
 
   const PemantauanRecord({
+    this.id,
     required this.dateStr,
     required this.badgeText,
     required this.imt,
@@ -87,6 +91,72 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
             keluhan: 'Tidak ada keluhan',
           ),
         ];
+    _fetchRecords();
+  }
+
+  Future<void> _fetchRecords() async {
+    try {
+      final res = await PasienApiService().getPantauHistory();
+      if (res.success && res.data != null && res.data!.isNotEmpty) {
+        final List<PemantauanRecord> fetched = [];
+        for (int i = 0; i < res.data!.length; i++) {
+          final item = res.data![i];
+          if (item is Map) {
+            final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
+            final dateStr = dt != null
+                ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} • ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WIB'
+                : (item['tanggal']?.toString() ?? 'Hari ini');
+            fetched.add(PemantauanRecord(
+              id: item['id'],
+              dateStr: dateStr,
+              badgeText: i == 0 ? 'Terbaru' : '$i hari lalu',
+              imt: double.tryParse((item['imt'] ?? item['bmi'])?.toString() ?? '22.5') ?? 22.5,
+              heightCm: int.tryParse((item['tb'] ?? item['tinggi_badan'])?.toString() ?? '170') ?? 170,
+              weightKg: double.tryParse((item['bb'] ?? item['berat_badan'])?.toString() ?? '65.0') ?? 65.0,
+              kondisiTubuh: (item['kondisi'] ?? item['kondisi_tubuh'])?.toString() ?? 'Baik',
+              keluhan: item['keluhan']?.toString() ?? 'Tidak ada keluhan',
+            ));
+          }
+        }
+        if (fetched.isNotEmpty && mounted) {
+          setState(() {
+            _records = fetched;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _confirmDeleteRecord(PemantauanRecord record) async {
+    if (record.id == null) return;
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Hapus Catatan', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
+        content: Text('Apakah Anda yakin ingin menghapus catatan pantau tanggal ${record.dateStr}?', style: GoogleFonts.inter(fontSize: 14)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Batal', style: GoogleFonts.inter(color: Colors.grey))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Hapus', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final res = await PasienApiService().deletePantau(record.id);
+      if (res.success && mounted) {
+        setState(() {
+          _records.removeWhere((r) => r.id == record.id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Catatan pemantauan berhasil dihapus.'), backgroundColor: Color(0xFF065A37)),
+        );
+      }
+    }
   }
 
   String _formatImt(double val) {
@@ -346,20 +416,35 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
                         ),
                       ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _buttonGreen,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        record.badgeText,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _buttonGreen,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            record.badgeText,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (record.id != null) ...[
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => _confirmDeleteRecord(record),
+                            child: const Padding(
+                              padding: EdgeInsets.all(2.0),
+                              child: Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

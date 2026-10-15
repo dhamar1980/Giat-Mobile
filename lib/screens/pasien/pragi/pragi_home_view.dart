@@ -7,6 +7,8 @@ import 'pragi_result_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 
+import '../../../services/pasien_api_service.dart';
+
 class PragiHomeView extends StatefulWidget {
   final bool isEmbedded;
 
@@ -22,6 +24,50 @@ class PragiHomeView extends StatefulWidget {
 class _PragiHomeViewState extends State<PragiHomeView> {
   static const _darkGreen = Color(0xFF065A37);
   static const _accentGreen = Color(0xFF10B981);
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    try {
+      final res = await PasienApiService().getPragiHistory();
+      if (res.success && res.data != null && res.data!.isNotEmpty) {
+        final List<PragiScreeningResult> items = [];
+        for (var d in res.data!) {
+          if (d is Map) {
+            final dt = d['created_at'] != null
+                ? DateTime.tryParse(d['created_at'].toString()) ?? DateTime.now()
+                : (d['tanggal'] != null ? DateTime.tryParse(d['tanggal'].toString()) ?? DateTime.now() : DateTime.now());
+            items.add(PragiScreeningResult(
+              id: d['id']?.toString() ?? 'scr-${dt.millisecondsSinceEpoch}',
+              date: dt,
+              gender: d['gender']?.toString() ?? 'Laki-laki',
+              ageRange: d['age_range']?.toString() ?? '45 – 49 thn',
+              heightCm: double.tryParse(d['tb']?.toString() ?? d['height']?.toString() ?? '168') ?? 168.0,
+              weightKg: double.tryParse(d['bb']?.toString() ?? d['weight']?.toString() ?? '65') ?? 65.0,
+              bmi: double.tryParse(d['bmi']?.toString() ?? '23.0') ?? 23.0,
+              hasHeartDisease: d['has_heart_disease'] == true || d['jantung'] == 1 || d['jantung'] == 'ya',
+              diabetesStatus: d['diabetes_status']?.toString() ?? 'Tidak',
+              hasStroke: d['has_stroke'] == true || d['stroke'] == 1 || d['stroke'] == 'ya',
+              hasPhysicalActivity: d['has_physical_activity'] == true || d['aktivitas'] == 1 || d['aktivitas'] == 'ya',
+              hasSmokingHistory: d['has_smoking_history'] == true || d['merokok'] == 1 || d['merokok'] == 'ya',
+              hasExcessiveAlcohol: d['has_excessive_alcohol'] == true || d['alkohol'] == 1 || d['alkohol'] == 'ya',
+              hasMobilityDifficulty: d['has_mobility_difficulty'] == true || d['mobilitas'] == 1 || d['mobilitas'] == 'ya',
+              riskLevel: d['kategori_risiko']?.toString() ?? d['risk_level']?.toString() ?? 'Rendah',
+              riskScore: d['total_skor'] != null ? 'Skor ${d['total_skor']}' : (d['risk_score']?.toString() ?? 'Risiko Rendah'),
+              rekomendasiDokter: d['rekomendasi_dokter']?.toString() ?? d['rekomendasi']?.toString(),
+            ));
+          }
+        }
+        if (items.isNotEmpty && mounted) {
+          PragiService().historyNotifier.value = items;
+        }
+      }
+    } catch (_) {}
+  }
 
   String _formatDate(DateTime dt) {
     const months = [

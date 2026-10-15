@@ -1,7 +1,8 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN RIWAYAT PEMBELIAN OBAT (Sesuai Desain Halaman Obat GIAT)
@@ -55,10 +56,12 @@ class RiwayatPesananData {
 
 class RiwayatObatScreen extends StatefulWidget {
   final String userName;
+  final bool autoFetch;
 
   const RiwayatObatScreen({
     super.key,
     this.userName = 'Pasien',
+    this.autoFetch = true,
   });
 
   @override
@@ -67,7 +70,6 @@ class RiwayatObatScreen extends StatefulWidget {
 
 class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
   static const _darkGreen = Color(0xFF065A37);
-  static const _buttonDark = Color(0xFF044E2F);
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
   static const _amberStatus = Color(0xFFE5A100);
@@ -75,11 +77,14 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
   String _selectedFilter = 'Semua';
   String _searchQuery = '';
 
-  late final List<RiwayatPesananData> _allOrders;
+  late List<RiwayatPesananData> _allOrders;
 
   @override
   void initState() {
     super.initState();
+    if (widget.autoFetch) {
+      _fetchRiwayatFromApi();
+    }
     _allOrders = [
       // 1. Pesanan #G-9021 (Sedang Diproses - Melalui Resep)
       const RiwayatPesananData(
@@ -203,6 +208,52 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
         ],
       ),
     ];
+  }
+
+  Future<void> _fetchRiwayatFromApi() async {
+    try {
+      final res = await PasienApiService().getRiwayatPembelian();
+      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+        final List<RiwayatPesananData> list = [];
+        for (var item in res.data!) {
+          if (item is Map) {
+            final id = item['id']?.toString() ?? item['order_id']?.toString() ?? '#G-000';
+            final status = item['status']?.toString() ?? 'Selesai';
+            final total = int.tryParse(item['total_harga']?.toString() ?? item['total']?.toString() ?? '0') ?? 0;
+            final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
+            final dateStr = dt != null ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}' : 'Hari ini';
+            final timeStr = dt != null ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WIB' : '14:00 WIB';
+
+            list.add(RiwayatPesananData(
+              orderId: id.startsWith('#') ? id : '#$id',
+              orderDate: dateStr,
+              orderTime: timeStr,
+              status: status,
+              statusColor: status.toLowerCase().contains('selesai') ? const Color(0xFF16A34A) : _amberStatus,
+              isMelaluiResep: item['is_resep'] == true || item['resep_id'] != null,
+              resepNumber: item['resep_id']?.toString(),
+              pharmacyName: item['apotek_name']?.toString() ?? 'Apotek Mitra GIAT',
+              totalPrice: total,
+              paymentMethod: item['metode_pembayaran']?.toString().toUpperCase() ?? 'QRIS',
+              medicines: const [
+                RiwayatObatDetail(
+                  name: 'Obat Terapi Ginjal',
+                  dosage: 'Sesuai petunjuk',
+                  packageInfo: '1 Box / Strip',
+                  qty: 1,
+                  price: 50000,
+                ),
+              ],
+            ));
+          }
+        }
+        if (list.isNotEmpty) {
+          setState(() {
+            _allOrders = list;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   List<RiwayatPesananData> get _filteredOrders {

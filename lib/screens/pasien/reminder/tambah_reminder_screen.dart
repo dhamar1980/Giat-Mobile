@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../widgets/giat_background.dart';
 
@@ -160,15 +160,23 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
           ? _dosisCtrl.text.trim()
           : 'Sesuai anjuran dokter';
 
+      final dateIso = '${_obatDate.year.toString().padLeft(4, '0')}-${_obatDate.month.toString().padLeft(2, '0')}-${_obatDate.day.toString().padLeft(2, '0')}';
+      final timeFormatted = '${_obatTime.hour.toString().padLeft(2, '0')}:${_obatTime.minute.toString().padLeft(2, '0')}:00';
+
       final newReminder = {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'type': 'obat',
+        'nama': nama,
         'title': nama,
         'subtitle': dosis,
+        'keterangan': dosis,
+        'tanggal': dateIso,
+        'waktu': timeFormatted,
         'time': _formatTime(_obatTime),
         'date': _formatDate(_obatDate),
-        'pengulangan': _obatPengulangan,
+        'pengulangan': _obatPengulangan.toLowerCase().contains('hari') ? 'harian' : 'sekali',
         'status': 'Belum di lakukan',
+        'is_active': true,
         'isActive': true,
       };
 
@@ -186,19 +194,26 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
           ? _lokasiCtrl.text.trim()
           : 'Klinik / RS Rekanan';
 
-      final timeStr = _konsultasiTime != null ? _formatTime(_konsultasiTime!) : '10:00 WIB';
-      final dateStr = _konsultasiDate != null ? _formatDate(_konsultasiDate!) : _formatDate(DateTime.now());
+      final targetDate = _konsultasiDate ?? DateTime.now();
+      final dateIso = '${targetDate.year.toString().padLeft(4, '0')}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
+      final targetTime = _konsultasiTime ?? const TimeOfDay(hour: 10, minute: 0);
+      final timeFormatted = '${targetTime.hour.toString().padLeft(2, '0')}:${targetTime.minute.toString().padLeft(2, '0')}:00';
 
       final newReminder = {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'type': 'konsultasi',
+        'nama': nama,
         'title': nama,
         'subtitle': lokasi,
-        'time': timeStr,
-        'date': dateStr,
-        'pengulangan': _konsultasiPengulangan,
+        'keterangan': '$lokasi - ${_catatanCtrl.text.trim()}',
+        'tanggal': dateIso,
+        'waktu': timeFormatted,
+        'time': _formatTime(targetTime),
+        'date': _formatDate(targetDate),
+        'pengulangan': _konsultasiPengulangan.toLowerCase().contains('minggu') ? 'mingguan' : 'sekali',
         'catatan': _catatanCtrl.text.trim(),
         'status': 'Akan Datang',
+        'is_active': true,
         'isActive': true,
       };
 

@@ -375,22 +375,47 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                     ),
                   ),
 
-                  // Right Side (Top): Time Pill Badge (Navy Background with White Text)
-                  Container(
-                    margin: const EdgeInsets.only(top: 2),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _textColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      timeStr,
-                      style: GoogleFonts.poppins(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
+                  // Right Side: Time Pill Badge & Switch Toggle
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _textColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          timeStr,
+                          style: GoogleFonts.poppins(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 28,
+                        child: Transform.scale(
+                          scale: 0.75,
+                          child: Switch(
+                            value: rem['isActive'] == true,
+                            activeColor: _primaryGreen,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (val) {
+                              setState(() {
+                                rem['isActive'] = val;
+                              });
+                              if (rem['id'] != null) {
+                                PasienApiService().toggleReminder(rem['id']);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

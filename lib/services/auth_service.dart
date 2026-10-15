@@ -105,47 +105,51 @@ class AuthService {
   }
 
   /// 2. Native Login (Email & Password)
-  /// Endpoint: POST /auth/firebase/login dengan fallback POST /auth/login
+  /// Endpoint: POST /login (fallback POST /auth/login, POST /auth/firebase/login)
   Future<AuthResult> loginWithEmailPassword({
     required String email,
     required String password,
-    String? role,
+    String? role = 'pasien',
   }) async {
     try {
       final Map<String, dynamic> payload = {
         'email': email.trim().toLowerCase(),
         'password': password,
+        'role': role ?? 'pasien',
       };
-      if (role != null && role.isNotEmpty) {
-        payload['role'] = role;
-      }
 
       dynamic response;
       try {
         response = await _apiClient.dio.post(
-          '/auth/firebase/login',
+          '/login',
           data: payload,
         );
-      } on DioException catch (fbErr) {
-        final statusCode = fbErr.response?.statusCode;
-        // Jika backend Firebase merespons penolakan kredensial / validasi (misal status 400, 401, 403, 422),
-        // itu adalah respon resmi validasi dari Firebase (seperti "Akun tidak ditemukan di Firebase" atau "Password salah").
-        // Lempar kembali error ini agar pesan error asli Firebase langsung ditampilkan ke pengguna.
-        if (statusCode != null && statusCode != 404 && statusCode < 500) {
+      } on DioException catch (dioErr) {
+        final statusCode = dioErr.response?.statusCode;
+        if (statusCode == 404) {
+          try {
+            response = await _apiClient.dio.post(
+              '/auth/login',
+              data: payload,
+            );
+          } on DioException catch (authErr) {
+            if (authErr.response?.statusCode == 404) {
+              response = await _apiClient.dio.post(
+                '/auth/firebase/login',
+                data: payload,
+              );
+            } else {
+              rethrow;
+            }
+          }
+        } else {
           rethrow;
         }
-
-        // Hanya coba fallback ke /auth/login jika route Firebase 404 (tidak tersedia) atau 500
-        debugPrint('Firebase endpoint unavailable ($statusCode), trying standard /auth/login: $fbErr');
-        response = await _apiClient.dio.post(
-          '/auth/login',
-          data: payload,
-        );
       }
 
       final data = response.data;
       if (data != null && data['success'] == true) {
-        final resultData = data['data'] as Map<String, dynamic>;
+        final resultData = data['data'] as Map<String, dynamic>? ?? {};
         final String token = resultData['access_token'] ?? '';
         final String backendRole = (resultData['role'] as String?)?.toLowerCase() ?? (role ?? 'pasien');
         final userData = resultData['user'] as Map<String, dynamic>? ?? {};
@@ -154,11 +158,13 @@ class AuthService {
         final String finalRole = user.role;
 
         // Simpan ke storage aman
-        await _storage.saveToken(token);
+        if (token.isNotEmpty) {
+          await _storage.saveToken(token);
+        }
         await _storage.saveUser(user);
         await _storage.saveRole(finalRole);
 
-        // Opsional: sinkronkan sesi FirebaseAuth lokal
+        // Opsional: sinkronkan sesi FirebaseAuth lokal jika ada
         if (!Platform.environment.containsKey('FLUTTER_TEST')) {
           try {
             await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -190,12 +196,13 @@ class AuthService {
     }
   }
 
-  /// 3. Native Firebase Register Pasien
-  /// Endpoint: POST /auth/firebase/register
+  /// 3. Register Pasien
+  /// Endpoint: POST /auth/register/pasien (fallback POST /auth/firebase/register, POST /auth/register)
   Future<AuthResult> registerPasien({
     required String nama,
     required String email,
     required String password,
+    String? passwordConfirmation,
     required String noHp,
     required String jenisKelamin,
     String? nik,
@@ -207,22 +214,47 @@ class AuthService {
         'nama': nama.trim(),
         'email': email.trim().toLowerCase(),
         'password': password,
+        'password_confirmation': passwordConfirmation ?? password,
         'role': role,
         'no_hp': noHp.trim(),
-        'jenis_kelamin': jenisKelamin,
+        'jenis_kelamin': jenisKelamin.startsWith('L') ? 'L' : (jenisKelamin.startsWith('P') ? 'P' : jenisKelamin),
       };
 
       if (nik != null && nik.trim().isNotEmpty) {
         payload['NIK'] = nik.trim();
+        payload['nik'] = nik.trim();
       }
       if (alamat != null && alamat.trim().isNotEmpty) {
         payload['alamat'] = alamat.trim();
       }
 
-      final response = await _apiClient.dio.post(
-        '/auth/firebase/register',
-        data: payload,
-      );
+      dynamic response;
+      try {
+        response = await _apiClient.dio.post(
+          '/auth/register/pasien',
+          data: payload,
+        );
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 404) {
+          try {
+            response = await _apiClient.dio.post(
+              '/auth/firebase/register',
+              data: payload,
+            );
+          } on DioException catch (fbErr) {
+            if (fbErr.response?.statusCode == 404) {
+              response = await _apiClient.dio.post(
+                '/auth/register',
+                data: payload,
+              );
+            } else {
+              rethrow;
+            }
+          }
+        } else {
+          rethrow;
+        }
+      }
 
       final data = response.data;
       if (data != null && data['success'] == true) {
@@ -318,7 +350,7 @@ class AuthService {
       final data = response.data;
       if (data != null && data['success'] == true) {
         final resultData = data['data'] as Map<String, dynamic>;
-        final userData = resultData['user'] as Map<String, dynamic>? ?? {};
+        final userData = resultData['user'] as Map<String, dynamic>? ?? resultData;
         final role = resultData['role'] as String? ?? 'pasien';
 
         final user = UserModel.fromJson(userData, defaultRole: role);
@@ -333,14 +365,18 @@ class AuthService {
   }
 
   /// 6. Logout dan Hapus Sesi
-  Future<void> logout() async {
+  /// Endpoint: POST /logout (fallback POST /auth/logout)
+  Future<void> logout({bool allDevices = false}) async {
     // 1. Bersihkan token & sesi lokal terlebih dahulu agar status segera offline/keluar
     await _storage.clearAuth();
 
     // 2. Beritahu server backend & bersihkan sesi Firebase/Google di latar belakang
     try {
-      _apiClient.dio.post('/auth/logout').timeout(const Duration(seconds: 2)).catchError((_) {
-        return Response(requestOptions: RequestOptions(path: '/auth/logout'));
+      final payload = {'all_devices': allDevices};
+      _apiClient.dio.post('/logout', data: payload).catchError((_) {
+        return _apiClient.dio.post('/auth/logout', data: payload);
+      }).timeout(const Duration(seconds: 3)).catchError((_) {
+        return Response(requestOptions: RequestOptions(path: '/logout'));
       });
     } catch (_) {}
 
@@ -351,6 +387,40 @@ class AuthService {
     try {
       _googleSignIn.signOut().catchError((_) => null);
     } catch (_) {}
+  }
+
+  /// 6b. Hapus Akun Pengguna
+  /// Endpoint: DELETE /auth/delete-account (fallback DELETE /pasien/profile)
+  Future<Map<String, dynamic>> deleteAccount() async {
+    try {
+      dynamic response;
+      try {
+        response = await _apiClient.dio.delete('/auth/delete-account');
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 404) {
+          response = await _apiClient.dio.delete('/pasien/profile');
+        } else {
+          rethrow;
+        }
+      }
+
+      await _storage.clearAuth();
+      try {
+        FirebaseAuth.instance.signOut().catchError((_) {});
+      } catch (_) {}
+
+      return {
+        'success': response?.data?['success'] ?? true,
+        'message': response?.data?['message'] ?? 'Akun berhasil dihapus.',
+      };
+    } catch (e) {
+      // Walau error di server, tetap bersihkan data lokal jika diinginkan
+      await _storage.clearAuth();
+      return {
+        'success': false,
+        'message': ApiClient.getErrorMessage(e),
+      };
+    }
   }
 
   /// 7. Register Dokter

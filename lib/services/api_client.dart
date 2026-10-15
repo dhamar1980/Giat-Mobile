@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../config/api_config.dart';
 import 'storage_service.dart';
+import 'navigation_service.dart';
 
 /// Singleton Dio HTTP client configured with Sanctum Bearer token interceptor
 class ApiClient {
@@ -112,7 +113,7 @@ class ApiClient {
         onRequest: (options, handler) async {
           // Keep baseUrl in sync with ApiConfig
           if (!options.path.startsWith('http')) {
-            options.baseUrl = ApiConfig.baseUrl;
+            options.baseUrl = ApiConfig.baseUrl.trim();
           }
 
           // Attach Sanctum Bearer token if present
@@ -130,6 +131,26 @@ class ApiClient {
         },
         onError: (DioException error, handler) async {
           debugPrint('❌ [API Error] ${error.response?.statusCode} ${error.requestOptions.path}: ${error.message}');
+          
+          // Handle 401 Unauthenticated: only redirect if user had an active real token
+          if (error.response?.statusCode == 401) {
+            final token = await StorageService().getToken();
+            final isDemo = token == null || token.isEmpty || token.startsWith('demo_');
+            final path = error.requestOptions.path.toLowerCase();
+            final isAuthFlow = path.contains('/login') ||
+                path.contains('/register') ||
+                path.contains('/forgot-password') ||
+                path.contains('/verify-otp') ||
+                path.contains('/reset-password');
+
+            if (!isAuthFlow && !isDemo) {
+              await StorageService().clearAuth();
+              NavigationService.navigateToLogin(
+                message: 'Sesi login Anda telah berakhir. Silakan masuk kembali.',
+              );
+            }
+          }
+          
           return handler.next(error);
         },
       ),

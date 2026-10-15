@@ -56,12 +56,15 @@ void main() {
     expect(find.text('Riwayat Pembelian Obat'), findsOneWidget);
     expect(find.text('Melalui Resep Dokter'), findsWidgets);
     expect(find.text('Obat Bebas (Tanpa Resep Dokter)'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 
   testWidgets('RiwayatObatScreen displays filter chips and orders properly', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: RiwayatObatScreen(userName: 'Pasien Test'),
+        home: RiwayatObatScreen(userName: 'Pasien Test', autoFetch: false),
       ),
     );
 
@@ -85,5 +88,8 @@ void main() {
     // Should now show non-prescription order and filter out prescription orders
     expect(find.text('#G-8450'), findsOneWidget);
     expect(find.text('#G-9021'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 }

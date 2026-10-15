@@ -1,4 +1,4 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
@@ -27,7 +27,6 @@ class LacakObatScreen extends StatefulWidget {
 
 class _LacakObatScreenState extends State<LacakObatScreen> {
   static const _darkGreen = Color(0xFF065A37);
-  static const _buttonDark = Color(0xFF044E2F);
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
   static const _amberStatus = Color(0xFFE5A100);

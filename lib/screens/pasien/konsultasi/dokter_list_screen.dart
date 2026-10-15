@@ -53,9 +53,29 @@ class _DokterListScreenState extends State<DokterListScreen> {
     _fetchLiveDoctors();
   }
 
-  Future<void> _fetchLiveDoctors() async {
+  Future<void> _fetchLiveDoctors({String? search, String? spesialisasi}) async {
     try {
-      final res = await KonsultasiApiService().getDokterList();
+      final catRes = await KonsultasiApiService().getKategoriDokter();
+      if (catRes.success && catRes.data != null && catRes.data!.isNotEmpty && mounted) {
+        final List<String> cats = ['Konsultasi Saya', 'Semua Dokter'];
+        for (var c in catRes.data!) {
+          final name = c is Map ? (c['nama'] ?? c['name'] ?? c['kategori']) : c.toString();
+          if (name != null && !cats.contains(name.toString())) {
+            cats.add(name.toString());
+          }
+        }
+        setState(() {
+          _categories.clear();
+          _categories.addAll(cats);
+        });
+      }
+    } catch (_) {}
+
+    try {
+      final res = await KonsultasiApiService().getDokterList(
+        search: search,
+        spesialisasi: spesialisasi,
+      );
       if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
         setState(() {
           _apiDoctors = res.data!.map<Map<String, dynamic>>((d) {

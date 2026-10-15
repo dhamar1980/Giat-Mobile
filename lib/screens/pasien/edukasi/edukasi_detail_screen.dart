@@ -51,16 +51,27 @@ class EdukasiDetailScreen extends StatelessWidget {
               height: 220,
               width: double.infinity,
               color: const Color(0xFFE2E8F0),
-              child: Image.asset(
-                article['image'],
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: const Color(0xFFDCFCE7),
-                  child: const Center(
-                    child: Icon(Icons.health_and_safety_rounded, size: 64, color: _darkGreen),
-                  ),
-                ),
-              ),
+              child: article['image'] != null && article['image'].toString().startsWith('http')
+                  ? Image.network(
+                      article['image'].toString(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFFDCFCE7),
+                        child: const Center(
+                          child: Icon(Icons.health_and_safety_rounded, size: 64, color: _darkGreen),
+                        ),
+                      ),
+                    )
+                  : Image.asset(
+                      article['image']?.toString() ?? 'assets/images/kidneys.jpg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFFDCFCE7),
+                        child: const Center(
+                          child: Icon(Icons.health_and_safety_rounded, size: 64, color: _darkGreen),
+                        ),
+                      ),
+                    ),
             ),
 
             Padding(

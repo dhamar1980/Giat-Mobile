@@ -8,6 +8,7 @@ import 'onboarding_screen.dart';
 import 'screens/apotek/apoteker_home_screen.dart';
 import 'screens/dokter/dokter_home_screen.dart';
 import 'screens/dokter/models/dokter_models.dart';
+import 'services/navigation_service.dart';
 import 'services/auth_service.dart';
 import 'services/storage_service.dart';
 
@@ -43,8 +44,14 @@ void main() async {
       final user = await AuthService().getCurrentUser();
       if (user != null) {
         savedUser = user;
+      } else {
+        savedUser = null;
+        await StorageService().clearAuth();
       }
-    } catch (_) {}
+    } catch (_) {
+      savedUser = null;
+      await StorageService().clearAuth();
+    }
   }
 
   if (savedUser != null && savedUser.role.toLowerCase() == 'dokter') {
@@ -84,6 +91,7 @@ class GiatApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'GIAT - Ginjal Sehat',
+      navigatorKey: NavigationService.navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

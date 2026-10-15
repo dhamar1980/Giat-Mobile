@@ -145,6 +145,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         nama: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         password: _passCtrl.text,
+        passwordConfirmation: _confirmPassCtrl.text,
         noHp: _phoneCtrl.text.trim().isNotEmpty
             ? _phoneCtrl.text.trim()
             : '081234567890',

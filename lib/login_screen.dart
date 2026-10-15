@@ -209,6 +209,7 @@ class _LoginScreenState extends State<LoginScreen>
         );
         await StorageService().saveUser(demoUser);
         await StorageService().saveRole(role);
+        await StorageService().saveToken('demo_${role}_$demoEmail');
 
         if (role == 'dokter') {
           DokterProfileState.instance.syncFromUser(

@@ -463,7 +463,9 @@ class PragiResultScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Konsultasikan hasil ini kepada Dokter atau Apoteker GIAT untuk mendapatkan rekomendasi gaya hidup dan pemeriksaan laboratorium penunjang.',
+            (result.rekomendasiDokter != null && result.rekomendasiDokter!.isNotEmpty)
+                ? result.rekomendasiDokter!
+                : 'Konsultasikan hasil ini kepada Dokter atau Apoteker GIAT untuk mendapatkan rekomendasi gaya hidup dan pemeriksaan laboratorium penunjang.',
             style: GoogleFonts.inter(
               fontSize: 12.5,
               color: const Color(0xFF166534),
