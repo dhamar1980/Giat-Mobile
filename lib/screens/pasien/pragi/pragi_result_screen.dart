@@ -359,10 +359,58 @@ class PragiResultScreen extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildParamCard(
-                icon: Icons.eco_rounded,
+                icon: Icons.smoking_rooms_outlined,
                 title: 'Gaya Hidup',
                 val1: 'Merokok: ${result.hasSmokingHistory ? 'Ya' : 'Tidak'}',
                 val2: 'Alkohol: ${result.hasExcessiveAlcohol ? 'Berlebih' : 'Wajar / Tidak'}',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Row 4: Kondisi 30 Hari + Tidur & Asma
+        Row(
+          children: [
+            Expanded(
+              child: _buildParamCard(
+                icon: Icons.psychology_outlined,
+                title: 'Kondisi 30 Hari',
+                val1: 'Fisik: ${result.physicalHealthDays ?? 0} hari sakit',
+                val2: 'Mental: ${result.mentalHealthDays ?? 0} hari tertekan',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildParamCard(
+                icon: Icons.nights_stay_outlined,
+                title: 'Pola Tidur & Asma',
+                val1: '${result.sleepHours ?? 7} Jam / Hari',
+                val2: 'Asma: ${(result.hasAsthma == true) ? 'Ya' : 'Tidak'}',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Row 5: Ras & Evaluasi Umum + Mobilitas
+        Row(
+          children: [
+            Expanded(
+              child: _buildParamCard(
+                icon: Icons.health_and_safety_outlined,
+                title: 'Ras & Evaluasi',
+                val1: result.race ?? 'Asia (Asian)',
+                val2: result.generalHealth ?? 'Baik (Good)',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildParamCard(
+                icon: Icons.directions_walk_rounded,
+                title: 'Mobilitas Tangga',
+                val1: result.hasMobilityDifficulty ? 'Mengalami Hambatan' : 'Berjalan Normal',
+                val2: result.hasMobilityDifficulty ? 'Kesulitan Berjalan' : 'Tanpa Kendala',
               ),
             ),
           ],
