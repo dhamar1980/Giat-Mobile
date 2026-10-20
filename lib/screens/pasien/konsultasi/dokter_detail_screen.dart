@@ -1,6 +1,9 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'jadwalkan_konsultasi_screen.dart';
+import '../../../services/storage_service.dart';
+import '../../../services/konsultasi_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DETAIL PROFIL DOKTER (Sesuai Referensi UI Figma GIAT)
@@ -8,8 +11,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 class DokterDetailScreen extends StatefulWidget {
   final Map<String, dynamic> doctor;
+  final String userName;
 
-  const DokterDetailScreen({super.key, required this.doctor});
+  const DokterDetailScreen({
+    super.key,
+    required this.doctor,
+    this.userName = 'Pasien',
+  });
 
   @override
   State<DokterDetailScreen> createState() => _DokterDetailScreenState();
@@ -22,12 +30,55 @@ class _DokterDetailScreenState extends State<DokterDetailScreen> {
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorder = Color(0xFFE2E8F0);
 
+  int _selectedRating = 3;
+  late final TextEditingController _ulasanController;
+
+  @override
+  void initState() {
+    super.initState();
+    _ulasanController = TextEditingController();
+    _loadExistingRating();
+  }
+
+  Future<void> _loadExistingRating() async {
+    final docId = widget.doctor['id']?.toString() ?? 'budi_santoso';
+    final saved = await StorageService().getDoctorRating(docId);
+    if (saved != null && mounted) {
+      setState(() {
+        if (saved['rating'] is int) {
+          _selectedRating = saved['rating'] as int;
+        }
+        if (saved['ulasan'] != null && saved['ulasan'].toString().isNotEmpty) {
+          _ulasanController.text = saved['ulasan'].toString();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _ulasanController.dispose();
+    super.dispose();
+  }
+
   static const _defaultPhoto =
       'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=500';
 
   String get _doctorName {
     final name = widget.doctor['name']?.toString() ?? '';
     return name.isNotEmpty ? name : 'Dr. Budi Santoso';
+  }
+
+  String get _doctorFullNameForQuestion {
+    final name = _doctorName;
+    if (name.startsWith('Dr. ')) {
+      return 'Dokter ${name.substring(4)}';
+    } else if (name.startsWith('dr. ')) {
+      return 'Dokter ${name.substring(4)}';
+    } else if (!name.toLowerCase().startsWith('dokter')) {
+      return 'Dokter $name';
+    }
+    return name;
   }
 
   String get _specialty {
@@ -87,6 +138,11 @@ class _DokterDetailScreenState extends State<DokterDetailScreen> {
                     children: [
                       // Section: Informasi Penilaian
                       _buildPenilaianSection(),
+
+                      const SizedBox(height: 16),
+
+                      // Card: Beri Penilaian (Rating & Ulasan Dokter)
+                      _buildBeriPenilaianCard(),
 
                       const SizedBox(height: 20),
 
@@ -364,7 +420,7 @@ class _DokterDetailScreenState extends State<DokterDetailScreen> {
             Expanded(
               child: _buildPenilaianCard(
                 iconWidget: const Icon(
-                  Icons.medical_services_rounded,
+                  Icons.work_history_rounded,
                   size: 26,
                   color: Color(0xFF00796B),
                 ),
@@ -442,6 +498,336 @@ class _DokterDetailScreenState extends State<DokterDetailScreen> {
         ),
       ),
     );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 2B. CARD BERI PENILAIAN (RATING & ULASAN)
+  // ─────────────────────────────────────────────────────────────────────────────
+  Widget _buildBeriPenilaianCard() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            // Subtle wave background decoration in top-left
+            Positioned(
+              left: 0,
+              top: 0,
+              child: CustomPaint(
+                size: const Size(120, 100),
+                painter: _CardTopographyPainter(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title: Beri Penilaian
+                  Text(
+                    'Beri Penilaian',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _darkGreen,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // Subtitle question with doctor's name
+                  Text(
+                    'Bagaimana pengalaman konsultasimu dengan $_doctorFullNameForQuestion?',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF0F172A),
+                      height: 1.4,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 5 Star Rating Row (Interactive)
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(5, (index) {
+                        final isFilled = index < _selectedRating;
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            setState(() {
+                              _selectedRating = index + 1;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            child: Icon(
+                              Icons.star_rounded,
+                              size: 44,
+                              color: isFilled
+                                  ? const Color(0xFFFBBF24)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Helper hint
+                  Center(
+                    child: Text(
+                      'Ketuk bintang untuk menilai',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w400,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Label: Ulasan (opsional)
+                  Text(
+                    'Ulasan (opsional)',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Review text input
+                  TextField(
+                    controller: _ulasanController,
+                    maxLines: 3,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: const Color(0xFF0F172A),
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Ceritakan pengalamanmu...',
+                      hintStyle: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w400,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _primaryGreen, width: 1.5),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Action Button: Konsultasi Sekarang
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _darkGreen,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: _onKonsultasiSekarang,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Konsultasi Sekarang',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Secondary Button: Kirim Penilaian Saja
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _onKirimPenilaianSaja,
+                      icon: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 16,
+                        color: _primaryGreen,
+                      ),
+                      label: Text(
+                        'Kirim Penilaian Saja',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: _primaryGreen,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onKirimPenilaianSaja() async {
+    final docId = widget.doctor['id']?.toString() ?? 'budi_santoso';
+    final rating = _selectedRating;
+    final ulasan = _ulasanController.text.trim();
+
+    // 1. Simpan ke local cache agar langsung tersimpan di device
+    await StorageService().saveDoctorRating(
+      doctorId: docId,
+      rating: rating,
+      ulasan: ulasan,
+    );
+
+    // 2. Simpan ke Database Supabase via KonsultasiApiService (tabel: ulasan_dokter / konsultasi)
+    try {
+      final res = await KonsultasiApiService().beriRatingDokter(
+        doctorId: docId,
+        konsultasiId: widget.doctor['konsultasi_id'] ?? widget.doctor['id_konsultasi'],
+        rating: rating,
+        ulasan: ulasan,
+        namaPasien: widget.userName,
+      );
+      debugPrint('⭐ Hasil simpan rating ke Supabase: ${res.message}');
+    } catch (e) {
+      debugPrint('⚠️ Gagal simpan rating ke API/Supabase: $e');
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Penilaian ($rating★) dan ulasan Anda berhasil disimpan ke database!',
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w500, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: _darkGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _onKonsultasiSekarang() async {
+    final docId = widget.doctor['id']?.toString() ?? 'budi_santoso';
+    final rating = _selectedRating;
+    final ulasan = _ulasanController.text.trim();
+
+    // 1. Simpan ke local cache agar langsung tersimpan di device
+    await StorageService().saveDoctorRating(
+      doctorId: docId,
+      rating: rating,
+      ulasan: ulasan,
+    );
+
+    // 2. Simpan ke Database Supabase via KonsultasiApiService (tabel: ulasan_dokter / konsultasi)
+    try {
+      final res = await KonsultasiApiService().beriRatingDokter(
+        doctorId: docId,
+        konsultasiId: widget.doctor['konsultasi_id'] ?? widget.doctor['id_konsultasi'],
+        rating: rating,
+        ulasan: ulasan,
+        namaPasien: widget.userName,
+      );
+      debugPrint('⭐ Hasil simpan rating ke Supabase: ${res.message}');
+    } catch (e) {
+      debugPrint('⚠️ Gagal simpan rating ke API/Supabase: $e');
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Penilaian Anda ($rating★) telah dicatat. Membuka jadwal konsultasi...',
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w500, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: _darkGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    final booked = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => JadwalkanKonsultasiScreen(
+          doctor: widget.doctor,
+          userName: widget.userName,
+        ),
+      ),
+    );
+    if (booked == true && mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

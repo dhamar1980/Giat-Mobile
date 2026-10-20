@@ -56,7 +56,36 @@ void main() {
     expect(find.text('Tentang Dokter'), findsOneWidget);
     expect(find.textContaining('Dokter yang memberikan layanan konsultasi kesehatan'), findsOneWidget);
 
-    // 6. Verify Konsultasi Sekarang Button is removed
-    expect(find.text('Konsultasi Sekarang'), findsNothing);
+    // 6. Verify Card Beri Penilaian (Rating & Ulasan Pasien)
+    expect(find.text('Beri Penilaian'), findsOneWidget);
+    expect(
+      find.text('Bagaimana pengalaman konsultasimu dengan Dokter Budi Santoso?'),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.star_rounded), findsNWidgets(5));
+    expect(find.text('Ketuk bintang untuk menilai'), findsOneWidget);
+    expect(find.text('Ulasan (opsional)'), findsOneWidget);
+    expect(find.text('Ceritakan pengalamanmu...'), findsOneWidget);
+    expect(find.text('Konsultasi Sekarang'), findsOneWidget);
+
+    // Verify rating interaction: Tap 5th star
+    await tester.tap(find.byIcon(Icons.star_rounded).last);
+    await tester.pump();
+
+    // Verify typing review
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Ceritakan pengalamanmu...'),
+      'Pelayanan dokter sangat memuaskan dan responsif.',
+    );
+    await tester.pump();
+    expect(find.text('Pelayanan dokter sangat memuaskan dan responsif.'), findsOneWidget);
+
+    // Verify Kirim Penilaian Saja button
+    expect(find.text('Kirim Penilaian Saja'), findsOneWidget);
+    await tester.tap(find.text('Kirim Penilaian Saja'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('Penilaian (5★) dan ulasan Anda berhasil disimpan'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
   });
 }

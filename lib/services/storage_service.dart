@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -207,5 +208,55 @@ class StorageService {
   Future<bool> hasToken() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;
+  }
+
+  /// Menyimpan rating dan ulasan dokter di local storage
+  Future<void> saveDoctorRating({
+    required String doctorId,
+    required int rating,
+    String? ulasan,
+  }) async {
+    final key = 'giat_doctor_rating_$doctorId';
+    final data = jsonEncode({
+      'rating': rating,
+      'ulasan': ulasan ?? '',
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+
+    if (_isTest) {
+      _testMemoryStorage[key] = data;
+      return;
+    }
+
+    try {
+      await _secureStorage.write(key: key, value: data);
+    } catch (_) {
+      await _prefs?.setString(key, data);
+    }
+  }
+
+  /// Mengambil rating dan ulasan dokter dari local storage
+  Future<Map<String, dynamic>?> getDoctorRating(String doctorId) async {
+    final key = 'giat_doctor_rating_$doctorId';
+    String? raw;
+
+    if (_isTest) {
+      raw = _testMemoryStorage[key];
+    } else {
+      try {
+        raw = await _secureStorage.read(key: key);
+      } catch (_) {}
+      raw ??= _prefs?.getString(key);
+    }
+
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 }

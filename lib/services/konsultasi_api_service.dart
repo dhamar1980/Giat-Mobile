@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'api_response.dart';
+import 'storage_service.dart';
 
 /// Service for all `/konsultasi` API endpoints
 class KonsultasiApiService {
@@ -276,6 +277,63 @@ class KonsultasiApiService {
       );
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Ulasan dan rating berhasil dikirim.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// POST /konsultasi/dokter/{id}/rating atau POST /dokter/{id}/rating atau POST /ratings
+  /// Menyimpan rating dan ulasan ke database Supabase (tabel: ulasan_dokter / konsultasi)
+  Future<ApiResponse<Map<String, dynamic>>> beriRatingDokter({
+    required dynamic doctorId,
+    dynamic konsultasiId,
+    required int rating,
+    String? ulasan,
+    String? namaPasien,
+  }) async {
+    try {
+      final user = await StorageService().getUser();
+      final payload = {
+        'id_dokter': doctorId,
+        'dokter_id': doctorId,
+        'id_pasien': user?.id,
+        'nama_pasien': namaPasien ?? user?.nama,
+        'rating': rating,
+        'ulasan': ulasan ?? '',
+      };
+      if (konsultasiId != null) {
+        payload['id_konsultasi'] = konsultasiId;
+        payload['konsultasi_id'] = konsultasiId;
+      }
+
+      dynamic response;
+      if (konsultasiId != null) {
+        response = await _client.dio.post('/konsultasi/$konsultasiId/rating', data: payload);
+      } else {
+        try {
+          response = await _client.dio.post('/konsultasi/dokter/$doctorId/rating', data: payload);
+        } on DioException catch (dioErr) {
+          if (dioErr.response?.statusCode == 404) {
+            try {
+              response = await _client.dio.post('/dokter/$doctorId/rating', data: payload);
+            } on DioException catch (dioErr2) {
+              if (dioErr2.response?.statusCode == 404) {
+                response = await _client.dio.post('/ratings', data: payload);
+              } else {
+                rethrow;
+              }
+            }
+          } else {
+            rethrow;
+          }
+        }
+      }
+
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Penilaian dokter berhasil disimpan ke database.',
         data: response.data?['data'] as Map<String, dynamic>?,
         statusCode: response.statusCode,
       );

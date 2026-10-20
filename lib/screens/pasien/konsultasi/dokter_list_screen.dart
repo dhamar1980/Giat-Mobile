@@ -1510,13 +1510,22 @@ class _DokterListScreenState extends State<DokterListScreen> {
                             ),
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                           ),
-                          onPressed: () {
-                            Navigator.push(
+                          onPressed: () async {
+                            final booked = await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => DokterDetailScreen(doctor: doc),
+                                builder: (_) => DokterDetailScreen(
+                                  doctor: doc,
+                                  userName: widget.userName,
+                                ),
                               ),
                             );
+                            if (booked == true && mounted) {
+                              setState(() {
+                                _selectedCategory = 'Konsultasi Saya';
+                                _hasUpcomingConsultation = true;
+                              });
+                            }
                           },
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
