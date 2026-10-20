@@ -347,7 +347,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
                 ],
               ),
               child: Text(
-                'Tambah Reminder Baru',
+                'Tambah Pengingat Baru',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -794,7 +794,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
             const Icon(Icons.check_circle_outline_rounded, size: 20),
             const SizedBox(width: 8),
             Text(
-              'Simpan Reminder',
+              'Simpan Pengingat',
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,

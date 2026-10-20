@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import '../models/pragi_model.dart';
 import 'api_client.dart';
 import 'api_response.dart';
 
@@ -469,29 +470,76 @@ class PasienApiService {
   // 5. PRAGI (SKRINING RISIKO CKD & CHATBOT AI PRAGI)
   // =========================================================================
 
-  /// GET /pragi/pertanyaan (fallback GET /pasien/pragi/pertanyaan)
-  Future<ApiResponse<List<dynamic>>> getPragiQuestions() async {
+  /// GET /api/pasien/pragi/pertanyaan (fallback GET /api/pragi/pertanyaan)
+  Future<ApiResponse<List<PragiPertanyaan>>> getPragiQuestions() async {
     try {
       dynamic response;
       try {
-        response = await _client.dio.get('/pragi/pertanyaan');
+        response = await _client.dio.get('/pasien/pragi/pertanyaan');
       } on DioException catch (dioErr) {
         if (dioErr.response?.statusCode == 404) {
-          response = await _client.dio.get('/pasien/pragi/pertanyaan');
+          response = await _client.dio.get('/pragi/pertanyaan');
         } else {
           rethrow;
         }
       }
       final raw = response.data;
       List<dynamic> list = [];
-      if (raw?['data'] is List) {
+      if (raw is Map && raw['data'] is Map && raw['data']['pertanyaan'] is List) {
+        list = raw['data']['pertanyaan'] as List;
+      } else if (raw is Map && raw['data'] is List) {
         list = raw['data'] as List;
+      } else if (raw is Map && raw['pertanyaan'] is List) {
+        list = raw['pertanyaan'] as List;
       } else if (raw is List) {
         list = raw;
       }
+
+      final questions = list
+          .map((item) => PragiPertanyaan.fromJson(
+              item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item as Map)))
+          .toList();
+
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat pertanyaan skrining PRAGI.',
-        data: list,
+        data: questions.isNotEmpty ? questions : PragiPertanyaan.default16Pertanyaan,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      // Graceful fallback to default 16 standard questions
+      return ApiResponse.success(
+        message: 'Menggunakan format pertanyaan standar PRAGI (${ApiClient.getErrorMessage(e)})',
+        data: PragiPertanyaan.default16Pertanyaan,
+      );
+    }
+  }
+
+  /// POST /api/pasien/pragi/skrining
+  /// Body: {"jawaban": {"HeartDisease": "No", "BMI": 26.45, ...}}
+  Future<ApiResponse<PragiHasilSkrining>> submitPragiSkrining(Map<String, dynamic> answers) async {
+    try {
+      final payload = {'jawaban': answers};
+      dynamic response;
+      try {
+        response = await _client.dio.post('/pasien/pragi/skrining', data: payload);
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 404) {
+          response = await _client.dio.post('/pragi/skrining', data: payload);
+        } else {
+          rethrow;
+        }
+      }
+
+      final raw = response.data;
+      final Map<String, dynamic> dataMap = (raw is Map && raw['data'] is Map)
+          ? Map<String, dynamic>.from(raw['data'])
+          : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
+
+      final hasil = PragiHasilSkrining.fromJson(dataMap);
+
+      return ApiResponse.success(
+        message: raw?['message'] ?? 'Skrining PRAGI berhasil diproses.',
+        data: hasil,
         statusCode: response.statusCode,
       );
     } catch (e) {
@@ -499,16 +547,19 @@ class PasienApiService {
     }
   }
 
-  /// POST /pasien/pragi/skrining (fallback POST /pasien/skrining)
-  /// Body: {"jawaban": {"1": "ya", "2": "tidak", ...}}
+  /// Legacy submitPragi compatibility
   Future<ApiResponse<Map<String, dynamic>>> submitPragi(Map<String, dynamic> answers) async {
     try {
+      final Map<String, dynamic> payload = answers.containsKey('jawaban')
+          ? answers
+          : {'jawaban': answers};
+
       dynamic response;
       try {
-        response = await _client.dio.post('/pasien/pragi/skrining', data: answers);
+        response = await _client.dio.post('/pasien/pragi/skrining', data: payload);
       } on DioException catch (dioErr) {
         if (dioErr.response?.statusCode == 404) {
-          response = await _client.dio.post('/pasien/skrining', data: answers);
+          response = await _client.dio.post('/pasien/skrining', data: payload);
         } else {
           rethrow;
         }

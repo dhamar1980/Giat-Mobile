@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../models/pragi_model.dart';
 
 /// Data model for a completed PRAGI CKD screening
 class PragiScreeningResult {
   final String id;
   final DateTime date;
-  final String gender; // 'Laki-laki' | 'Perempuan'
+  final String gender; // 'Laki-laki' | 'Perempuan' | 'Male' | 'Female'
   final String ageRange; // e.g. '45 – 49 thn'
   final double heightCm; // e.g. 168
   final double weightKg; // e.g. 65
@@ -16,15 +17,17 @@ class PragiScreeningResult {
   final int? sleepHours; // 1..24
   final bool hasHeartDisease;
   final bool hasStroke;
-  final String diabetesStatus; // 'Ya' | 'Ya, tetapi hanya saat hamil (diabetes gestasional)' | 'Tidak, tetapi pernah diberitahu prediabetes / batas gula darah tinggi' | 'Tidak'
+  final String diabetesStatus;
   final bool? hasAsthma;
   final bool hasPhysicalActivity;
   final bool hasSmokingHistory;
   final bool hasExcessiveAlcohol;
   final bool hasMobilityDifficulty;
   final String riskLevel; // 'Rendah' | 'Sedang' | 'Tinggi'
-  final String riskScore; // e.g. 'Skor 12 / 100'
+  final String riskScore; // e.g. 'Skor 12 / 100' or 'Skor 4'
   final String? rekomendasiDokter;
+  final List<String> faktorRisiko;
+  final String? hasilPrediksi;
 
   PragiScreeningResult({
     required this.id,
@@ -50,7 +53,47 @@ class PragiScreeningResult {
     this.riskLevel = 'Rendah',
     this.riskScore = 'Risiko Rendah',
     this.rekomendasiDokter,
+    this.faktorRisiko = const [],
+    this.hasilPrediksi,
   });
+
+  factory PragiScreeningResult.fromHasil({
+    required PragiHasilSkrining hasil,
+    required Map<String, dynamic> jawaban,
+  }) {
+    final double bmiVal = double.tryParse(jawaban['BMI']?.toString() ?? '23.0') ?? 23.0;
+    final int physDays = int.tryParse(jawaban['PhysicalHealth']?.toString() ?? '0') ?? 0;
+    final int mentDays = int.tryParse(jawaban['MentalHealth']?.toString() ?? '0') ?? 0;
+    final int sleepH = int.tryParse(jawaban['SleepTime']?.toString() ?? '7') ?? 7;
+
+    return PragiScreeningResult(
+      id: hasil.idPragi.isNotEmpty ? hasil.idPragi : 'scr-${DateTime.now().millisecondsSinceEpoch}',
+      date: DateTime.tryParse(hasil.tanggalScreening) ?? DateTime.now(),
+      gender: jawaban['Sex']?.toString() ?? 'Male',
+      ageRange: jawaban['AgeCategory']?.toString() ?? '45–49 tahun',
+      heightCm: 168.0,
+      weightKg: 65.0,
+      bmi: bmiVal,
+      race: jawaban['Race']?.toString() ?? 'Asian',
+      generalHealth: jawaban['GenHealth']?.toString() ?? 'Good',
+      physicalHealthDays: physDays,
+      mentalHealthDays: mentDays,
+      sleepHours: sleepH,
+      hasHeartDisease: (jawaban['HeartDisease']?.toString().toLowerCase() == 'yes'),
+      hasStroke: (jawaban['Stroke']?.toString().toLowerCase() == 'yes'),
+      diabetesStatus: jawaban['Diabetic']?.toString() ?? 'No',
+      hasAsthma: (jawaban['Asthma']?.toString().toLowerCase() == 'yes'),
+      hasPhysicalActivity: (jawaban['PhysicalActivity']?.toString().toLowerCase() == 'yes'),
+      hasSmokingHistory: (jawaban['Smoking']?.toString().toLowerCase() == 'yes'),
+      hasExcessiveAlcohol: (jawaban['AlcoholDrinking']?.toString().toLowerCase() == 'yes'),
+      hasMobilityDifficulty: (jawaban['DiffWalking']?.toString().toLowerCase() == 'yes'),
+      riskLevel: hasil.formattedKategori.replaceAll('Risiko ', ''),
+      riskScore: 'Skor ${hasil.skor}',
+      rekomendasiDokter: hasil.rekomendasi,
+      faktorRisiko: hasil.faktorRisiko,
+      hasilPrediksi: hasil.hasilPrediksi,
+    );
+  }
 }
 
 /// Global State Management for PRAGI Screening & History

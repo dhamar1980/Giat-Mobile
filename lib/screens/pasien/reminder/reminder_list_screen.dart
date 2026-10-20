@@ -336,7 +336,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
 
           const SizedBox(height: 12),
 
-          // 2. Below: Reminder Saya Pill Badge (Centered)
+          // 2. Below: Pengingat Saya Pill Badge (Centered)
           Center(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -352,7 +352,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                 ],
               ),
               child: Text(
-                'Reminder Saya',
+                'Pengingat Saya',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -519,7 +519,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                           scale: 0.75,
                           child: Switch(
                             value: rem['isActive'] == true,
-                            activeColor: _primaryGreen,
+                            activeThumbColor: _primaryGreen,
                             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             onChanged: (val) {
                               setState(() {
@@ -607,7 +607,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
             const Icon(Icons.add_circle_outline_rounded, size: 20),
             const SizedBox(width: 8),
             Text(
-              'Tambah Reminder Baru',
+              'Tambah Pengingat Baru',
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,

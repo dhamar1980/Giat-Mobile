@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'pragi_state_service.dart';
+import '../../../models/pragi_model.dart';
+import '../../../services/pasien_api_service.dart';
 import 'pragi_topography_background.dart';
 import 'pragi_processing_screen.dart';
 
@@ -12,226 +13,233 @@ class PragiScreeningScreen extends StatefulWidget {
 }
 
 class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
-  int _currentStep = 1;
-  final int _totalSteps = 16;
-
   static const _darkGreen = Color(0xFF065A37);
   static const _accentGreen = Color(0xFF10B981);
   static const _selectedCardBg = Color(0xFFE0F2FE);
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // FORM STATE ANSWERS (16 QUESTIONS)
-  // ───────────────────────────────────────────────────────────────────────────
-  // 1. Jenis Kelamin (A. Laki-laki, B. Perempuan)
-  String? _selectedGender;
+  bool _isLoading = true;
+  List<PragiPertanyaan> _questions = [];
+  int _currentStep = 1; // 1-based (1 to 16)
 
-  // 2. Kelompok Usia (A to M)
-  String _selectedAgeRange = '45–49 tahun';
+  // Map jawaban user: key = kodeField, value = answer ("Yes", 26.45, "Female", etc.)
+  final Map<String, dynamic> _jawaban = {};
 
-  // 3. Tinggi & Berat Badan
-  final TextEditingController _heightController = TextEditingController(text: '168');
-  final TextEditingController _weightController = TextEditingController(text: '65');
-  double _calculatedBmi = 23.0;
+  // Controllers untuk input angka dinamis
+  final TextEditingController _numberController = TextEditingController();
 
-  // 4. Ras / Etnis (A to E)
-  String? _selectedRace;
-
-  // 5. Evaluasi Kesehatan Umum (A to E)
-  String? _generalHealth;
-
-  // 6. Kesehatan Fisik (0 hingga 30 hari)
-  int _physicalHealthDays = 0;
-
-  // 7. Kesehatan Mental (0 hingga 30 hari)
-  int _mentalHealthDays = 0;
-
-  // 8. Durasi Tidur Harian (1 hingga 24 jam)
-  int _sleepHours = 7;
-
-  // 9. Riwayat Penyakit Jantung (A. Ya, B. Tidak)
-  bool? _hasHeartDisease;
-
-  // 10. Riwayat Stroke (A. Ya, B. Tidak)
-  bool? _hasStroke;
-
-  // 11. Riwayat Diabetes (A to D)
-  String? _diabetesStatus;
-
-  // 12. Riwayat Asma (A. Ya, B. Tidak)
-  bool? _hasAsthma;
-
-  // 13. Kebiasaan Merokok (A. Ya, B. Tidak)
-  bool? _hasSmokingHistory;
-
-  // 14. Konsumsi Alkohol (A. Ya, B. Tidak)
-  bool? _hasExcessiveAlcohol;
-
-  // 15. Aktivitas Fisik (A. Ya, B. Tidak)
-  bool? _hasPhysicalActivity;
-
-  // 16. Kesulitan Berjalan (A. Ya, B. Tidak)
-  bool? _hasMobilityDifficulty;
+  // Helper kalkulator BMI (Tinggi & Berat Badan)
+  final TextEditingController _tbController = TextEditingController(text: '168');
+  final TextEditingController _bbController = TextEditingController(text: '65');
+  bool _showBmiCalculator = false;
 
   @override
   void initState() {
     super.initState();
-    _recalculateBmi();
+    _fetchQuestions();
   }
 
   @override
   void dispose() {
-    _heightController.dispose();
-    _weightController.dispose();
+    _numberController.dispose();
+    _tbController.dispose();
+    _bbController.dispose();
     super.dispose();
   }
 
-  void _recalculateBmi() {
-    final double? h = double.tryParse(_heightController.text);
-    final double? w = double.tryParse(_weightController.text);
-    if (h != null && w != null && h > 0 && w > 0) {
-      final double hMeter = h / 100;
-      setState(() {
-        _calculatedBmi = w / (hMeter * hMeter);
-      });
+  Future<void> _fetchQuestions() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final res = await PasienApiService().getPragiQuestions();
+      if (res.data != null && res.data!.isNotEmpty) {
+        _questions = res.data!;
+      } else {
+        _questions = PragiPertanyaan.default16Pertanyaan;
+      }
+    } catch (e) {
+      _questions = PragiPertanyaan.default16Pertanyaan;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _syncInputForCurrentStep();
+      }
     }
   }
 
-  String _getBmiCategory(double bmi) {
-    if (bmi < 18.5) return 'Berat Badan Kurang';
-    if (bmi < 23.0) return 'Berat Badan Normal / Ideal';
-    if (bmi < 25.0) return 'Kelebihan Berat Badan';
-    return 'Obesitas';
+  PragiPertanyaan? get _currentQuestion {
+    if (_questions.isEmpty || _currentStep < 1 || _currentStep > _questions.length) {
+      return null;
+    }
+    return _questions[_currentStep - 1];
   }
 
-  Color _getBmiColor(double bmi) {
-    if (bmi < 18.5) return const Color(0xFFF59E0B);
-    if (bmi < 23.0) return const Color(0xFF10B981);
-    if (bmi < 25.0) return const Color(0xFFF97316);
-    return const Color(0xFFEF4444);
+  void _syncInputForCurrentStep() {
+    final q = _currentQuestion;
+    if (q == null) return;
+
+    if (q.tipeInput == 'number') {
+      final val = _jawaban[q.kodeField];
+      if (val != null) {
+        _numberController.text = val.toString();
+      } else {
+        // Berikan nilai awal yang masuk akal jika belum ada
+        if (q.kodeField == 'BMI') {
+          _calculateAndSetBmi(updateTextOnly: false);
+        } else if (q.kodeField == 'SleepTime') {
+          _numberController.text = '7';
+          _jawaban[q.kodeField] = 7;
+        } else if (q.kodeField == 'PhysicalHealth' || q.kodeField == 'MentalHealth') {
+          _numberController.text = '0';
+          _jawaban[q.kodeField] = 0;
+        } else {
+          _numberController.text = (q.min ?? 0).toString();
+          _jawaban[q.kodeField] = q.min ?? 0;
+        }
+      }
+    }
+  }
+
+  void _calculateAndSetBmi({bool updateTextOnly = false}) {
+    final double? tb = double.tryParse(_tbController.text);
+    final double? bb = double.tryParse(_bbController.text);
+    if (tb != null && bb != null && tb > 0 && bb > 0) {
+      final double tbMeter = tb / 100.0;
+      final double calculatedBmi = double.parse((bb / (tbMeter * tbMeter)).toStringAsFixed(2));
+      _numberController.text = calculatedBmi.toString();
+      if (!updateTextOnly) {
+        _jawaban['BMI'] = calculatedBmi;
+      }
+      setState(() {});
+    }
   }
 
   String _getCategoryForStep(int step) {
-    if (step <= 4) return 'Demografi Pasien';
+    if (step <= 4) return 'Demografi & Parameter Tubuh';
     if (step <= 8) return 'Status Kesehatan & Pola Harian';
-    if (step <= 12) return 'Riwayat Medis & Klinis';
-    return 'Gaya Hidup & Mobilitas';
+    if (step <= 12) return 'Riwayat Medis & Klinis Kronis';
+    return 'Gaya Hidup, Mobilitas & Asma';
+  }
+
+  String _getMedicalExplanation(String kodeField) {
+    switch (kodeField) {
+      case 'HeartDisease':
+        return 'Penyakit jantung dan ginjal sangat berkaitan erat (Sindrom Kardiorenal). Gangguan sirkulasi darah dapat memengaruhi laju filtrasi ginjal.';
+      case 'BMI':
+        return 'Indeks Massa Tubuh (IMT) berlebih atau obesitas meningkatkan beban kerja nefron ginjal dan berkaitan dengan risiko hipertensi serta diabetes.';
+      case 'Smoking':
+        return 'Nikotin dan racun rokok merusak pembuluh darah kapiler halus di ginjal, mempercepat penurunan fungsi ginjal secara signifikan.';
+      case 'AlcoholDrinking':
+        return 'Konsumsi alkohol berlebih dapat memicu lonjakan tekanan darah dan dehidrasi seluler yang membebani kerja penyaringan ginjal.';
+      case 'Stroke':
+        return 'Riwayat stroke menandakan adanya gangguan vaskular sistemik yang seringkali berhubungan dengan komplikasi pembuluh darah ginjal.';
+      case 'PhysicalHealth':
+        return 'Kondisi fisik yang sering sakit dalam sebulan terakhir menjadi indikator tingkat kelemahan sistem imun dan inflamasi kronis.';
+      case 'MentalHealth':
+        return 'Stres emosional dan gangguan kesehatan mental dapat memicu ketidakseimbangan hormon kortisol yang mempengaruhi tekanan darah dan ginjal.';
+      case 'DiffWalking':
+        return 'Kesulitan mobilitas fisik atau berjalan dapat mencerminkan komplikasi mikrovaskular, kelemahan otot, atau retensi cairan.';
+      case 'Sex':
+        return 'Jenis kelamin biologis digunakan dalam perhitungan estimasi Laju Filtrasi Glomerulus (eGFR) dan profil risiko CKD.';
+      case 'AgeCategory':
+        return 'Fungsi penyaringan ginjal secara alami mengalami penurunan fisiologis seiring bertambahnya usia, terutama di atas 45 tahun.';
+      case 'Race':
+        return 'Distribusi predisposisi genetik tertentu dapat memengaruhi kerentanan terhadap komplikasi hipertensi dan nefropati.';
+      case 'Diabetic':
+        return 'Diabetes adalah penyebab utama penyakit ginjal kronis (Nefropati Diabetik) di dunia karena kadar gula tinggi merusak nefron.';
+      case 'PhysicalActivity':
+        return 'Aktivitas fisik teratur membantu menjaga sensitivitas insulin, kestabilan tekanan darah, dan melancarkan sirkulasi ke ginjal.';
+      case 'GenHealth':
+        return 'Penilaian kesehatan mandiri berkorelasi kuat dengan kualitas hidup dan deteksi awal penurunan kapasitas fungsional tubuh.';
+      case 'SleepTime':
+        return 'Tidur cukup (7–8 jam) krusial untuk regenerasi jaringan ginjal dan regulasi ritme sirkadian tekanan darah malam hari.';
+      case 'Asthma':
+        return 'Kondisi alergi atau inflamasi saluran napas kronis berkaitan dengan respon imunitas sistemik dan penggunaan obat rutin.';
+      default:
+        return 'Data ini penting untuk pemetaan model algoritma machine learning AI PRAGI dalam mendeteksi risiko ginjal secara presisi.';
+    }
   }
 
   bool _isCurrentStepValid() {
-    switch (_currentStep) {
-      case 1:
-        return _selectedGender != null && _selectedGender!.isNotEmpty;
-      case 2:
-        return _selectedAgeRange.isNotEmpty;
-      case 3:
-        final h = double.tryParse(_heightController.text);
-        final w = double.tryParse(_weightController.text);
-        return h != null && w != null && h > 0 && w > 0;
-      case 4:
-        return _selectedRace != null && _selectedRace!.isNotEmpty;
-      case 5:
-        return _generalHealth != null && _generalHealth!.isNotEmpty;
-      case 6:
-        return _physicalHealthDays >= 0 && _physicalHealthDays <= 30;
-      case 7:
-        return _mentalHealthDays >= 0 && _mentalHealthDays <= 30;
-      case 8:
-        return _sleepHours >= 1 && _sleepHours <= 24;
-      case 9:
-        return _hasHeartDisease != null;
-      case 10:
-        return _hasStroke != null;
-      case 11:
-        return _diabetesStatus != null && _diabetesStatus!.isNotEmpty;
-      case 12:
-        return _hasAsthma != null;
-      case 13:
-        return _hasSmokingHistory != null;
-      case 14:
-        return _hasExcessiveAlcohol != null;
-      case 15:
-        return _hasPhysicalActivity != null;
-      case 16:
-        return _hasMobilityDifficulty != null;
-      default:
-        return false;
+    final q = _currentQuestion;
+    if (q == null) return false;
+
+    final val = _jawaban[q.kodeField];
+    if (val == null) return false;
+
+    if (q.tipeInput == 'number') {
+      final num? parsed = num.tryParse(val.toString());
+      if (parsed == null) return false;
+      if (q.min != null && parsed < q.min!) return false;
+      if (q.max != null && parsed > q.max!) return false;
+      return true;
     }
+
+    if (q.tipeInput == 'binary' || q.tipeInput == 'select') {
+      return val.toString().trim().isNotEmpty;
+    }
+
+    return true;
+  }
+
+  bool get _areAllQuestionsAnswered {
+    if (_questions.isEmpty) return false;
+    for (var q in _questions) {
+      final val = _jawaban[q.kodeField];
+      if (val == null) return false;
+      if (q.tipeInput == 'number') {
+        final parsed = num.tryParse(val.toString());
+        if (parsed == null) return false;
+        if (q.min != null && parsed < q.min!) return false;
+        if (q.max != null && parsed > q.max!) return false;
+      } else if (val.toString().trim().isEmpty) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  int get _answeredCount {
+    int count = 0;
+    for (var q in _questions) {
+      final val = _jawaban[q.kodeField];
+      if (val != null && val.toString().trim().isNotEmpty) {
+        count++;
+      }
+    }
+    return count;
   }
 
   void _nextStep() {
     if (!_isCurrentStepValid()) {
+      final q = _currentQuestion;
+      String pesan = 'Silakan pilih atau isi jawaban terlebih dahulu';
+      if (q != null && q.tipeInput == 'number' && (q.min != null || q.max != null)) {
+        pesan = 'Mohon masukkan nilai antara ${q.min ?? 0} s/d ${q.max ?? 100} ${q.satuan ?? ''}';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Silakan pilih atau isi jawaban terlebih dahulu'),
-          duration: Duration(seconds: 1),
+        SnackBar(
+          content: Text(pesan, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
         ),
       );
       return;
     }
 
-    if (_currentStep < _totalSteps) {
+    if (_currentStep < _questions.length) {
       setState(() {
         _currentStep++;
       });
+      _syncInputForCurrentStep();
     } else {
-      // Risk Assessment Calculation Logic
-      int riskPoints = 0;
-      if (_hasHeartDisease == true) riskPoints += 2;
-      if (_hasStroke == true) riskPoints += 2;
-      if (_diabetesStatus == 'Ya' || _diabetesStatus == 'Ya, tetapi hanya saat hamil (diabetes gestasional)') {
-        riskPoints += 2;
-      }
-      if (_diabetesStatus == 'Tidak, tetapi pernah diberitahu prediabetes / batas gula darah tinggi') {
-        riskPoints += 1;
-      }
-      if (_hasAsthma == true) riskPoints += 1;
-      if (_hasSmokingHistory == true) riskPoints += 1;
-      if (_hasExcessiveAlcohol == true) riskPoints += 1;
-      if (_hasPhysicalActivity == false) riskPoints += 1;
-      if (_hasMobilityDifficulty == true) riskPoints += 1;
-      if (_calculatedBmi >= 30) riskPoints += 1;
-      if (_physicalHealthDays > 14) riskPoints += 1;
-      if (_mentalHealthDays > 14) riskPoints += 1;
-      if (_sleepHours < 6 || _sleepHours > 9) riskPoints += 1;
-      if (_generalHealth == 'Buruk (Poor)' || _generalHealth == 'Cukup / Biasa Saja (Fair)') {
-        riskPoints += 1;
-      }
-
-      final String riskLevel = (riskPoints >= 5)
-          ? 'Tinggi'
-          : (riskPoints >= 2 ? 'Sedang' : 'Rendah');
-
-      final result = PragiScreeningResult(
-        id: 'scr-${DateTime.now().millisecondsSinceEpoch}',
-        date: DateTime.now(),
-        gender: _selectedGender ?? 'Laki-laki',
-        ageRange: _selectedAgeRange,
-        heightCm: double.tryParse(_heightController.text) ?? 168,
-        weightKg: double.tryParse(_weightController.text) ?? 65,
-        bmi: _calculatedBmi,
-        race: _selectedRace ?? 'Asia (Asian)',
-        generalHealth: _generalHealth ?? 'Baik (Good)',
-        physicalHealthDays: _physicalHealthDays,
-        mentalHealthDays: _mentalHealthDays,
-        sleepHours: _sleepHours,
-        hasHeartDisease: _hasHeartDisease ?? false,
-        hasStroke: _hasStroke ?? false,
-        diabetesStatus: _diabetesStatus ?? 'Tidak',
-        hasAsthma: _hasAsthma ?? false,
-        hasPhysicalActivity: _hasPhysicalActivity ?? true,
-        hasSmokingHistory: _hasSmokingHistory ?? false,
-        hasExcessiveAlcohol: _hasExcessiveAlcohol ?? false,
-        hasMobilityDifficulty: _hasMobilityDifficulty ?? false,
-        riskLevel: riskLevel,
-        riskScore: 'Tingkat $riskLevel',
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PragiProcessingScreen(result: result),
-        ),
-      );
+      _submitScreening();
     }
   }
 
@@ -240,13 +248,115 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
       setState(() {
         _currentStep--;
       });
+      _syncInputForCurrentStep();
     } else {
       Navigator.of(context).pop();
     }
   }
 
+  void _submitScreening() {
+    // Validasi kelengkapan seluruh pertanyaan
+    for (int i = 0; i < _questions.length; i++) {
+      final q = _questions[i];
+      final val = _jawaban[q.kodeField];
+      if (val == null || val.toString().trim().isEmpty) {
+        setState(() {
+          _currentStep = i + 1;
+        });
+        _syncInputForCurrentStep();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Pertanyaan No. ${i + 1} (${q.kodeField}) belum terisi.',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: const Color(0xFFD97706),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        return;
+      }
+    }
+
+    // Pastikan seluruh tipe number dikirim sebagai numeric
+    final Map<String, dynamic> cleanJawaban = Map<String, dynamic>.from(_jawaban);
+    for (var q in _questions) {
+      if (q.tipeInput == 'number') {
+        final rawVal = cleanJawaban[q.kodeField];
+        if (rawVal != null) {
+          if (q.kodeField == 'BMI') {
+            cleanJawaban[q.kodeField] = double.tryParse(rawVal.toString()) ?? 23.0;
+          } else {
+            cleanJawaban[q.kodeField] = int.tryParse(rawVal.toString()) ?? (num.tryParse(rawVal.toString()) ?? 0);
+          }
+        }
+      }
+    }
+
+    // Pindah ke PragiProcessingScreen untuk pengiriman POST /api/pasien/pragi/skrining
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PragiProcessingScreen(
+          jawabanMap: cleanJawaban,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF7F9FF),
+        body: Stack(
+          children: [
+            Positioned.fill(child: CustomPaint(painter: PragiTopographyPainter())),
+            SafeArea(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(_darkGreen),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Memuat 16 Kuesioner AI PRAGI...',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Menghubungkan ke API Backend GIAT',
+                      style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final q = _currentQuestion;
+    if (q == null) {
+      return Scaffold(
+        body: Center(
+          child: Text('Pertanyaan tidak ditemukan', style: GoogleFonts.inter()),
+        ),
+      );
+    }
+
+    final int totalQuestions = _questions.length;
+    final double progressRatio = _currentStep / totalQuestions;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FF),
       body: Stack(
@@ -261,51 +371,74 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
           SafeArea(
             child: Column(
               children: [
-                // Top Bar
+                // Top Navigation Bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Back Pill
-                      GestureDetector(
-                        onTap: _previousStep,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Back Pill
+                          GestureDetector(
+                            onTap: _previousStep,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.arrow_back, size: 16, color: Color(0xFF1E293B)),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Kembali',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E293B),
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.arrow_back, size: 16, color: Color(0xFF1E293B)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Kembali',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+
+                          // Step Counter Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0F2FE),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              '$_answeredCount / $totalQuestions Terisi',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0369A1),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
+
                       // Center Category Pill
                       Center(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
                           decoration: BoxDecoration(
                             color: _darkGreen,
                             borderRadius: BorderRadius.circular(20),
@@ -320,7 +453,7 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
                           child: Text(
                             _getCategoryForStep(_currentStep),
                             style: GoogleFonts.inter(
-                              fontSize: 13,
+                              fontSize: 12.5,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                             ),
@@ -339,22 +472,22 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Step Progress Card
-                        _buildProgressCard(),
+                        // Progress Card
+                        _buildProgressCard(progressRatio, totalQuestions),
 
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
 
                         // Question Chat Bubble with PRAGI Avatar
-                        _buildQuestionBubble(),
+                        _buildQuestionBubble(q),
 
                         const SizedBox(height: 18),
 
                         // Section Title: Jawaban Anda
                         Center(
                           child: Text(
-                            'Jawaban Anda',
+                            'Pilihan Jawaban Anda',
                             style: GoogleFonts.inter(
-                              fontSize: 15,
+                              fontSize: 14.5,
                               fontWeight: FontWeight.w700,
                               color: const Color(0xFF0F172A),
                             ),
@@ -363,51 +496,18 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
 
                         const SizedBox(height: 14),
 
-                        // Step-specific Input Widget
-                        _buildStepContent(),
+                        // Dynamic Input Component
+                        _buildDynamicInput(q),
 
                         const SizedBox(height: 20),
 
-                        // Info Card ("Mengapa data ini dibutuhkan?")
-                        _buildStepInfoCard(),
+                        // Medical Info Card ("Mengapa data ini dibutuhkan?")
+                        _buildStepInfoCard(q),
 
                         const SizedBox(height: 24),
 
-                        // Lanjutkan Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: _nextStep,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _darkGreen,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 2,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  _currentStep == _totalSteps ? 'Selesai & Analisis' : 'Lanjutkan',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  _currentStep == _totalSteps
-                                      ? Icons.check_circle_outline_rounded
-                                      : Icons.arrow_circle_right_outlined,
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        // Next / Submit Button
+                        _buildActionButton(totalQuestions),
 
                         const SizedBox(height: 28),
                       ],
@@ -425,9 +525,7 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
   // ───────────────────────────────────────────────────────────────────────────
   // PROGRESS CARD
   // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildProgressCard() {
-    final double progress = _currentStep / _totalSteps;
-
+  Widget _buildProgressCard(double progress, int total) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -447,37 +545,26 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
         children: [
           // Circular Progress Arc
           SizedBox(
-            width: 58,
-            height: 58,
+            width: 52,
+            height: 52,
             child: Stack(
-              alignment: Alignment.center,
+              fit: StackFit.expand,
               children: [
                 CircularProgressIndicator(
                   value: progress,
-                  strokeWidth: 4.5,
+                  strokeWidth: 5,
+                  valueColor: const AlwaysStoppedAnimation<Color>(_accentGreen),
                   backgroundColor: const Color(0xFFE2E8F0),
-                  valueColor: const AlwaysStoppedAnimation<Color>(_darkGreen),
                 ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Status',
-                      style: GoogleFonts.inter(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF64748B),
-                      ),
+                Center(
+                  child: Text(
+                    '${(progress * 100).toInt()}%',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: _darkGreen,
                     ),
-                    Text(
-                      '$_currentStep / $_totalSteps',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -488,22 +575,21 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _currentStep == _totalSteps
-                      ? 'Langkah Terakhir'
-                      : 'Langkah $_currentStep Dari $_totalSteps',
+                  'Pertanyaan $_currentStep dari $total',
                   style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: const Color(0xFF0F172A),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
-                  'Mohon isi sesuai dengan kondisi atau data yang sebenarnya!',
+                  _currentStep == total
+                      ? 'Langkah Terakhir: Siap untuk analisis AI'
+                      : 'Isi dengan jujur sesuai kondisi aktual tubuh Anda',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: const Color(0xFF64748B),
-                    height: 1.35,
                   ),
                 ),
               ],
@@ -515,1115 +601,785 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // QUESTION BUBBLE WITH MASCOT
+  // QUESTION SPEECH BUBBLE WITH MASCOT
   // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildQuestionBubble() {
-    final questionData = _getQuestionDataForStep(_currentStep);
-
-    return Column(
+  Widget _buildQuestionBubble(PragiPertanyaan q) {
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // Mascot Avatar
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: _accentGreen, width: 1.5),
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/pragi.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.smart_toy_rounded, size: 20, color: _darkGreen),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // Green Chat Bubble
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: const BoxDecoration(
-                  color: _darkGreen,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                    bottomRight: Radius.circular(16),
-                    bottomLeft: Radius.circular(4),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      questionData['question'] ?? '',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        height: 1.35,
-                      ),
-                    ),
-                    if (questionData['subQuestion'] != null &&
-                        questionData['subQuestion']!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        questionData['subQuestion']!,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFFD1FAE5),
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'PRAGI',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF86EFAC),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.done_all, size: 14, color: Color(0xFF86EFAC)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (questionData['footnote'] != null && questionData['footnote']!.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.only(left: 44),
-            child: Text(
-              questionData['footnote']!,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: const Color(0xFF475569),
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // STEP CONTENT DISPATCHER (16 STEPS)
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildStepContent() {
-    switch (_currentStep) {
-      case 1:
-        return _buildStep1Gender();
-      case 2:
-        return _buildStep2AgeRange();
-      case 3:
-        return _buildStep3HeightWeight();
-      case 4:
-        return _buildStep4Race();
-      case 5:
-        return _buildStep5GeneralHealth();
-      case 6:
-        return _buildStep6PhysicalHealth();
-      case 7:
-        return _buildStep7MentalHealth();
-      case 8:
-        return _buildStep8SleepDuration();
-      case 9:
-        return _buildStep9HeartDisease();
-      case 10:
-        return _buildStep10Stroke();
-      case 11:
-        return _buildStep11Diabetes();
-      case 12:
-        return _buildStep12Asthma();
-      case 13:
-        return _buildStep13Smoking();
-      case 14:
-        return _buildStep14Alcohol();
-      case 15:
-        return _buildStep15PhysicalActivity();
-      case 16:
-        return _buildStep16Mobility();
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // STEP WIDGETS
-  // ───────────────────────────────────────────────────────────────────────────
-
-  // Step 1: Jenis Kelamin
-  Widget _buildStep1Gender() {
-    return Column(
-      children: [
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Laki-laki',
-          subtitle: 'Pria',
-          icon: Icons.male_rounded,
-          isSelected: _selectedGender == 'Laki-laki',
-          onTap: () => setState(() => _selectedGender = 'Laki-laki'),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Perempuan',
-          subtitle: 'Wanita',
-          icon: Icons.female_rounded,
-          isSelected: _selectedGender == 'Perempuan',
-          onTap: () => setState(() => _selectedGender = 'Perempuan'),
-        ),
-      ],
-    );
-  }
-
-  // Step 2: Kelompok Usia (13 options A-M)
-  Widget _buildStep2AgeRange() {
-    final ageOptions = [
-      {'letter': 'A', 'label': '18–24 tahun'},
-      {'letter': 'B', 'label': '25–29 tahun'},
-      {'letter': 'C', 'label': '30–34 tahun'},
-      {'letter': 'D', 'label': '35–39 tahun'},
-      {'letter': 'E', 'label': '40–44 tahun'},
-      {'letter': 'F', 'label': '45–49 tahun'},
-      {'letter': 'G', 'label': '50–54 tahun'},
-      {'letter': 'H', 'label': '55–59 tahun'},
-      {'letter': 'I', 'label': '60–64 tahun'},
-      {'letter': 'J', 'label': '65–69 tahun'},
-      {'letter': 'K', 'label': '70–74 tahun'},
-      {'letter': 'L', 'label': '75–79 tahun'},
-      {'letter': 'M', 'label': '80 tahun ke atas'},
-    ];
-
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: ageOptions.map((opt) {
-        final letter = opt['letter']!;
-        final label = opt['label']!;
-        final isSelected = _selectedAgeRange == label;
-
-        return GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedAgeRange = label;
-            });
-          },
-          child: Container(
-            width: (MediaQuery.of(context).size.width - 50) / 2,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-              color: isSelected ? _selectedCardBg : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected ? const Color(0xFF60A5FA) : const Color(0xFFE2E8F0),
-                width: isSelected ? 1.6 : 1.0,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: isSelected ? _darkGreen : const Color(0xFFF1F5F9),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    letter,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? Colors.white : const Color(0xFF475569),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: GoogleFonts.inter(
-                      fontSize: 12.5,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color: const Color(0xFF1E293B),
-                    ),
-                  ),
-                ),
-                Icon(
-                  isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                  size: 16,
-                  color: isSelected ? _darkGreen : const Color(0xFFCBD5E1),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // Step 3: Tinggi dan Berat Badan (Auto BMI)
-  Widget _buildStep3HeightWeight() {
-    final bmiCategory = _getBmiCategory(_calculatedBmi);
-    final bmiColor = _getBmiColor(_calculatedBmi);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Tinggi Badan',
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF1E293B),
-          ),
-        ),
-        const SizedBox(height: 6),
+        // PRAGI Mascot Circle
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            color: _selectedCardBg.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFBFDBFE)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _heightController,
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => _recalculateBmi(),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1E293B),
-                  ),
-                ),
-              ),
-              Text(
-                'CM',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 14),
-
-        Text(
-          'Berat Badan',
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF1E293B),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: _selectedCardBg.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFBFDBFE)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _weightController,
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => _recalculateBmi(),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1E293B),
-                  ),
-                ),
-              ),
-              Text(
-                'KG',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 18),
-
-        // Auto BMI Box
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
+            shape: BoxShape.circle,
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: _darkGreen.withValues(alpha: 0.15),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.calculate_outlined, color: _darkGreen, size: 24),
+          child: ClipOval(
+            child: Image.asset(
+              'assets/images/pragi.png',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: const Color(0xFFDCFCE7),
+                child: const Icon(Icons.smart_toy_rounded, size: 26, color: _darkGreen),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Speech Bubble
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+              ),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Indeks Massa Tubuh (IMT / BMI)',
+                      'PRAGI AI ASSISTANT',
                       style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF64748B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: _darkGreen,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Text(
-                          _calculatedBmi.toStringAsFixed(1),
-                          style: GoogleFonts.inter(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0F172A),
-                          ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        q.kodeField,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'kg/m²',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: bmiColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: bmiColor.withValues(alpha: 0.3)),
-                          ),
-                          child: Text(
-                            bmiCategory,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: bmiColor,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  q.pertanyaan,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF0F172A),
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  // Step 4: Ras / Etnis
-  Widget _buildStep4Race() {
-    final races = [
-      {'letter': 'A', 'title': 'Asia (Asian)'},
-      {'letter': 'B', 'title': 'Kulit Hitam / Afrika (Black)'},
-      {'letter': 'C', 'title': 'Hispanik / Latin (Hispanic)'},
-      {'letter': 'D', 'title': 'Kulit Putih (White)'},
-      {'letter': 'E', 'title': 'Lainnya (Other)'},
-    ];
-
-    return Column(
-      children: races.map((r) {
-        return _buildOptionCard(
-          optionLetter: r['letter']!,
-          title: r['title']!,
-          isSelected: _selectedRace == r['title'],
-          onTap: () => setState(() => _selectedRace = r['title']),
-        );
-      }).toList(),
-    );
-  }
-
-  // Step 5: Evaluasi Kesehatan Umum
-  Widget _buildStep5GeneralHealth() {
-    final healthLevels = [
-      {'letter': 'A', 'title': 'Sangat Baik Sekali (Excellent)'},
-      {'letter': 'B', 'title': 'Sangat Baik (Very Good)'},
-      {'letter': 'C', 'title': 'Baik (Good)'},
-      {'letter': 'D', 'title': 'Cukup / Biasa Saja (Fair)'},
-      {'letter': 'E', 'title': 'Buruk (Poor)'},
-    ];
-
-    return Column(
-      children: healthLevels.map((h) {
-        return _buildOptionCard(
-          optionLetter: h['letter']!,
-          title: h['title']!,
-          isSelected: _generalHealth == h['title'],
-          onTap: () => setState(() => _generalHealth = h['title']),
-        );
-      }).toList(),
-    );
-  }
-
-  // Step 6: Kesehatan Fisik (0 hingga 30 hari)
-  Widget _buildStep6PhysicalHealth() {
-    return _buildNumericPickerCard(
-      currentValue: _physicalHealthDays,
-      unit: 'Hari',
-      min: 0,
-      max: 30,
-      description: _physicalHealthDays == 0
-          ? 'Kesehatan fisik terasa prima dan tidak ada kendala sakit fisik.'
-          : '$_physicalHealthDays hari dalam 30 hari terakhir merasa kurang sehat fisik.',
-      quickPresets: [0, 3, 7, 14, 30],
-      onChanged: (val) => setState(() => _physicalHealthDays = val),
-    );
-  }
-
-  // Step 7: Kesehatan Mental (0 hingga 30 hari)
-  Widget _buildStep7MentalHealth() {
-    return _buildNumericPickerCard(
-      currentValue: _mentalHealthDays,
-      unit: 'Hari',
-      min: 0,
-      max: 30,
-      description: _mentalHealthDays == 0
-          ? 'Kondisi mental dan suasana hati terasa tenang, stabil, dan prima.'
-          : '$_mentalHealthDays hari dalam 30 hari terakhir mengalami stres atau beban emosional.',
-      quickPresets: [0, 3, 7, 14, 30],
-      onChanged: (val) => setState(() => _mentalHealthDays = val),
-    );
-  }
-
-  // Step 8: Durasi Tidur Harian (1 hingga 24 jam)
-  Widget _buildStep8SleepDuration() {
-    String sleepQuality;
-    if (_sleepHours < 6) {
-      sleepQuality = 'Kurang dari rekomendasi standar kesehatan (potensi kelelahan).';
-    } else if (_sleepHours <= 8) {
-      sleepQuality = 'Durasi tidur optimal untuk regenerasi sel tubuh dan fungsi ginjal.';
-    } else {
-      sleepQuality = 'Durasi tidur lebih panjang dari rata-rata kebutuhan harian.';
+  // ───────────────────────────────────────────────────────────────────────────
+  // DYNAMIC FORM INPUT
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildDynamicInput(PragiPertanyaan q) {
+    switch (q.tipeInput) {
+      case 'binary':
+        return _buildBinaryInput(q);
+      case 'number':
+        return _buildNumberInput(q);
+      case 'select':
+        return _buildSelectInput(q);
+      default:
+        return _buildBinaryInput(q);
     }
-
-    return _buildNumericPickerCard(
-      currentValue: _sleepHours,
-      unit: 'Jam',
-      min: 1,
-      max: 24,
-      description: sleepQuality,
-      quickPresets: [5, 6, 7, 8, 9],
-      onChanged: (val) => setState(() => _sleepHours = val),
-    );
   }
 
-  // Step 9: Riwayat Penyakit Jantung
-  Widget _buildStep9HeartDisease() {
-    return Column(
-      children: [
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Ya',
-          subtitle: 'Pernah diberitahu tenaga medis menderita penyakit jantung koroner atau serangan jantung',
-          isSelected: _hasHeartDisease == true,
-          onTap: () => setState(() => _hasHeartDisease = true),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Tidak',
-          subtitle: 'Tidak pernah mengalami atau diberitahu menderita penyakit jantung',
-          isSelected: _hasHeartDisease == false,
-          onTap: () => setState(() => _hasHeartDisease = false),
-        ),
-      ],
-    );
-  }
+  // 1. Tipe Input: BINARY (Switch Card / Radio Buttons: Yes & No)
+  Widget _buildBinaryInput(PragiPertanyaan q) {
+    final currentVal = _jawaban[q.kodeField]?.toString();
+    final bool isYes = currentVal == 'Yes';
+    final bool isNo = currentVal == 'No';
 
-  // Step 10: Riwayat Stroke
-  Widget _buildStep10Stroke() {
-    return Column(
+    return Row(
       children: [
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Ya',
-          subtitle: 'Pernah diberitahu dokter/tenaga medis pernah mengalami stroke',
-          isSelected: _hasStroke == true,
-          onTap: () => setState(() => _hasStroke = true),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Tidak',
-          subtitle: 'Tidak pernah mengalami atau didiagnosis stroke',
-          isSelected: _hasStroke == false,
-          onTap: () => setState(() => _hasStroke = false),
-        ),
-      ],
-    );
-  }
-
-  // Step 11: Riwayat Diabetes (4 Options)
-  Widget _buildStep11Diabetes() {
-    return Column(
-      children: [
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Ya',
-          subtitle: 'Pernah didiagnosis dokter memiliki diabetes (kencing manis)',
-          isSelected: _diabetesStatus == 'Ya',
-          onTap: () => setState(() => _diabetesStatus = 'Ya'),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Ya, tetapi hanya saat hamil (diabetes gestasional)',
-          subtitle: 'Kenaikan gula darah hanya terjadi saat masa kehamilan',
-          isSelected: _diabetesStatus == 'Ya, tetapi hanya saat hamil (diabetes gestasional)',
-          onTap: () => setState(() => _diabetesStatus = 'Ya, tetapi hanya saat hamil (diabetes gestasional)'),
-        ),
-        _buildOptionCard(
-          optionLetter: 'C',
-          title: 'Tidak, tetapi pernah diberitahu prediabetes / batas gula darah tinggi',
-          subtitle: 'Kadar gula darah di atas normal / batas toleransi glukosa',
-          isSelected: _diabetesStatus == 'Tidak, tetapi pernah diberitahu prediabetes / batas gula darah tinggi',
-          onTap: () => setState(() => _diabetesStatus = 'Tidak, tetapi pernah diberitahu prediabetes / batas gula darah tinggi'),
-        ),
-        _buildOptionCard(
-          optionLetter: 'D',
-          title: 'Tidak',
-          subtitle: 'Kadar gula darah normal dan tidak pernah didiagnosis diabetes',
-          isSelected: _diabetesStatus == 'Tidak',
-          onTap: () => setState(() => _diabetesStatus = 'Tidak'),
-        ),
-      ],
-    );
-  }
-
-  // Step 12: Riwayat Asma
-  Widget _buildStep12Asthma() {
-    return Column(
-      children: [
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Ya',
-          subtitle: 'Pernah diberitahu dokter atau tenaga medis bahwa menderita asma',
-          isSelected: _hasAsthma == true,
-          onTap: () => setState(() => _hasAsthma = true),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Tidak',
-          subtitle: 'Tidak memiliki riwayat asma bronkial',
-          isSelected: _hasAsthma == false,
-          onTap: () => setState(() => _hasAsthma = false),
-        ),
-      ],
-    );
-  }
-
-  // Step 13: Kebiasaan Merokok
-  Widget _buildStep13Smoking() {
-    return Column(
-      children: [
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Ya',
-          subtitle: 'Pernah merokok minimal 100 batang (sekitar 5 bungkus) sepanjang hidup',
-          isSelected: _hasSmokingHistory == true,
-          onTap: () => setState(() => _hasSmokingHistory = true),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Tidak',
-          subtitle: 'Kurang dari 100 batang atau tidak pernah merokok sama sekali',
-          isSelected: _hasSmokingHistory == false,
-          onTap: () => setState(() => _hasSmokingHistory = false),
-        ),
-      ],
-    );
-  }
-
-  // Step 14: Konsumsi Alkohol
-  Widget _buildStep14Alcohol() {
-    return Column(
-      children: [
-        // Standard intake guideline card
-        Container(
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        // Pilihan: YA (Yes)
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _jawaban[q.kodeField] = 'Yes';
+              });
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isYes ? _selectedCardBg : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isYes ? _darkGreen : const Color(0xFFE2E8F0),
+                  width: isYes ? 2 : 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isYes
+                        ? _darkGreen.withValues(alpha: 0.12)
+                        : Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(5),
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(8),
+                      shape: BoxShape.circle,
+                      color: isYes ? _darkGreen : const Color(0xFFF1F5F9),
                     ),
-                    child: const Icon(Icons.info_outline_rounded, color: _darkGreen, size: 16),
+                    child: Icon(
+                      Icons.check_rounded,
+                      color: isYes ? Colors.white : const Color(0xFF94A3B8),
+                      size: 24,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(height: 12),
                   Text(
-                    'Kriteria Konsumsi Alkohol Berlebihan:',
+                    'Ya',
                     style: GoogleFonts.inter(
-                      fontSize: 12.5,
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1E293B),
+                      color: isYes ? _darkGreen : const Color(0xFF1E293B),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '• Pria: Lebih dari 14 gelas / takaran standar per minggu\n• Wanita: Lebih dari 7 gelas / takaran standar per minggu',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: const Color(0xFF475569),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '*1 takaran standar setara ±330 ml bir (5%) atau ±150 ml anggur (12%).',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: const Color(0xFF64748B),
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ),
-        ),
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Ya',
-          subtitle: 'Mengonsumsi alkohol melebihi ambang batas yang disebutkan',
-          isSelected: _hasExcessiveAlcohol == true,
-          onTap: () => setState(() => _hasExcessiveAlcohol = true),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Tidak',
-          subtitle: 'Di bawah ambang batas tersebut atau tidak mengonsumsi alkohol',
-          isSelected: _hasExcessiveAlcohol == false,
-          onTap: () => setState(() => _hasExcessiveAlcohol = false),
-        ),
-      ],
-    );
-  }
-
-  // Step 15: Aktivitas Fisik
-  Widget _buildStep15PhysicalActivity() {
-    return Column(
-      children: [
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Ya',
-          subtitle: 'Rutin berolahraga atau beraktivitas fisik (jalan kaki, bersepeda, senam, dll) dalam 30 hari terakhir',
-          isSelected: _hasPhysicalActivity == true,
-          onTap: () => setState(() => _hasPhysicalActivity = true),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Tidak',
-          subtitle: 'Hanya aktivitas sedentari / tidak melakukan olahraga teratur dalam 30 hari terakhir',
-          isSelected: _hasPhysicalActivity == false,
-          onTap: () => setState(() => _hasPhysicalActivity = false),
-        ),
-      ],
-    );
-  }
-
-  // Step 16: Kesulitan Berjalan
-  Widget _buildStep16Mobility() {
-    return Column(
-      children: [
-        _buildOptionCard(
-          optionLetter: 'A',
-          title: 'Ya',
-          subtitle: 'Mengalami kesulitan serius atau butuh bantuan saat berjalan atau menaiki anak tangga',
-          isSelected: _hasMobilityDifficulty == true,
-          onTap: () => setState(() => _hasMobilityDifficulty = true),
-        ),
-        _buildOptionCard(
-          optionLetter: 'B',
-          title: 'Tidak',
-          subtitle: 'Dapat berjalan dan menaiki tangga secara mandiri tanpa kesulitan serius',
-          isSelected: _hasMobilityDifficulty == false,
-          onTap: () => setState(() => _hasMobilityDifficulty = false),
-        ),
-      ],
-    );
-  }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // REUSABLE OPTION CARD (A, B, C, D, E)
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildOptionCard({
-    required String optionLetter,
-    required String title,
-    String? subtitle,
-    required bool isSelected,
-    required VoidCallback onTap,
-    IconData? icon,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: isSelected ? _selectedCardBg : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF60A5FA) : const Color(0xFFE2E8F0),
-            width: isSelected ? 1.8 : 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: isSelected ? _darkGreen : const Color(0xFFF1F5F9),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                optionLetter,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? Colors.white : const Color(0xFF475569),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            if (icon != null) ...[
-              Icon(icon, size: 20, color: isSelected ? _darkGreen : const Color(0xFF64748B)),
-              const SizedBox(width: 10),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                  const SizedBox(height: 2),
                   Text(
-                    title,
+                    'Benar / Sesuai',
                     style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                      color: const Color(0xFF0F172A),
+                      fontSize: 11.5,
+                      color: const Color(0xFF64748B),
                     ),
                   ),
-                  if (subtitle != null && subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF64748B),
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Icon(
-              isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-              size: 20,
-              color: isSelected ? _darkGreen : const Color(0xFFCBD5E1),
-            ),
-          ],
+          ),
         ),
-      ),
+
+        const SizedBox(width: 14),
+
+        // Pilihan: TIDAK (No)
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _jawaban[q.kodeField] = 'No';
+              });
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isNo ? _selectedCardBg : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isNo ? _darkGreen : const Color(0xFFE2E8F0),
+                  width: isNo ? 2 : 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isNo
+                        ? _darkGreen.withValues(alpha: 0.12)
+                        : Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isNo ? _darkGreen : const Color(0xFFF1F5F9),
+                    ),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: isNo ? Colors.white : const Color(0xFF94A3B8),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Tidak',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isNo ? _darkGreen : const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tidak Pernah',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // NUMERIC PICKER COMPONENT (STEPS 6, 7, 8)
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildNumericPickerCard({
-    required int currentValue,
-    required String unit,
-    required int min,
-    required int max,
-    required String description,
-    required List<int> quickPresets,
-    required ValueChanged<int> onChanged,
-  }) {
+  // 2. Tipe Input: NUMBER (Numeric Stepper, Direct TextField, Range Check, Satuan, & BMI Helper)
+  Widget _buildNumberInput(PragiPertanyaan q) {
+    final num currentNum = num.tryParse(_numberController.text) ?? (q.min ?? 0);
+    final String satuan = q.satuan ?? '';
+
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
-            offset: const Offset(0, 3),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Large Visual Readout
+          // Input Display Row
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                '$currentValue',
-                style: GoogleFonts.inter(
-                  fontSize: 48,
-                  fontWeight: FontWeight.w800,
-                  color: _darkGreen,
+              // Decrement Button
+              IconButton(
+                onPressed: () {
+                  final double step = (q.kodeField == 'BMI') ? 0.5 : 1.0;
+                  final double next = currentNum.toDouble() - step;
+                  if (q.min != null && next < q.min!) return;
+                  final formatted = (q.kodeField == 'BMI')
+                      ? next.toStringAsFixed(1)
+                      : next.toInt().toString();
+                  _numberController.text = formatted;
+                  _jawaban[q.kodeField] = num.parse(formatted);
+                  setState(() {});
+                },
+                icon: const Icon(Icons.remove_circle_outline_rounded),
+                color: _darkGreen,
+                iconSize: 32,
+              ),
+
+              // Digital Value Input
+              Expanded(
+                child: TextField(
+                  controller: _numberController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: _darkGreen,
+                  ),
+                  decoration: InputDecoration(
+                    suffixText: satuan.isNotEmpty ? ' $satuan' : null,
+                    suffixStyle: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF64748B),
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                  onChanged: (val) {
+                    final parsed = num.tryParse(val);
+                    if (parsed != null) {
+                      _jawaban[q.kodeField] = parsed;
+                      setState(() {});
+                    }
+                  },
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                unit,
+
+              // Increment Button
+              IconButton(
+                onPressed: () {
+                  final double step = (q.kodeField == 'BMI') ? 0.5 : 1.0;
+                  final double next = currentNum.toDouble() + step;
+                  if (q.max != null && next > q.max!) return;
+                  final formatted = (q.kodeField == 'BMI')
+                      ? next.toStringAsFixed(1)
+                      : next.toInt().toString();
+                  _numberController.text = formatted;
+                  _jawaban[q.kodeField] = num.parse(formatted);
+                  setState(() {});
+                },
+                icon: const Icon(Icons.add_circle_outline_rounded),
+                color: _darkGreen,
+                iconSize: 32,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // Range Info Badge
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Rentang valid: ${q.min ?? 0} s/d ${q.max ?? 100} $satuan',
                 style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
                   color: const Color(0xFF64748B),
                 ),
               ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Stepper Buttons (- and +)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton.filledTonal(
-                onPressed: currentValue > min
-                    ? () => onChanged(currentValue - 1)
-                    : null,
-                icon: const Icon(Icons.remove, size: 22),
-                style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  foregroundColor: const Color(0xFF1E293B),
-                  padding: const EdgeInsets.all(12),
-                ),
-              ),
-              const SizedBox(width: 20),
-              // Slider
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: _darkGreen,
-                    inactiveTrackColor: const Color(0xFFE2E8F0),
-                    thumbColor: _darkGreen,
-                    overlayColor: _darkGreen.withValues(alpha: 0.15),
-                    trackHeight: 6,
-                  ),
-                  child: Slider(
-                    value: currentValue.toDouble().clamp(min.toDouble(), max.toDouble()),
-                    min: min.toDouble(),
-                    max: max.toDouble(),
-                    divisions: (max - min) > 0 ? (max - min) : 1,
-                    onChanged: (val) => onChanged(val.round()),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 20),
-              IconButton.filledTonal(
-                onPressed: currentValue < max
-                    ? () => onChanged(currentValue + 1)
-                    : null,
-                icon: const Icon(Icons.add, size: 22),
-                style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFFDCFCE7),
-                  foregroundColor: _darkGreen,
-                  padding: const EdgeInsets.all(12),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // Quick Presets
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: quickPresets.map((preset) {
-              final isPresetSelected = currentValue == preset;
-              return ChoiceChip(
-                label: Text('$preset $unit'),
-                selected: isPresetSelected,
-                onSelected: (_) => onChanged(preset),
-                selectedColor: _darkGreen,
-                labelStyle: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isPresetSelected ? Colors.white : const Color(0xFF334155),
-                ),
-                backgroundColor: const Color(0xFFF8FAFC),
-                side: BorderSide(
-                  color: isPresetSelected ? _darkGreen : const Color(0xFFE2E8F0),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Description Note
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              description,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: const Color(0xFF64748B),
-                height: 1.35,
-              ),
             ),
           ),
+
+          // Helper Kalkulator BMI Khusus Field BMI
+          if (q.kodeField == 'BMI') ...[
+            const SizedBox(height: 16),
+            const Divider(color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 8),
+
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _showBmiCalculator = !_showBmiCalculator;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calculate_outlined, color: _darkGreen, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Kalkulator IMT dari Tinggi & Berat Badan',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: _darkGreen,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      _showBmiCalculator ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: _darkGreen,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            if (_showBmiCalculator) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Tinggi Badan (cm)', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: _tbController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: '168',
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onChanged: (_) => _calculateAndSetBmi(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Berat Badan (kg)', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: _bbController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: '65',
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onChanged: (_) => _calculateAndSetBmi(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+
+          // Preset Chips untuk PhysicalHealth / MentalHealth / SleepTime
+          if (q.kodeField == 'SleepTime') ...[
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [5, 6, 7, 8, 9].map((hours) {
+                final isSel = currentNum == hours;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: ChoiceChip(
+                    label: Text('$hours Jam'),
+                    selected: isSel,
+                    selectedColor: _darkGreen,
+                    labelStyle: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSel ? Colors.white : const Color(0xFF334155),
+                    ),
+                    onSelected: (selected) {
+                      if (selected) {
+                        _numberController.text = hours.toString();
+                        _jawaban[q.kodeField] = hours;
+                        setState(() {});
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // INFO CARD PER STEP
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildStepInfoCard() {
-    final infoData = _getInfoDataForStep(_currentStep);
+  // 3. Tipe Input: SELECT (Card Options & Bottom Sheet Selector)
+  Widget _buildSelectInput(PragiPertanyaan q) {
+    final currentVal = _jawaban[q.kodeField]?.toString();
+    final options = q.opsiJawaban;
 
+    // Jika opsi lebih dari 4 (seperti AgeCategory atau Race), sertakan tombol pemilih Bottom Sheet
+    final bool hasManyOptions = options.length > 4;
+
+    return Column(
+      children: [
+        if (hasManyOptions) ...[
+          // Bottom Sheet trigger button
+          GestureDetector(
+            onTap: () => _showSelectBottomSheet(q),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _darkGreen, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: _darkGreen.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.list_alt_rounded, color: _darkGreen, size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pilihan Terpilih:',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        ),
+                        Text(
+                          _getOptionLabel(q, currentVal),
+                          style: GoogleFonts.inter(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Buka Daftar',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0369A1),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down, color: Color(0xFF0369A1), size: 18),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // List kartu pilihan langsung
+        ...options.map((opt) {
+          final isSelected = currentVal == opt.nilai.toString();
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _jawaban[q.kodeField] = opt.nilai;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isSelected ? _selectedCardBg : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isSelected ? _darkGreen : const Color(0xFFE2E8F0),
+                    width: isSelected ? 1.8 : 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isSelected
+                          ? _darkGreen.withValues(alpha: 0.1)
+                          : Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? _darkGreen : const Color(0xFFCBD5E1),
+                          width: 2,
+                        ),
+                        color: isSelected ? _darkGreen : Colors.transparent,
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.circle, size: 10, color: Colors.white)
+                          : null,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        opt.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? _darkGreen : const Color(0xFF1E293B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  String _getOptionLabel(PragiPertanyaan q, String? val) {
+    if (val == null || val.isEmpty) return 'Belum dipilih (Ketuk untuk memilih)';
+    for (var opt in q.opsiJawaban) {
+      if (opt.nilai.toString() == val) return opt.label;
+    }
+    return val;
+  }
+
+  void _showSelectBottomSheet(PragiPertanyaan q) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.65,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Pilih Opsi untuk ${q.kodeField}',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                q.pertanyaan,
+                style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: q.opsiJawaban.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final opt = q.opsiJawaban[index];
+                    final isSel = _jawaban[q.kodeField]?.toString() == opt.nilai.toString();
+
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      title: Text(
+                        opt.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                          color: isSel ? _darkGreen : const Color(0xFF1E293B),
+                        ),
+                      ),
+                      trailing: isSel
+                          ? const Icon(Icons.check_circle_rounded, color: _darkGreen)
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          _jawaban[q.kodeField] = opt.nilai;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // STEP INFO CARD
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildStepInfoCard(PragiPertanyaan q) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.info_outline_rounded,
-              color: _darkGreen,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
+          const Icon(Icons.info_outline_rounded, size: 18, color: _darkGreen),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  infoData['title'] ?? '',
+                  'Mengapa data ini dibutuhkan?',
                   style: GoogleFonts.inter(
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
+                    color: const Color(0xFF1E293B),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  infoData['text'] ?? '',
+                  _getMedicalExplanation(q.kodeField),
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
-                    color: const Color(0xFF475569),
+                    color: const Color(0xFF64748B),
                     height: 1.4,
                   ),
                 ),
@@ -1635,178 +1391,46 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
     );
   }
 
-  Map<String, String> _getQuestionDataForStep(int step) {
-    switch (step) {
-      case 1:
-        return {
-          'question': 'Apakah jenis kelamin Bapak/Ibu?',
-          'subQuestion': '(Pilih jenis kelamin sesuai identitas KTP Bapak/Ibu.)',
-        };
-      case 2:
-        return {
-          'question': 'Berapa kelompok usia Bapak/Ibu saat ini?',
-          'subQuestion': '(Pilih kelompok rentang usia Bapak/Ibu saat ini.)',
-        };
-      case 3:
-        return {
-          'question': 'Berapa tinggi badan dan berat badan Bapak/Ibu saat ini?',
-          'subQuestion': '(Sistem akan menghitung Indeks Massa Tubuh / BMI secara otomatis)',
-        };
-      case 4:
-        return {
-          'question': 'Manakah kelompok ras/etnis yang paling menggambarkan Bapak/Ibu?',
-          'subQuestion': '(Pilih salah satu kelompok ras atau etnis)',
-        };
-      case 5:
-        return {
-          'question': 'Secara umum, bagaimana Bapak/Ibu menilai kondisi kesehatan Bapak/Ibu saat ini?',
-          'subQuestion': '(Evaluasi subjektif terhadap kondisi kebugaran dan kesehatan Anda)',
-        };
-      case 6:
-        return {
-          'question': 'Dalam 30 hari terakhir, berapa hari kesehatan fisik Bapak/Ibu (termasuk sakit fisik dan cedera) terasa tidak baik?',
-          'subQuestion': '(Pilihan angka 0 hingga 30 hari)',
-        };
-      case 7:
-        return {
-          'question': 'Dalam 30 hari terakhir, berapa hari kesehatan mental Bapak/Ibu (termasuk stres, depresi, atau masalah emosional) terasa tidak baik?',
-          'subQuestion': '(Pilihan angka 0 hingga 30 hari)',
-        };
-      case 8:
-        return {
-          'question': 'Berapa rata-rata jam tidur yang Bapak/Ibu dapatkan dalam rentang waktu 24 jam sehari?',
-          'subQuestion': '(Pilihan angka 1 hingga 24 jam)',
-        };
-      case 9:
-        return {
-          'question': 'Apakah Bapak/Ibu pernah diberitahu oleh tenaga medis memiliki penyakit jantung koroner atau pernah mengalami serangan jantung?',
-          'subQuestion': '(Termasuk riwayat serangan jantung atau penyakit jantung koroner)',
-        };
-      case 10:
-        return {
-          'question': 'Apakah Bapak/Ibu pernah diberitahu oleh tenaga medis mengalami stroke?',
-          'subQuestion': '(Pernah mengalami stroke iskemik/hemoragik atau stroke ringan/TIA)',
-        };
-      case 11:
-        return {
-          'question': 'Apakah Bapak/Ibu pernah diberitahu oleh tenaga medis memiliki diabetes (kencing manis)?',
-          'subQuestion': '(Pilih salah satu kondisi yang paling menggambarkan Bapak/Ibu)',
-        };
-      case 12:
-        return {
-          'question': 'Apakah Bapak/Ibu pernah diberitahu oleh dokter atau tenaga medis bahwa Bapak/Ibu menderita asma?',
-          'subQuestion': '(Riwayat asma bronkial atau masalah penyempitan saluran napas kronis)',
-        };
-      case 13:
-        return {
-          'question': 'Apakah Bapak/Ibu pernah merokok minimal 100 batang (sekitar 5 bungkus) sepanjang hidup Bapak/Ibu?',
-          'subQuestion': '(Total konsumsi rokok mencapai minimal 100 batang sepanjang hidup)',
-        };
-      case 14:
-        return {
-          'question': 'Apakah Bapak/Ibu mengonsumsi alkohol secara berlebihan (pria >14 gelas/minggu, wanita >7 gelas/minggu)?',
-          'subQuestion': '(Pria >14 takaran/minggu, wanita >7 takaran/minggu)',
-        };
-      case 15:
-        return {
-          'question': 'Selain pekerjaan rutin, apakah Bapak/Ibu melakukan aktivitas fisik atau olahraga (seperti berjalan kaki, bersepeda, berkebun, atau senam) dalam 30 hari terakhir?',
-          'subQuestion': '(Aktivitas fisik teratur minimal 20-30 menit dalam sebulan terakhir)',
-        };
-      case 16:
-        return {
-          'question': 'Apakah Bapak/Ibu mengalami kesulitan serious untuk berjalan atau menaiki tangga?',
-          'subQuestion': '(Keterbatasan fisik, kelemahan tungkai, atau butuh bantuan saat berjalan)',
-          'footnote': '*Meliputi kesulitan menaiki tangga, kelemahan sendi, atau keterbatasan mobilitas harian.',
-        };
-      default:
-        return {'question': '', 'subQuestion': ''};
-    }
-  }
+  // ───────────────────────────────────────────────────────────────────────────
+  // ACTION BUTTON: LANJUTKAN / ANALISIS SKRINING SEKARANG
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildActionButton(int total) {
+    final bool isLastStep = _currentStep == total;
+    final bool canSubmit = isLastStep && _areAllQuestionsAnswered;
 
-  Map<String, String> _getInfoDataForStep(int step) {
-    switch (step) {
-      case 1:
-        return {
-          'title': 'Mengapa data ini dibutuhkan?',
-          'text': 'Perhitungan laju filtrasi ginjal (eGFR) menggunakan rumus baku CKD-EPI yang memperhitungkan faktor biologis jenis kelamin secara spesifik dan akurat.',
-        };
-      case 2:
-        return {
-          'title': 'Mengapa data usia dibutuhkan?',
-          'text': 'Fungsi penyaringan nefron ginjal mengalami penurunan fisiologis alami seiring bertambahnya usia, sehingga menjadi parameter penting dalam skrining.',
-        };
-      case 3:
-        return {
-          'title': 'Mengapa IMT penting?',
-          'text': 'Kelebihan berat badan (obesitas) meningkatkan tekanan glomerulus dan memaksa ginjal bekerja lebih keras (hiperfiltrasi).',
-        };
-      case 4:
-        return {
-          'title': 'Mengapa data ras/etnis dibutuhkan?',
-          'text': 'Studi klinis epidemiologi menunjukkan variasi predisposisi genetik dan vaskular terhadap risiko penyakit ginjal serta hipertensi pada populasi tertentu.',
-        };
-      case 5:
-        return {
-          'title': 'Mengapa evaluasi kesehatan umum penting?',
-          'text': 'Penilaian subjektif kesehatan mencerminkan status kebugaran multisistemik dan kesejahteraan tubuh secara menyeluruh.',
-        };
-      case 6:
-        return {
-          'title': 'Mengapa data kesehatan fisik dibutuhkan?',
-          'text': 'Jumlah hari sakit fisik mencerminkan tingkat morbiditas aktif yang dapat memberikan beban metabolik tambahan pada organ ekskresi ginjal.',
-        };
-      case 7:
-        return {
-          'title': 'Mengapa kesehatan mental diperhitungkan?',
-          'text': 'Beban stres emosional dan depresi memicu aktivasi aksis HPA serta hormon stres yang berdampak langsung pada tekanan darah dan perfusi ginjal.',
-        };
-      case 8:
-        return {
-          'title': 'Mengapa durasi tidur penting?',
-          'text': 'Ritme sirkadian saat tidur mengatur ritme filtrasi ginjal malam hari serta keseimbangan elektrolit dan kontrol tekanan darah.',
-        };
-      case 9:
-        return {
-          'title': 'Mengapa faktor ini penting?',
-          'text': 'Penyakit jantung dan gangguan fungsi ginjal saling memengaruhi erat dalam sindrom kardiorenal tubuh.',
-        };
-      case 10:
-        return {
-          'title': 'Mengapa informasi stroke penting?',
-          'text': 'Kesehatan pembuluh darah otak dan ginjal memiliki keterkaitan erat dalam sirkulasi mikrovaskular dan endotel pembuluh darah.',
-        };
-      case 11:
-        return {
-          'title': 'Keterkaitan Diabetes dan Ginjal',
-          'text': 'Diabetes merupakan penyebab nomor satu nefropati dan gagal ginjal kronis di seluruh dunia akibat kerusakan kapiler glomerulus.',
-        };
-      case 12:
-        return {
-          'title': 'Mengapa data asma dibutuhkan?',
-          'text': 'Peradangan saluran napas kronis serta riwayat penggunaan obat kortikosteroid berpotensi memengaruhi fungsi metabolik dan ginjal.',
-        };
-      case 13:
-        return {
-          'title': 'Mengapa riwayat merokok penting?',
-          'text': 'Paparan nikotin dan racun tembakau memicu vasokonstriksi pembuluh ginjal dan mempercepat proses aterosklerosis renal.',
-        };
-      case 14:
-        return {
-          'title': 'Mengapa konsumsi alkohol diperhatikan?',
-          'text': 'Asupan alkohol berlebih memicu dehidrasi seluler, beban metabolik hepatorenal, dan gangguan regulasi cairan tubuh.',
-        };
-      case 15:
-        return {
-          'title': 'Mengapa aktivitas fisik penting?',
-          'text': 'Olahraga teratur menjaga sirkulasi vaskular, meningkatkan sensitivitas insulin, dan mempertahankan laju filtrasi ginjal yang sehat.',
-        };
-      case 16:
-        return {
-          'title': 'Mengapa mobilitas penting?',
-          'text': 'Kemampuan mobilitas mandiri mencerminkan kebugaran fungsional kardiorespirasi dan toleransi beban sirkulasi tubuh.',
-        };
-      default:
-        return {'title': '', 'text': ''};
-    }
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: _nextStep,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isLastStep
+              ? (canSubmit ? _darkGreen : const Color(0xFF047857))
+              : _darkGreen,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          elevation: 2,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              isLastStep ? 'Analisis Skrining Sekarang' : 'Lanjutkan',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              isLastStep ? Icons.auto_awesome_rounded : Icons.arrow_forward_rounded,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
