@@ -16,6 +16,8 @@ class EdukasiListScreen extends StatefulWidget {
 
 class _EdukasiListScreenState extends State<EdukasiListScreen> {
   String _selectedCat = 'Semua';
+  String _searchQuery = '';
+  final TextEditingController _searchCtrl = TextEditingController();
   static const _darkGreen = Color(0xFF065A37);
 
   List<Map<String, dynamic>> _articles = [
@@ -77,9 +79,22 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
   }
 
   @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final filtered = _articles.where((a) {
-      return _selectedCat == 'Semua' || a['category'] == _selectedCat;
+      final matchCat = _selectedCat == 'Semua' || a['category'] == _selectedCat;
+      if (!matchCat) return false;
+      if (_searchQuery.isNotEmpty) {
+        final title = (a['title'] ?? '').toString().toLowerCase();
+        final content = (a['content'] ?? '').toString().toLowerCase();
+        return title.contains(_searchQuery) || content.contains(_searchQuery);
+      }
+      return true;
     }).toList();
 
     return Scaffold(
@@ -98,6 +113,40 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
       ),
       body: Column(
         children: [
+          // Search Bar
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF0F172A)),
+                decoration: InputDecoration(
+                  hintText: 'Cari artikel kesehatan ginjal...',
+                  hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                ),
+              ),
+            ),
+          ),
+
           // Category Chips
           Container(
             color: Colors.white,
@@ -113,8 +162,13 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
                     child: ChoiceChip(
                       label: Text(cat),
                       selected: isSel,
+                      showCheckmark: false,
                       selectedColor: _darkGreen,
-                      labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isSel ? Colors.white : const Color(0xFF475569)),
+                      labelStyle: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: isSel ? FontWeight.w700 : FontWeight.w600,
+                        color: isSel ? Colors.white : const Color(0xFF475569),
+                      ),
                       backgroundColor: const Color(0xFFF1F5F9),
                       side: BorderSide.none,
                       onSelected: (_) => setState(() => _selectedCat = cat),
@@ -127,10 +181,28 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
 
           // Article List
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: filtered.length,
-              itemBuilder: (context, i) {
+            child: filtered.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.search_off_rounded, size: 48, color: Color(0xFF94A3B8)),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Artikel tidak ditemukan',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, i) {
                 final art = filtered[i];
                 return GestureDetector(
                   onTap: () {

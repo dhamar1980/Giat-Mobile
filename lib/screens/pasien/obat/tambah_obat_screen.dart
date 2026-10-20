@@ -84,6 +84,7 @@ class _TambahObatScreenState extends State<TambahObatScreen> {
                 return ChoiceChip(
                   label: Text(f),
                   selected: isSel,
+                  showCheckmark: false,
                   selectedColor: _darkGreen,
                   labelStyle: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: isSel ? Colors.white : const Color(0xFF334155)),
                   backgroundColor: Colors.white,
@@ -105,6 +106,7 @@ class _TambahObatScreenState extends State<TambahObatScreen> {
                 return ChoiceChip(
                   label: Text(r),
                   selected: isSel,
+                  showCheckmark: false,
                   selectedColor: _darkGreen,
                   labelStyle: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: isSel ? Colors.white : const Color(0xFF334155)),
                   backgroundColor: Colors.white,

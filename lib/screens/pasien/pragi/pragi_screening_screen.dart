@@ -1082,6 +1082,7 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
                   child: ChoiceChip(
                     label: Text('$hours Jam'),
                     selected: isSel,
+                    showCheckmark: false,
                     selectedColor: _darkGreen,
                     labelStyle: GoogleFonts.inter(
                       fontSize: 12,

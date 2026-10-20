@@ -706,19 +706,13 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFF86EFAC)),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_outline_rounded, size: 16, color: _darkGreen),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Obat Bebas (Tanpa Resep Dokter)',
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF166534),
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Obat Bebas (Tanpa Resep Dokter)',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF166534),
+                  ),
                 ),
               ),
 

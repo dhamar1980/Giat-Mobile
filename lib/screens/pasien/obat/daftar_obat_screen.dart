@@ -365,25 +365,13 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.check_circle_rounded,
-                                      color: _darkGreen,
-                                      size: 15,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Expanded(
-                                      child: Text(
-                                        'Siap ditebus ke apotek rekanan',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: _darkGreen,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  'Siap ditebus ke apotek rekanan',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: _darkGreen,
+                                  ),
                                 ),
                               ],
                             ),
