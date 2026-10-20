@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../notifikasi/pasien_notifikasi_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 import 'catat_kondisi_screen.dart';
 import 'riwayat_pemantauan_screen.dart';
@@ -415,8 +416,11 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                               ),
                               tooltip: 'Notifikasi',
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PasienNotifikasiScreen(),
+                                  ),
                                 );
                               },
                             ),

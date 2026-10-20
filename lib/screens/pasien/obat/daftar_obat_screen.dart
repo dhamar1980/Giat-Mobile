@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../notifikasi/pasien_notifikasi_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 import 'resep_dokter_screen.dart';
 import 'pembelian_obat_screen.dart';
@@ -182,8 +183,11 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                               ),
                               tooltip: 'Notifikasi',
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PasienNotifikasiScreen(),
+                                  ),
                                 );
                               },
                             ),

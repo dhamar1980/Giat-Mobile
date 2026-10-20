@@ -13,6 +13,7 @@ import 'screens/pasien/widgets/pasien_bottom_navbar.dart';
 import 'widgets/giat_background.dart';
 import 'widgets/app_brand_title.dart';
 import 'services/pasien_api_service.dart';
+import 'screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER LAYOUT GIAT (Persistent TopBar, Content Switcher, & Navbar)
@@ -248,7 +249,16 @@ class _MasterLayoutState extends State<MasterLayout> {
                         color: Color(0xFF1F2937),
                       ),
                       tooltip: 'Notifikasi',
-                      onPressed: _showNotificationsModal,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PasienNotifikasiScreen(),
+                          ),
+                        ).then((_) {
+                          if (mounted) _fetchNotificationState();
+                        });
+                      },
                     ),
                     if (_unreadCount > 0 || hasUnread)
                       Positioned(
@@ -316,181 +326,5 @@ class _MasterLayoutState extends State<MasterLayout> {
     );
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // NOTIFICATION MODAL BOTTOM SHEET
-  // ───────────────────────────────────────────────────────────────────────────
-  void _showNotificationsModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.65,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
-                ),
-              ),
-              child: Column(
-                children: [
-                  // Handle bar
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(top: 12, bottom: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
 
-                  // Header
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Notifikasi',
-                          style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () async {
-                            await PasienApiService().markAllNotificationsRead();
-                            setModalState(() {
-                              for (var item in _notifications) {
-                                item['isRead'] = true;
-                              }
-                              _unreadCount = 0;
-                            });
-                            setState(() {
-                              _unreadCount = 0;
-                            });
-                          },
-                          child: Text(
-                            'Tandai Semua Dibaca',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: _darkGreen,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const Divider(color: Color(0xFFF1F5F9)),
-
-                  // Notification List
-                  Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.all(20),
-                      itemCount: _notifications.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final notif = _notifications[index];
-                        final bool isRead = notif['isRead'] == true;
-                        return GestureDetector(
-                          onTap: () async {
-                            if (!isRead && notif['id'] != null) {
-                              await PasienApiService().markNotificationRead(notif['id']);
-                              setModalState(() {
-                                notif['isRead'] = true;
-                              });
-                              setState(() {
-                                if (_unreadCount > 0) _unreadCount--;
-                              });
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: isRead ? Colors.white : const Color(0xFFF0FDF4),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isRead ? const Color(0xFFE2E8F0) : const Color(0xFFBBF7D0),
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: (notif['color'] as Color).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  notif['icon'] as IconData,
-                                  color: notif['color'] as Color,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            notif['title'] as String,
-                                            style: GoogleFonts.inter(
-                                              fontSize: 13.5,
-                                              fontWeight: isRead ? FontWeight.w600 : FontWeight.w700,
-                                              color: const Color(0xFF0F172A),
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          notif['time'] as String,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            color: const Color(0xFF94A3B8),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      notif['body'] as String,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.5,
-                                        color: const Color(0xFF475569),
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 }

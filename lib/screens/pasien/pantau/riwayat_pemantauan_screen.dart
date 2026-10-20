@@ -2,6 +2,7 @@ import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../notifikasi/pasien_notifikasi_screen.dart';
 
 import '../../../services/pasien_api_service.dart';
 
@@ -257,8 +258,11 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
                                 color: Color(0xFF1F2937),
                               ),
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PasienNotifikasiScreen(),
+                                  ),
                                 );
                               },
                             ),

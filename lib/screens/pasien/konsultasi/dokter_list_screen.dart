@@ -5,6 +5,7 @@ import 'konsultasi_chat_screen.dart';
 import 'dokter_detail_screen.dart';
 import 'jadwalkan_konsultasi_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../notifikasi/pasien_notifikasi_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
@@ -364,8 +365,11 @@ class _DokterListScreenState extends State<DokterListScreen> {
                                     color: Color(0xFF1F2937),
                                   ),
                                   onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PasienNotifikasiScreen(),
+                                      ),
                                     );
                                   },
                                 ),

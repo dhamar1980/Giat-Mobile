@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'reminder/reminder_list_screen.dart';
+import 'notifikasi/pasien_notifikasi_screen.dart';
 import 'profile/profile_pasien_screen.dart';
 import 'edukasi/edukasi_list_screen.dart';
 import 'edukasi/edukasi_detail_screen.dart';
@@ -251,9 +252,11 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) => const ReminderListScreen(),
+                                        builder: (_) => const PasienNotifikasiScreen(),
                                       ),
-                                    );
+                                    ).then((_) {
+                                      if (mounted) _fetchLiveHome();
+                                    });
                                   },
                                 ),
                                 if (_unreadCount > 0)

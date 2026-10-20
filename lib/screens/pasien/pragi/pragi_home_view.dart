@@ -5,6 +5,7 @@ import 'pragi_topography_background.dart';
 import 'pragi_screening_screen.dart';
 import 'pragi_result_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../notifikasi/pasien_notifikasi_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 
 import '../../../services/pasien_api_service.dart';
@@ -127,8 +128,11 @@ class _PragiHomeViewState extends State<PragiHomeView> {
                               color: Color(0xFF1F2937),
                             ),
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Tidak ada notifikasi baru.')),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PasienNotifikasiScreen(),
+                                ),
                               );
                             },
                           ),
