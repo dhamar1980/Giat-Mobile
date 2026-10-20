@@ -146,7 +146,13 @@ class _LoginScreenState extends State<LoginScreen>
     // Pastikan ApiConfig langsung sinkron ke URL tunnel terkini dari ApiConstants
     final currentHost = Uri.tryParse(ApiConstants.serverUrl)?.host ?? '';
     final activeHost = Uri.tryParse(ApiConfig.baseUrl)?.host ?? '';
-    if (activeHost.contains('trycloudflare.com') && activeHost != currentHost) {
+    if (currentHost.isNotEmpty &&
+        activeHost != currentHost &&
+        (activeHost.contains('trycloudflare.com') ||
+         activeHost == '10.0.2.2' ||
+         activeHost == '127.0.0.1' ||
+         activeHost == 'localhost' ||
+         activeHost.isEmpty)) {
       debugPrint('🔄 Mengalihkan Base URL dari $activeHost ke $currentHost');
       ApiConfig.setBaseUrl(ApiConstants.defaultBaseUrl);
       StorageService().saveBaseUrl(ApiConstants.defaultBaseUrl);

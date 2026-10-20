@@ -58,6 +58,17 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
     'Kustom',
   ];
 
+  bool _isPopping = false;
+  bool _isSubmitting = false;
+
+  void _handleBack() {
+    if (_isPopping) return;
+    _isPopping = true;
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -148,6 +159,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
   }
 
   void _simpanReminder() {
+    if (_isSubmitting) return;
     if (_selectedCategory == 'Obat') {
       final nama = _namaPengingatCtrl.text.trim();
       if (nama.isEmpty) {
@@ -156,6 +168,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
         );
         return;
       }
+      _isSubmitting = true;
       final dosis = _dosisCtrl.text.trim().isNotEmpty
           ? _dosisCtrl.text.trim()
           : 'Sesuai anjuran dokter';
@@ -190,6 +203,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
         );
         return;
       }
+      _isSubmitting = true;
       final lokasi = _lokasiCtrl.text.trim().isNotEmpty
           ? _lokasiCtrl.text.trim()
           : 'Klinik / RS Rekanan';
@@ -289,7 +303,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
         children: [
           // 1. Top: Kembali Pill Button
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: _handleBack,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(

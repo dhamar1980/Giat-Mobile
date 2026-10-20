@@ -22,8 +22,8 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
   static const _textColor = Color(0xFF091D2E);
   static const _subtextColor = Color(0xFF475569);
 
-  // Initial reminders matching Figma Node 771:5254
-  List<Map<String, dynamic>> _reminders = [
+  // Default fallback reminders matching Figma Node 771:5254
+  static final List<Map<String, dynamic>> _defaultReminders = [
     {
       'id': '1',
       'type': 'obat',
@@ -44,58 +44,143 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
     },
   ];
 
+  List<Map<String, dynamic>> _reminders = [];
+  bool _isLoading = true;
+  bool _isNavigating = false;
+
   @override
   void initState() {
     super.initState();
     _loadRemindersFromApi();
   }
 
-  Future<void> _loadRemindersFromApi() async {
-    final res = await PasienApiService().getReminders();
-    if (res.success && res.data != null && res.data!.isNotEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _reminders = res.data!.map((item) {
-          if (item is Map<String, dynamic>) {
-            return {
-              'id': item['id']?.toString() ?? '1',
-              'type': item['tipe']?.toString().toLowerCase() ?? item['type']?.toString().toLowerCase() ?? 'obat',
-              'title': item['judul']?.toString() ?? item['title']?.toString() ?? 'Pengingat',
-              'subtitle': item['deskripsi']?.toString() ?? item['subtitle']?.toString() ?? '',
-              'time': item['waktu']?.toString() ?? item['time']?.toString() ?? '08:00 WIB',
-              'date': item['tanggal']?.toString() ?? item['date']?.toString() ?? 'Hari ini',
-              'isActive': item['is_active'] == true || item['is_active'] == 1 || item['isActive'] == true,
-            };
+  static String _formatApiTime(dynamic rawTime) {
+    if (rawTime == null) return '08:00 WIB';
+    final str = rawTime.toString().trim();
+    if (str.toUpperCase().contains('WIB') ||
+        str.toUpperCase().contains('WITA') ||
+        str.toUpperCase().contains('WIT')) {
+      return str;
+    }
+    final parts = str.split(':');
+    if (parts.length >= 2) {
+      final h = parts[0].padLeft(2, '0');
+      final m = parts[1].padLeft(2, '0');
+      return '$h:$m WIB';
+    }
+    return str.isNotEmpty ? str : '08:00 WIB';
+  }
+
+  Future<void> _loadRemindersFromApi({bool isRefresh = false}) async {
+    if (!isRefresh && _reminders.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final res = await PasienApiService().getReminders();
+      if (res.success && res.data != null && res.data!.isNotEmpty) {
+        final List<Map<String, dynamic>> mapped = [];
+        for (var item in res.data!) {
+          if (item is Map) {
+            final id = item['id']?.toString() ?? item['id_reminder']?.toString() ?? '';
+            final type = item['tipe']?.toString().toLowerCase() ??
+                item['type']?.toString().toLowerCase() ??
+                'obat';
+            final title = item['judul']?.toString() ??
+                item['nama']?.toString() ??
+                item['title']?.toString() ??
+                'Pengingat';
+            final subtitle = item['subjudul']?.toString() ??
+                item['keterangan']?.toString() ??
+                item['dosis']?.toString() ??
+                item['deskripsi']?.toString() ??
+                item['subtitle']?.toString() ??
+                '';
+            final time = _formatApiTime(item['waktu'] ?? item['time']);
+            final date = item['tanggal']?.toString() ?? item['date']?.toString() ?? 'Hari ini';
+            final isActive = item['is_active'] == true ||
+                item['is_active'] == 1 ||
+                item['isActive'] == true ||
+                item['status'] == 'aktif';
+
+            mapped.add({
+              'id': id,
+              'type': type,
+              'title': title,
+              'subtitle': subtitle,
+              'time': time,
+              'date': date,
+              'isActive': isActive,
+            });
           }
-          return <String, dynamic>{};
-        }).where((m) => m.isNotEmpty).toList();
+        }
+
+        // Deduplicate reminders by (title + time + subtitle) to prevent duplicate cards
+        final seen = <String>{};
+        final deduplicated = <Map<String, dynamic>>[];
+        for (var m in mapped) {
+          final key = '${m['title']}_${m['time']}_${m['subtitle']}';
+          if (!seen.contains(key)) {
+            seen.add(key);
+            deduplicated.add(m);
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _reminders = deduplicated;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        if (_reminders.isEmpty) {
+          _reminders = List.from(_defaultReminders);
+        }
+        _isLoading = false;
       });
     }
   }
 
   Future<void> _navigateToAddReminder() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const TambahReminderScreen(),
-      ),
-    );
+    if (_isNavigating) return;
+    _isNavigating = true;
 
-    if (result != null && result is Map<String, dynamic>) {
-      setState(() {
-        _reminders.insert(0, result);
-      });
-      PasienApiService().createReminder(result);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Pengingat "${result['title']}" berhasil ditambahkan! ⏰'),
-            backgroundColor: _primaryGreen,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+    try {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const TambahReminderScreen(),
+        ),
+      );
+
+      if (result != null && result is Map<String, dynamic>) {
+        setState(() {
+          _reminders.insert(0, result);
+        });
+        final apiRes = await PasienApiService().createReminder(result);
+        if (apiRes.success && apiRes.data != null) {
+          final realId = apiRes.data!['id'] ?? apiRes.data!['id_reminder'];
+          if (realId != null) {
+            result['id'] = realId.toString();
+          }
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Pengingat "${result['title']}" berhasil ditambahkan! ⏰'),
+              backgroundColor: _primaryGreen,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
       }
+    } finally {
+      _isNavigating = false;
     }
   }
 
@@ -106,7 +191,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
     setState(() {
       _reminders.removeAt(index);
     });
-    if (id != null) {
+    if (id != null && id.toString().isNotEmpty) {
       PasienApiService().deleteReminder(id);
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -166,16 +251,29 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
 
                         // List of Reminders
                         Expanded(
-                          child: _reminders.isEmpty
-                              ? _buildEmptyState()
-                              : ListView.builder(
-                                  itemCount: _reminders.length,
-                                  physics: const BouncingScrollPhysics(),
-                                  itemBuilder: (context, index) {
-                                    final rem = _reminders[index];
-                                    return _buildReminderCard(rem, index);
-                                  },
-                                ),
+                          child: _isLoading
+                              ? const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(32),
+                                    child: CircularProgressIndicator(color: _primaryGreen),
+                                  ),
+                                )
+                              : _reminders.isEmpty
+                                  ? _buildEmptyState()
+                                  : RefreshIndicator(
+                                      onRefresh: () => _loadRemindersFromApi(isRefresh: true),
+                                      color: _primaryGreen,
+                                      child: ListView.builder(
+                                        itemCount: _reminders.length,
+                                        physics: const AlwaysScrollableScrollPhysics(
+                                          parent: BouncingScrollPhysics(),
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final rem = _reminders[index];
+                                          return _buildReminderCard(rem, index);
+                                        },
+                                      ),
+                                    ),
                         ),
 
                         // Bottom Button: "Tambah Reminder Baru" (Figma 771:5254 Frame 3)
@@ -206,7 +304,11 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
         children: [
           // 1. Top: Kembali Pill Button
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
@@ -269,8 +371,23 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
   // Tanpa status (Belum di lakukan / Akan Datang / Selesai dihapus)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildReminderCard(Map<String, dynamic> rem, int index) {
-    final isObat = rem['type'] == 'obat';
+    final type = (rem['type'] ?? 'obat').toString().toLowerCase();
+    final isObat = type.contains('obat');
+    final isAir = type.contains('air') || type.contains('minum');
     final timeStr = rem['time'] ?? '08:00 WIB';
+
+    IconData cardIcon;
+    Color iconBgColor = const Color(0xFFD5E8F0);
+    if (isAir) {
+      cardIcon = Icons.water_drop_outlined;
+      iconBgColor = const Color(0xFFE0F2FE);
+    } else if (isObat) {
+      cardIcon = Icons.medication_outlined;
+      iconBgColor = const Color(0xFFD5E8F0);
+    } else {
+      cardIcon = Icons.medical_services_outlined;
+      iconBgColor = const Color(0xFFEDE9FE);
+    }
 
     return Dismissible(
       key: Key(rem['id'] ?? index.toString()),
@@ -329,12 +446,12 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                     width: 58,
                     height: 58,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD5E8F0),
+                      color: iconBgColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
                       child: Icon(
-                        isObat ? Icons.medication_outlined : Icons.medical_services_outlined,
+                        cardIcon,
                         color: _textColor,
                         size: 26,
                       ),

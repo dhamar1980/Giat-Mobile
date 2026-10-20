@@ -2,7 +2,7 @@ import 'dart:convert';
 
 /// Model representing a GIAT user (Pasien, Dokter, Apotek, etc.)
 class UserModel {
-  final int id;
+  final dynamic id;
   final String nama;
   final String email;
   final String? noHp;
@@ -41,13 +41,17 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, {String defaultRole = 'pasien'}) {
-    final int parsedId = json['id_pasien'] ??
+    final dynamic parsedId = json['id_pasien'] ??
         json['id_dokter'] ??
         json['id_apotek'] ??
+        (json['user'] is Map ? (json['user'] as Map)['id'] : null) ??
         json['id'] ??
         0;
 
     String resolvedRole = (json['role'] as String?)?.toLowerCase() ?? '';
+    if (resolvedRole.isEmpty && json['user'] is Map) {
+      resolvedRole = ((json['user'] as Map)['role'] as String?)?.toLowerCase() ?? '';
+    }
     if (resolvedRole.isEmpty || resolvedRole == 'pasien') {
       if (json['id_apotek'] != null || json.containsKey('lokasi_apotek') || json.containsKey('jam_operasional')) {
         resolvedRole = 'apotek';
@@ -62,8 +66,8 @@ class UserModel {
 
     return UserModel(
       id: parsedId,
-      nama: json['nama'] as String? ?? 'Pengguna GIAT',
-      email: json['email'] as String? ?? '',
+      nama: json['nama'] as String? ?? json['nama_apotek'] as String? ?? json['name'] as String? ?? 'Pengguna GIAT',
+      email: json['email'] as String? ?? (json['user'] is Map ? (json['user'] as Map)['email'] as String? : null) ?? '',
       noHp: json['no_hp'] as String?,
       alamat: json['alamat'] as String?,
       jenisKelamin: json['jenis_kelamin'] as String?,
@@ -73,9 +77,9 @@ class UserModel {
       authProvider: json['auth_provider'] as String?,
       role: resolvedRole,
       spesialisasi: json['spesialisasi'] as String?,
-      instansi: json['instansi'] as String?,
+      instansi: json['institusi'] as String? ?? json['instansi'] as String?,
       noStr: json['no_str'] as String?,
-      noSip: json['no_sip'] as String?,
+      noSip: json['no_sip'] as String? ?? json['no_sipa_sia'] as String?,
       tanggalLahir: json['tanggal_lahir'] as String?,
       golonganDarah: json['golongan_darah'] as String?,
     );

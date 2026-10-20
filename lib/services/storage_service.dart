@@ -56,10 +56,14 @@ class StorageService {
         // otomatis perbarui SharedPreferences ke URL tunnel yang baru
         final currentHost = Uri.tryParse(ApiConstants.serverUrl)?.host ?? '';
         final savedHost = Uri.tryParse(savedUrl)?.host ?? '';
-        if (savedHost.contains('trycloudflare.com') &&
-            currentHost.isNotEmpty &&
-            savedHost != currentHost) {
-          debugPrint('🔄 Sinkronisasi URL tunnel lama ($savedHost) -> URL baru ($currentHost)');
+        if (currentHost.isNotEmpty &&
+            savedHost != currentHost &&
+            (savedHost.contains('trycloudflare.com') ||
+             savedHost == '10.0.2.2' ||
+             savedHost == '127.0.0.1' ||
+             savedHost == 'localhost' ||
+             savedHost.isEmpty)) {
+          debugPrint('🔄 Sinkronisasi Base URL ($savedHost) -> URL baru ($currentHost)');
           await saveBaseUrl(ApiConstants.defaultBaseUrl);
         } else {
           ApiConfig.setBaseUrl(savedUrl);

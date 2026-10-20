@@ -89,6 +89,17 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
     super.dispose();
   }
 
+  void _openReminderList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ReminderListScreen(),
+      ),
+    ).then((_) {
+      if (mounted) _fetchLiveHome();
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -510,14 +521,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                 ),
               ),
               GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ReminderListScreen(),
-                    ),
-                  );
-                },
+                onTap: _openReminderList,
                 child: Row(
                   children: [
                     Text(
@@ -542,16 +546,9 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
               _buildReminderCard(
                 icon: Icons.medication_rounded,
                 iconBg: const Color(0xFF065A37),
-                title: rem['nama']?.toString() ?? rem['title']?.toString() ?? 'Minum Obat',
+                title: rem['nama']?.toString() ?? rem['judul']?.toString() ?? rem['title']?.toString() ?? 'Minum Obat',
                 time: rem['waktu']?.toString() ?? rem['time']?.toString() ?? '08:00 WIB',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ReminderListScreen(),
-                    ),
-                  );
-                },
+                onTap: _openReminderList,
               ),
               const SizedBox(height: 10),
             ],
@@ -562,14 +559,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
               iconBg: const Color(0xFF065A37),
               title: 'Minum Obat (Amlodipine)',
               time: '08:00 WIB',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ReminderListScreen(),
-                  ),
-                );
-              },
+              onTap: _openReminderList,
             ),
             const SizedBox(height: 10),
             _buildReminderCard(
@@ -577,14 +567,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
               iconBg: const Color(0xFF065A37),
               title: 'Kontrol Kesehatan Ginjal',
               time: 'Besok, 10:00 WIB',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ReminderListScreen(),
-                  ),
-                );
-              },
+              onTap: _openReminderList,
             ),
           ],
         ],
