@@ -45,7 +45,7 @@ class _PragiProcessingScreenState extends State<PragiProcessingScreen>
     setState(() {
       _hasError = false;
       _errorMessage = '';
-      _processingStatus = 'Menganalisis 16 biomarker & data klinis...';
+      _processingStatus = 'Menghubungkan ke API Backend GIAT & Machine Learning Python...';
     });
 
     final Map<String, dynamic> payloadJawaban = widget.jawabanMap ?? {
@@ -68,15 +68,21 @@ class _PragiProcessingScreenState extends State<PragiProcessingScreen>
     };
 
     try {
+      if (mounted) {
+        setState(() {
+          _processingStatus = 'Menganalisis 16 biomarker & data klinis Anda...';
+        });
+      }
+
       final apiResp = await PasienApiService().submitPragiSkrining(payloadJawaban);
 
       if (mounted) {
         setState(() {
-          _processingStatus = 'Menyusun rekomendasi personal AI...';
+          _processingStatus = 'Menghitung probabilitas risiko & menyusun rekomendasi personal...';
         });
       }
 
-      await Future.delayed(const Duration(milliseconds: 900));
+      await Future.delayed(const Duration(milliseconds: 700));
 
       PragiHasilSkrining hasil;
       if (apiResp.success && apiResp.data != null) {
@@ -304,9 +310,9 @@ class _PragiProcessingScreenState extends State<PragiProcessingScreen>
 
                     const SizedBox(height: 28),
 
-                    // Title: Sedang memproses...
+                    // Title: AI Sedang Menganalisis...
                     Text(
-                      'Sedang Menganalisis Skrining...',
+                      'AI sedang menganalisis profil kesehatan ginjal Anda...',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         fontSize: 18,

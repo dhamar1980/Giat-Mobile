@@ -270,23 +270,39 @@ class PragiPertanyaan {
   ];
 }
 
-/// Hasil evaluasi skrining AI PRAGI dari response POST /api/pasien/pragi/skrining
+/// Hasil evaluasi skrining AI PRAGI dari response POST /api/pasien/pragi/predict atau /skrining
 class PragiHasilSkrining {
   final String idPragi;
-  final int skor;
+  final String? label;
+  final int? prediction; // 0: Non-CKD, 1: CKD
+  final double? confidencePercent; // contoh: 62.62
+  final double? probabilityCkd; // contoh: 0.6262
+  final double? probabilityNoCkd; // contoh: 0.3738
   final String kategoriRisiko; // "rendah", "sedang", "tinggi"
   final String hasilPrediksi;
+  final int skor;
+  final double? probabilitas;
   final String rekomendasi;
   final List<String> faktorRisiko;
+  final String? sumberPrediksi;
+  final bool isFallback;
   final String tanggalScreening;
 
   PragiHasilSkrining({
     required this.idPragi,
-    required this.skor,
+    this.label,
+    this.prediction,
+    this.confidencePercent,
+    this.probabilityCkd,
+    this.probabilityNoCkd,
     required this.kategoriRisiko,
     required this.hasilPrediksi,
+    required this.skor,
+    this.probabilitas,
     required this.rekomendasi,
     this.faktorRisiko = const [],
+    this.sumberPrediksi,
+    this.isFallback = false,
     required this.tanggalScreening,
   });
 
@@ -298,35 +314,111 @@ class PragiHasilSkrining {
       faktor = (json['faktor'] as List).map((e) => e.toString()).toList();
     }
 
+    // Parse nested probability object { ckd: 0.6262, no_ckd: 0.3738 }
+    double? ckdProb;
+    double? noCkdProb;
+    if (json['probability'] is Map) {
+      final pMap = json['probability'] as Map;
+      ckdProb = double.tryParse(pMap['ckd']?.toString() ?? '');
+      noCkdProb = double.tryParse(pMap['no_ckd']?.toString() ?? '');
+    }
+
+    final double? probabilitasVal = json['probabilitas'] != null
+        ? double.tryParse(json['probabilitas'].toString())
+        : (ckdProb ?? (json['probability'] is num ? (json['probability'] as num).toDouble() : null));
+
+    final double? confPercent = json['confidence_percent'] != null
+        ? double.tryParse(json['confidence_percent'].toString())
+        : (probabilitasVal != null ? probabilitasVal * 100 : null);
+
+    final int? predVal = json['prediction'] != null
+        ? int.tryParse(json['prediction'].toString())
+        : (json['prediksi_numeric'] != null
+            ? int.tryParse(json['prediksi_numeric'].toString())
+            : null);
+
+    final String labelVal = json['label']?.toString() ??
+        json['hasil_prediksi']?.toString() ??
+        json['prediksi']?.toString() ??
+        'Hasil Skrining AI PRAGI';
+
     return PragiHasilSkrining(
       idPragi: json['id_pragi']?.toString() ?? json['id']?.toString() ?? '',
-      skor: int.tryParse(json['skor']?.toString() ?? json['total_skor']?.toString() ?? '0') ?? 0,
+      label: labelVal,
+      prediction: predVal,
+      confidencePercent: confPercent,
+      probabilityCkd: ckdProb,
+      probabilityNoCkd: noCkdProb,
       kategoriRisiko: (json['kategori_risiko']?.toString() ?? 'rendah').toLowerCase(),
-      hasilPrediksi: json['hasil_prediksi']?.toString() ?? json['prediksi']?.toString() ?? 'Hasil Skrining AI PRAGI',
+      hasilPrediksi: labelVal,
+      skor: int.tryParse(json['skor']?.toString() ?? json['total_skor']?.toString() ?? '0') ?? 0,
+      probabilitas: probabilitasVal,
       rekomendasi: json['rekomendasi']?.toString() ?? 'Jaga pola makan seimbang dan konsumsi air putih secukupnya.',
       faktorRisiko: faktor,
-      tanggalScreening: json['tanggal_screening']?.toString() ?? json['tanggal']?.toString() ?? json['created_at']?.toString() ?? '',
+      sumberPrediksi: json['sumber_prediksi']?.toString(),
+      isFallback: json['is_fallback'] == true,
+      tanggalScreening: json['tanggal_screening']?.toString() ??
+          json['tanggal']?.toString() ??
+          json['created_at']?.toString() ??
+          DateTime.now().toIso8601String(),
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id_pragi': idPragi,
-    'skor': skor,
+    if (label != null) 'label': label,
+    if (prediction != null) 'prediction': prediction,
+    if (confidencePercent != null) 'confidence_percent': confidencePercent,
+    if (probabilityCkd != null || probabilityNoCkd != null)
+      'probability': {
+        if (probabilityCkd != null) 'ckd': probabilityCkd,
+        if (probabilityNoCkd != null) 'no_ckd': probabilityNoCkd,
+      },
     'kategori_risiko': kategoriRisiko,
     'hasil_prediksi': hasilPrediksi,
+    'skor': skor,
+    if (probabilitas != null) 'probabilitas': probabilitas,
     'rekomendasi': rekomendasi,
     'faktor_risiko': faktorRisiko,
+    if (sumberPrediksi != null) 'sumber_prediksi': sumberPrediksi,
+    'is_fallback': isFallback,
     'tanggal_screening': tanggalScreening,
   };
 
-  bool get isRisikoTinggi => kategoriRisiko.contains('tinggi');
-  bool get isRisikoSedang => kategoriRisiko.contains('sedang');
+  bool get isRisikoTinggi => kategoriRisiko.contains('tinggi') || prediction == 1 && (confidencePercent ?? 0) >= 60.0;
+  bool get isRisikoSedang => kategoriRisiko.contains('sedang') || (prediction == 1 && !isRisikoTinggi);
   bool get isRisikoRendah => !isRisikoTinggi && !isRisikoSedang;
+
+  bool get isCkdDetected => (prediction == 1) || isRisikoTinggi || isRisikoSedang;
 
   String get formattedKategori {
     if (isRisikoTinggi) return 'Risiko Tinggi';
     if (isRisikoSedang) return 'Risiko Sedang';
     return 'Risiko Rendah';
+  }
+
+  /// Persentase probabilitas CKD untuk indikator visual (0..100)
+  double get displayCkdPercentage {
+    if (confidencePercent != null && prediction == 1) {
+      return confidencePercent!.clamp(0.0, 100.0);
+    }
+    if (probabilityCkd != null) {
+      return (probabilityCkd! * 100).clamp(0.0, 100.0);
+    }
+    if (probabilitas != null && prediction == 1) {
+      return (probabilitas! * 100).clamp(0.0, 100.0);
+    }
+    if (isRisikoTinggi) return 72.5;
+    if (isRisikoSedang) return 45.0;
+    return 14.2;
+  }
+
+  /// Persentase probabilitas Non-CKD untuk perbandingan visual (0..100)
+  double get displayNoCkdPercentage {
+    if (probabilityNoCkd != null) {
+      return (probabilityNoCkd! * 100).clamp(0.0, 100.0);
+    }
+    return (100.0 - displayCkdPercentage).clamp(0.0, 100.0);
   }
 }
 

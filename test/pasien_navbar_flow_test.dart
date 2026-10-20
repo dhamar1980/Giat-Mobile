@@ -74,7 +74,7 @@ void main() {
     await tester.pump();
 
     // Find Konsultasi button in PragiResultScreen and ensure it's visible
-    final konsultasiBtn = find.text('Konsultasi Dokter Sekarang');
+    final konsultasiBtn = find.textContaining('Konsultasi Dokter');
     expect(konsultasiBtn, findsOneWidget);
     await tester.ensureVisible(konsultasiBtn);
     await tester.pumpAndSettle();

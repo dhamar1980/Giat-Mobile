@@ -28,6 +28,14 @@ class PragiScreeningResult {
   final String? rekomendasiDokter;
   final List<String> faktorRisiko;
   final String? hasilPrediksi;
+  final String? label;
+  final int? prediction;
+  final double? confidencePercent;
+  final double? probabilityCkd;
+  final double? probabilityNoCkd;
+  final double? probabilitas;
+  final String? sumberPrediksi;
+  final bool isFallback;
 
   PragiScreeningResult({
     required this.id,
@@ -55,6 +63,14 @@ class PragiScreeningResult {
     this.rekomendasiDokter,
     this.faktorRisiko = const [],
     this.hasilPrediksi,
+    this.label,
+    this.prediction,
+    this.confidencePercent,
+    this.probabilityCkd,
+    this.probabilityNoCkd,
+    this.probabilitas,
+    this.sumberPrediksi,
+    this.isFallback = false,
   });
 
   factory PragiScreeningResult.fromHasil({
@@ -92,6 +108,14 @@ class PragiScreeningResult {
       rekomendasiDokter: hasil.rekomendasi,
       faktorRisiko: hasil.faktorRisiko,
       hasilPrediksi: hasil.hasilPrediksi,
+      label: hasil.label,
+      prediction: hasil.prediction,
+      confidencePercent: hasil.confidencePercent,
+      probabilityCkd: hasil.probabilityCkd,
+      probabilityNoCkd: hasil.probabilityNoCkd,
+      probabilitas: hasil.probabilitas,
+      sumberPrediksi: hasil.sumberPrediksi,
+      isFallback: hasil.isFallback,
     );
   }
 }

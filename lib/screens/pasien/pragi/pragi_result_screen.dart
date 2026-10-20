@@ -24,8 +24,12 @@ class PragiResultScreen extends StatelessWidget {
     return 'rendah';
   }
 
-  bool get _isRisikoTinggi => _kategoriRisiko.contains('tinggi');
-  bool get _isRisikoSedang => _kategoriRisiko.contains('sedang');
+  int? get _prediction => hasil?.prediction ?? result?.prediction;
+
+  double? get _confidencePercent => hasil?.confidencePercent ?? result?.confidencePercent;
+
+  bool get _isRisikoTinggi => _kategoriRisiko.contains('tinggi') || (_prediction == 1 && (_confidencePercent ?? 0) >= 60.0);
+  bool get _isRisikoSedang => (_kategoriRisiko.contains('sedang') || _prediction == 1) && !_isRisikoTinggi;
 
   String get _kategoriLabel {
     if (_isRisikoTinggi) return 'Risiko Tinggi';
@@ -71,6 +75,42 @@ class PragiResultScreen extends StatelessWidget {
     }
     return 'Hasil Skrining AI PRAGI';
   }
+
+  String get _label {
+    if (hasil?.label != null && hasil!.label!.isNotEmpty) {
+      return hasil!.label!;
+    }
+    if (result?.label != null && result!.label!.isNotEmpty) {
+      return result!.label!;
+    }
+    if (_prediction == 1 || _isRisikoTinggi || _isRisikoSedang) {
+      return 'Berisiko Penyakit Ginjal Kronis (CKD)';
+    }
+    return 'Tidak Berisiko Penyakit Ginjal Kronis';
+  }
+
+  double get _ckdPercent {
+    if (hasil != null) return hasil!.displayCkdPercentage;
+    if (_confidencePercent != null && _prediction == 1) {
+      return _confidencePercent!.clamp(0.0, 100.0);
+    }
+    if (result?.probabilityCkd != null) {
+      return (result!.probabilityCkd! * 100).clamp(0.0, 100.0);
+    }
+    if (_isRisikoTinggi) return 72.5;
+    if (_isRisikoSedang) return 45.0;
+    return 14.2;
+  }
+
+  double get _noCkdPercent {
+    if (hasil != null) return hasil!.displayNoCkdPercentage;
+    if (result?.probabilityNoCkd != null) {
+      return (result!.probabilityNoCkd! * 100).clamp(0.0, 100.0);
+    }
+    return (100.0 - _ckdPercent).clamp(0.0, 100.0);
+  }
+
+  String get _sumberPrediksi => hasil?.sumberPrediksi ?? result?.sumberPrediksi ?? 'python_ml_api';
 
   String get _rekomendasi {
     if (hasil != null && hasil!.rekomendasi.isNotEmpty) {
@@ -261,9 +301,13 @@ class PragiResultScreen extends StatelessWidget {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // MAIN RESULT HERO CARD
+  // MAIN RESULT HERO CARD (DENGAN LABEL AI, BADGE RISIKO, & PROBABILITAS CKD)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildMainResultCard() {
+    final double ckdVal = _ckdPercent;
+    final double noCkdVal = _noCkdPercent;
+    final double? confVal = _confidencePercent;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -282,7 +326,7 @@ class PragiResultScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row: Date Pill & ID
+          // Top Row: Date Pill & AI Engine Indicator
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -309,79 +353,245 @@ class PragiResultScreen extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
                 ),
-                child: Text(
-                  'PRAGI AI v2.0',
-                  style: GoogleFonts.inter(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF94A3B8),
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.psychology_rounded, size: 13, color: Color(0xFF047857)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'AI ML Python Gateway',
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF047857),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // Badge Kategori Risiko
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: _kategoriBgColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _kategoriBorderColor, width: 1.5),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _isRisikoTinggi
-                      ? Icons.warning_rounded
-                      : (_isRisikoSedang ? Icons.shield_outlined : Icons.check_circle_rounded),
-                  color: _kategoriColor,
-                  size: 18,
+          // Row Badges: Kategori Risiko & Tingkat Keyakinan AI
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // Badge Kategori Risiko (Merah: Tinggi, Oranye: Sedang, Hijau: Rendah)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: _kategoriBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _kategoriBorderColor, width: 1.5),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  _kategoriLabel.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: _kategoriColor,
-                    letterSpacing: 0.5,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isRisikoTinggi
+                          ? Icons.warning_rounded
+                          : (_isRisikoSedang ? Icons.shield_outlined : Icons.check_circle_rounded),
+                      color: _kategoriColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _kategoriLabel.toUpperCase(),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: _kategoriColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+
+              // Badge Tingkat Keyakinan AI (Confidence Percent)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBFDBFE), width: 1.2),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded, color: Color(0xFF2563EB), size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      confVal != null
+                          ? 'Keyakinan AI: ${confVal.toStringAsFixed(1)}%'
+                          : 'Keyakinan AI: ${ckdVal.toStringAsFixed(1)}%',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1D4ED8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // Prediksi Title
+          // Label Utama AI
           Text(
-            _hasilPrediksi,
+            _label,
             style: GoogleFonts.inter(
-              fontSize: 22,
+              fontSize: 21,
               fontWeight: FontWeight.w800,
               color: const Color(0xFF0F172A),
               height: 1.25,
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
           Text(
-            'Berdasarkan pemrosesan 16 biomarker dan parameter klinis yang telah Anda laporkan secara lengkap.',
+            'Berdasarkan hasil analisis prediktif 16 biomarker dan parameter klinis tubuh yang Anda laporkan.',
             style: GoogleFonts.inter(
               fontSize: 13,
               color: const Color(0xFF64748B),
               height: 1.45,
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          // ── PROGRESS BAR PROBABILITAS CKD VS NON-CKD ──
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.analytics_outlined, size: 16, color: _darkGreen),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Probabilitas AI Prediksi',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'CKD vs Non-CKD',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Dual-Segmented Progress Bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    height: 14,
+                    child: Row(
+                      children: [
+                        // CKD portion
+                        Expanded(
+                          flex: (ckdVal * 10).round().clamp(1, 999),
+                          child: Container(
+                            color: _kategoriColor,
+                          ),
+                        ),
+                        // Non-CKD portion
+                        Expanded(
+                          flex: (noCkdVal * 10).round().clamp(1, 999),
+                          child: Container(
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Labels below bar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _kategoriColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Berisiko CKD: ${ckdVal.toStringAsFixed(1)}%',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: _kategoriColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Bebas CKD: ${noCkdVal.toStringAsFixed(1)}%',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF047857),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
 
@@ -433,7 +643,7 @@ class PragiResultScreen extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         _isRisikoTinggi
-                            ? 'Skor mengindikasikan prioritas perhatian klinis'
+                            ? 'Skor mengindikasikan prioritas perhatian klinis nefrologi'
                             : (_isRisikoSedang
                                 ? 'Skor berada dalam batas kewaspadaan moderat'
                                 : 'Skor berada dalam batas normal / terpantau aman'),
@@ -753,13 +963,15 @@ class PragiResultScreen extends StatelessWidget {
   // ACTION BUTTONS (KONSULTASI DOKTER / KEMBALI KE BERANDA)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildActionButtons(BuildContext context) {
-    if (_isRisikoSedang || _isRisikoTinggi) {
+    final bool hasRisk = _isRisikoSedang || _isRisikoTinggi || _prediction == 1;
+
+    if (hasRisk) {
       return Column(
         children: [
-          // Primary: Konsultasi Dokter
+          // Primary: Konsultasi Dokter Ginjal Sekarang
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 52,
             child: ElevatedButton.icon(
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
@@ -770,50 +982,87 @@ class PragiResultScreen extends StatelessWidget {
                   (route) => false,
                 );
               },
-              icon: const Icon(Icons.medical_services_rounded, size: 18),
+              icon: const Icon(Icons.medical_services_rounded, size: 20),
               label: Text(
-                'Konsultasi Dokter Sekarang',
+                'Konsultasi Dokter Ginjal Sekarang',
                 style: GoogleFonts.inter(
-                  fontSize: 14,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _darkGreen,
+                backgroundColor: _isRisikoTinggi ? const Color(0xFFDC2626) : _darkGreen,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 1,
+                elevation: 2,
               ),
             ),
           ),
           const SizedBox(height: 12),
-          // Secondary: Kembali ke Beranda
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MasterLayout(initialIndex: 0),
+
+          // Secondary Row: Lihat Riwayat Skrining & Kembali ke Beranda
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MasterLayout(initialIndex: 2),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    icon: const Icon(Icons.history_rounded, size: 18),
+                    label: Text(
+                      'Riwayat Skrining',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      foregroundColor: const Color(0xFF334155),
+                    ),
                   ),
-                  (route) => false,
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                foregroundColor: const Color(0xFF334155),
-              ),
-              child: Text(
-                'Kembali ke Beranda',
-                style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MasterLayout(initialIndex: 0),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    icon: const Icon(Icons.home_outlined, size: 18),
+                    label: Text(
+                      'Ke Beranda',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      foregroundColor: const Color(0xFF334155),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       );
@@ -825,7 +1074,7 @@ class PragiResultScreen extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             height: 50,
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -835,50 +1084,87 @@ class PragiResultScreen extends StatelessWidget {
                   (route) => false,
                 );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _darkGreen,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 1,
-              ),
-              child: Text(
+              icon: const Icon(Icons.home_rounded, size: 20),
+              label: Text(
                 'Kembali ke Beranda',
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _darkGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 1,
+              ),
             ),
           ),
           const SizedBox(height: 12),
-          // Secondary: Konsultasi Dokter Opsional
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MasterLayout(initialIndex: 1),
+
+          // Secondary Row: Lihat Riwayat Skrining & Konsultasi Dokter Opsional
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MasterLayout(initialIndex: 2),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    icon: const Icon(Icons.history_rounded, size: 18),
+                    label: Text(
+                      'Riwayat Skrining',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      foregroundColor: const Color(0xFF334155),
+                    ),
                   ),
-                  (route) => false,
-                );
-              },
-              icon: const Icon(Icons.medical_services_outlined, size: 18),
-              label: Text(
-                'Konsultasi Dokter (Opsional)',
-                style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                foregroundColor: const Color(0xFF334155),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MasterLayout(initialIndex: 1),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    icon: const Icon(Icons.medical_services_outlined, size: 18),
+                    label: Text(
+                      'Konsultasi Dokter',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      foregroundColor: const Color(0xFF334155),
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       );

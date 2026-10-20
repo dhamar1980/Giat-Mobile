@@ -1392,7 +1392,7 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // ACTION BUTTON: LANJUTKAN / ANALISIS SKRINING SEKARANG
+  // ACTION BUTTON: LANJUTKAN / ANALISIS DENGAN AI PRAGI
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildActionButton(int total) {
     final bool isLastStep = _currentStep == total;
@@ -1417,7 +1417,7 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              isLastStep ? 'Analisis Skrining Sekarang' : 'Lanjutkan',
+              isLastStep ? 'Analisis dengan AI PRAGI' : 'Lanjutkan',
               style: GoogleFonts.inter(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,

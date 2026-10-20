@@ -514,19 +514,50 @@ class PasienApiService {
     }
   }
 
-  /// POST /api/pasien/pragi/skrining
-  /// Body: {"jawaban": {"HeartDisease": "No", "BMI": 26.45, ...}}
+  /// POST /api/pasien/pragi/predict (fallback /api/pasien/pragi/skrining)
+  /// Body: 16 biomarker features JSON directly (or wrapped in 'jawaban')
   Future<ApiResponse<PragiHasilSkrining>> submitPragiSkrining(Map<String, dynamic> answers) async {
     try {
-      final payload = {'jawaban': answers};
       dynamic response;
+      DioException? lastDioError;
+
+      // Ensure answers map is flattened to 16 features if inadvertently passed with 'jawaban' key
+      final Map<String, dynamic> directPayload = answers.containsKey('jawaban') && answers['jawaban'] is Map
+          ? Map<String, dynamic>.from(answers['jawaban'])
+          : answers;
+
+      // 1. Try POST /pasien/pragi/predict with direct 16 features
       try {
-        response = await _client.dio.post('/pasien/pragi/skrining', data: payload);
-      } on DioException catch (dioErr) {
-        if (dioErr.response?.statusCode == 404) {
-          response = await _client.dio.post('/pragi/skrining', data: payload);
-        } else {
-          rethrow;
+        response = await _client.dio.post('/pasien/pragi/predict', data: directPayload);
+      } on DioException catch (e1) {
+        lastDioError = e1;
+        // 2. Try POST /pasien/pragi/skrining with direct features
+        try {
+          response = await _client.dio.post('/pasien/pragi/skrining', data: directPayload);
+        } on DioException catch (e2) {
+          lastDioError = e2;
+          // 3. Try with wrapped {"jawaban": ...} on /pasien/pragi/skrining if 422 or 400
+          try {
+            response = await _client.dio.post(
+              '/pasien/pragi/skrining',
+              data: {'jawaban': directPayload},
+            );
+          } on DioException catch (e3) {
+            lastDioError = e3;
+            // 4. Try public fallback /pragi/predict
+            try {
+              response = await _client.dio.post('/pragi/predict', data: directPayload);
+            } on DioException catch (e4) {
+              lastDioError = e4;
+              // 5. Try public fallback /pragi/skrining
+              try {
+                response = await _client.dio.post('/pragi/skrining', data: directPayload);
+              } on DioException catch (e5) {
+                lastDioError = e5;
+                rethrow;
+              }
+            }
+          }
         }
       }
 
@@ -538,7 +569,7 @@ class PasienApiService {
       final hasil = PragiHasilSkrining.fromJson(dataMap);
 
       return ApiResponse.success(
-        message: raw?['message'] ?? 'Skrining PRAGI berhasil diproses.',
+        message: raw?['message'] ?? 'Skrining AI PRAGI berhasil diproses dan diprediksi.',
         data: hasil,
         statusCode: response.statusCode,
       );
