@@ -7,6 +7,7 @@ import 'catat_kondisi_screen.dart';
 import 'riwayat_pemantauan_screen.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
+import '../../../widgets/giat_header_style.dart';
 import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,7 +48,6 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
   // Theme colors matching the design
   static const _darkGreen = Color(0xFF065A37);
   static const _buttonGreen = Color(0xFF044E2F);
-  static const _bubbleDarkGreen = Color(0xFF065A37);
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
 
@@ -365,29 +365,10 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
   Widget _buildHeaderSection() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF22C55E),
-            Color(0xFF16A34A),
-            Color(0xFF0D7A3E),
-          ],
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(38),
-          bottomRight: Radius.circular(38),
-        ),
-      ),
+      decoration: GiatHeaderStyle.headerDecoration,
       child: Stack(
         children: [
-          // Background organic curves
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _PantauHeaderCurvePainter(),
-            ),
-          ),
+          const GiatHeaderCurvesOverlay(),
 
           Padding(
             padding: EdgeInsets.fromLTRB(
@@ -473,22 +454,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 320),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(4),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
+                    decoration: GiatHeaderStyle.chatBubbleDecoration,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -498,7 +464,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: _bubbleDarkGreen,
+                            color: GiatHeaderStyle.chatBubbleGreen,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -507,7 +473,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            color: _bubbleDarkGreen.withValues(alpha: 0.9),
+                            color: GiatHeaderStyle.chatBubbleTextSecondary,
                             height: 1.35,
                           ),
                         ),
@@ -1408,37 +1374,7 @@ class _CardCornerContoursPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CUSTOM PAINTER: HEADER ORGANIC CURVE
-// ─────────────────────────────────────────────────────────────────────────────
 
-class _PantauHeaderCurvePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
-
-    for (int i = 0; i < 4; i++) {
-      final path = Path();
-      final yOffset = 40.0 + (i * 40);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.25,
-        yOffset + 30,
-        size.width * 0.75,
-        yOffset - 30,
-        size.width,
-        yOffset + 20,
-      );
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CUSTOM PAINTER: BACKGROUND TOPOGRAPHY

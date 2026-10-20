@@ -1,4 +1,5 @@
 import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_header_style.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'jadwalkan_konsultasi_screen.dart';
@@ -178,15 +179,7 @@ class _DokterDetailScreenState extends State<DokterDetailScreen> {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF22C55E), // Fresh green top
-            Color(0xFF059669), // Emerald transition
-            Color(0xFF065A37), // Deep GIAT green
-          ],
-        ),
+        gradient: GiatHeaderStyle.backgroundGradient,
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(42),
           bottomRight: Radius.circular(42),

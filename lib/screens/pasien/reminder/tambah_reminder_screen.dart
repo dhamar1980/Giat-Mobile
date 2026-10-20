@@ -43,19 +43,9 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
 
   final List<String> _kategoriOptions = ['Obat', 'Konsultasi'];
 
-  final List<String> _pengulanganObatOptions = [
+  final List<String> _pengulanganOptions = [
     'Setiap Hari',
     'Sekali Saja',
-    'Hari Kerja (Senin - Jumat)',
-    'Akhir Pekan (Sabtu - Minggu)',
-    'Kustom',
-  ];
-
-  final List<String> _pengulanganKonsultasiOptions = [
-    'Sekali Saja',
-    'Setiap Minggu',
-    'Setiap Bulan',
-    'Kustom',
   ];
 
   bool _isPopping = false;
@@ -224,7 +214,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
         'waktu': timeFormatted,
         'time': _formatTime(targetTime),
         'date': _formatDate(targetDate),
-        'pengulangan': _konsultasiPengulangan.toLowerCase().contains('minggu') ? 'mingguan' : 'sekali',
+        'pengulangan': _konsultasiPengulangan == 'Setiap Hari' ? 'harian' : 'sekali',
         'catatan': _catatanCtrl.text.trim(),
         'status': 'Akan Datang',
         'is_active': true,
@@ -279,7 +269,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
                         // 3. Simpan Reminder Button
                         _buildSubmitButton(),
 
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 80),
                       ],
                     ),
                   ),
@@ -365,6 +355,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
   // CATEGORY DROPDOWN (Hanya Obat & Konsultasi)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildCategoryDropdown() {
+    final isObat = _selectedCategory == 'Obat';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -377,29 +368,79 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
               ),
-            ],
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedCategory,
-              isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _textColor),
-              items: _kategoriOptions.map((cat) {
-                final isObat = cat == 'Obat';
-                return DropdownMenuItem<String>(
-                  value: cat,
+              child: PopupMenuButton<String>(
+                tooltip: '',
+                position: PopupMenuPosition.under,
+                offset: const Offset(0, 6),
+                constraints: BoxConstraints(
+                  minWidth: constraints.maxWidth,
+                  maxWidth: constraints.maxWidth,
+                ),
+                elevation: 4,
+                shadowColor: Colors.black.withValues(alpha: 0.15),
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: Color(0xFFCBD5E1), width: 1),
+                ),
+                onSelected: (val) {
+                  setState(() => _selectedCategory = val);
+                },
+                itemBuilder: (context) {
+                  return _kategoriOptions.map((cat) {
+                    final itemIsObat = cat == 'Obat';
+                    final isSelected = cat == _selectedCategory;
+                    return PopupMenuItem<String>(
+                      value: cat,
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Row(
+                        children: [
+                          Icon(
+                            itemIsObat ? Icons.medication_rounded : Icons.medical_services_rounded,
+                            color: isSelected ? _primaryGreen : const Color(0xFF64748B),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              cat,
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                color: isSelected ? _primaryGreen : _textColor,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(Icons.check_rounded, color: _primaryGreen, size: 18),
+                        ],
+                      ),
+                    );
+                  }).toList();
+                },
+                child: Container(
+                  height: 50,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: Row(
                     children: [
                       Icon(
@@ -408,25 +449,23 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
                         size: 20,
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        cat,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: _textColor,
+                      Expanded(
+                        child: Text(
+                          _selectedCategory,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: _textColor,
+                          ),
                         ),
                       ),
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: _textColor),
                     ],
                   ),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _selectedCategory = val);
-                }
-              },
-            ),
-          ),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -523,7 +562,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
         const SizedBox(height: 8),
         _buildDropdownSelector(
           currentValue: _obatPengulangan,
-          items: _pengulanganObatOptions,
+          items: _pengulanganOptions,
           onChanged: (val) {
             if (val != null) setState(() => _obatPengulangan = val);
           },
@@ -628,7 +667,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
         const SizedBox(height: 8),
         _buildDropdownSelector(
           currentValue: _konsultasiPengulangan,
-          items: _pengulanganKonsultasiOptions,
+          items: _pengulanganOptions,
           onChanged: (val) {
             if (val != null) setState(() => _konsultasiPengulangan = val);
           },
@@ -737,41 +776,105 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
           ),
-        ],
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: currentValue,
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _textColor),
-          items: items.map((opt) {
-            return DropdownMenuItem<String>(
-              value: opt,
-              child: Text(
-                opt,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: _textColor,
-                ),
+          child: PopupMenuButton<String>(
+            tooltip: '',
+            position: PopupMenuPosition.under,
+            offset: const Offset(0, 6),
+            constraints: BoxConstraints(
+              minWidth: constraints.maxWidth,
+              maxWidth: constraints.maxWidth,
+            ),
+            elevation: 4,
+            shadowColor: Colors.black.withValues(alpha: 0.15),
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFCBD5E1), width: 1),
+            ),
+            onSelected: onChanged,
+            itemBuilder: (context) {
+              return items.map((opt) {
+                final isSelected = opt == currentValue;
+                return PopupMenuItem<String>(
+                  value: opt,
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        opt == 'Setiap Hari'
+                            ? Icons.replay_rounded
+                            : Icons.event_available_rounded,
+                        color: isSelected ? _primaryGreen : const Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          opt,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                            color: isSelected ? _primaryGreen : _textColor,
+                          ),
+                        ),
+                      ),
+                      if (isSelected)
+                        const Icon(Icons.check_rounded, color: _primaryGreen, size: 18),
+                    ],
+                  ),
+                );
+              }).toList();
+            },
+            child: Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            );
-          }).toList(),
-          onChanged: onChanged,
-        ),
-      ),
+              child: Row(
+                children: [
+                  Icon(
+                    currentValue == 'Setiap Hari'
+                        ? Icons.replay_rounded
+                        : Icons.event_available_rounded,
+                    color: _primaryGreen,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      currentValue,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: _textColor,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.keyboard_arrow_down_rounded, color: _textColor),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

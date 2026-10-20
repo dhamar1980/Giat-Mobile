@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
 import '../notifikasi/apotek_notifikasi_screen.dart';
 import 'apotek_detail_pesanan_screen.dart';
+import '../../../widgets/giat_header_style.dart';
 import '../../../services/apotek_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,34 +197,10 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
   Widget _buildHeaderSection(double topPadding) {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF22C55E),
-            Color(0xFF16A34A),
-            Color(0xFF065A37),
-          ],
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(36),
-          bottomRight: Radius.circular(36),
-        ),
-      ),
+      decoration: GiatHeaderStyle.headerDecoration,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(36),
-                bottomRight: Radius.circular(36),
-              ),
-              child: CustomPaint(
-                painter: _PesananHeaderCurvePainter(),
-              ),
-            ),
-          ),
+          const GiatHeaderCurvesOverlay(),
           Padding(
             padding: EdgeInsets.fromLTRB(20, topPadding + 86, 20, 20),
             child: Column(
@@ -244,7 +221,7 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF065A37),
+                            color: GiatHeaderStyle.chatBubbleGreen,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -253,7 +230,7 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF065A37).withValues(alpha: 0.9),
+                            color: GiatHeaderStyle.chatBubbleTextSecondary,
                             height: 1.35,
                           ),
                         ),
@@ -747,30 +724,4 @@ class _ChatTailPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _PesananHeaderCurvePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
 
-    for (int i = 0; i < 5; i++) {
-      final path = Path();
-      final yOffset = 30.0 + (i * 45);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.25,
-        yOffset + 35,
-        size.width * 0.75,
-        yOffset - 35,
-        size.width,
-        yOffset + 25,
-      );
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

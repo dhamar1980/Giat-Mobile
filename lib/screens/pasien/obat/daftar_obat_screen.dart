@@ -8,6 +8,7 @@ import 'lacak_obat_screen.dart';
 import 'riwayat_obat_screen.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
+import '../../../widgets/giat_header_style.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN OBAT & RESEP PASIEN (Figma Screen: Tab Obat Pasien)
@@ -131,29 +132,10 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
   Widget _buildHeaderSection() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF22C55E),
-            Color(0xFF16A34A),
-            Color(0xFF0D7A3E),
-          ],
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(38),
-          bottomRight: Radius.circular(38),
-        ),
-      ),
+      decoration: GiatHeaderStyle.headerDecoration,
       child: Stack(
         children: [
-          // Background organic curves
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _ObatHeaderCurvePainter(),
-            ),
-          ),
+          const GiatHeaderCurvesOverlay(),
 
           Padding(
             padding: EdgeInsets.fromLTRB(
@@ -239,22 +221,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 340),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(4),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
+                    decoration: GiatHeaderStyle.chatBubbleDecoration,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -264,7 +231,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: _darkGreen,
+                            color: GiatHeaderStyle.chatBubbleGreen,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -273,7 +240,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            color: _darkGreen.withValues(alpha: 0.9),
+                            color: GiatHeaderStyle.chatBubbleTextSecondary,
                             height: 1.35,
                           ),
                         ),
@@ -1168,34 +1135,4 @@ class _ObatTopographyPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CUSTOM PAINTER: HEADER ORGANIC CURVE
-// ─────────────────────────────────────────────────────────────────────────────
 
-class _ObatHeaderCurvePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
-
-    for (int i = 0; i < 4; i++) {
-      final path = Path();
-      final yOffset = 40.0 + (i * 40);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.25,
-        yOffset + 30,
-        size.width * 0.75,
-        yOffset - 30,
-        size.width,
-        yOffset + 20,
-      );
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

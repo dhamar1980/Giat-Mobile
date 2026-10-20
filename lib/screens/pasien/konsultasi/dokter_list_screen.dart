@@ -8,6 +8,7 @@ import '../profile/profile_pasien_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
+import '../../../widgets/giat_header_style.dart';
 import '../../../services/konsultasi_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -312,31 +313,10 @@ class _DokterListScreenState extends State<DokterListScreen> {
   Widget _buildHeaderSection() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF22C55E), Color(0xFF15803D), Color(0xFF065A37)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(36),
-          bottomRight: Radius.circular(36),
-        ),
-      ),
+      decoration: GiatHeaderStyle.headerDecoration,
       child: Stack(
         children: [
-          // Header Topography Line Painter
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(36),
-                bottomRight: Radius.circular(36),
-              ),
-              child: CustomPaint(
-                painter: _HeaderCurvePainter(),
-              ),
-            ),
-          ),
+          const GiatHeaderCurvesOverlay(),
 
           Padding(
             padding: EdgeInsets.fromLTRB(
@@ -437,22 +417,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 340),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(4),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
+                    decoration: GiatHeaderStyle.chatBubbleDecoration,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -462,7 +427,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF044E2F),
+                            color: GiatHeaderStyle.chatBubbleGreen,
                             height: 1.35,
                           ),
                         ),
@@ -472,7 +437,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w400,
-                            color: const Color(0xFF044E2F).withValues(alpha: 0.9),
+                            color: GiatHeaderStyle.chatBubbleTextSecondary,
                             height: 1.35,
                           ),
                         ),
@@ -1644,33 +1609,6 @@ class _KonsultasiTopographyPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _HeaderCurvePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
-
-    for (int i = 0; i < 4; i++) {
-      final path = Path();
-      final yOffset = 30.0 + (i * 45);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.25,
-        yOffset + 35,
-        size.width * 0.75,
-        yOffset - 35,
-        size.width,
-        yOffset + 25,
-      );
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 class _SubtleCardOverlayPainter extends CustomPainter {
   @override

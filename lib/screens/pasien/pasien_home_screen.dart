@@ -9,6 +9,7 @@ import 'widgets/pasien_bottom_navbar.dart';
 import '../../master_layout.dart';
 import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
+import '../../widgets/giat_header_style.dart';
 import '../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,28 +200,10 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
   Widget _buildHeaderSection() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF22C55E),
-            Color(0xFF16A34A),
-            Color(0xFF0D7A3E),
-          ],
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(36),
-          bottomRight: Radius.circular(36),
-        ),
-      ),
+      decoration: GiatHeaderStyle.headerDecoration,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _HeaderCurvePainter(),
-            ),
-          ),
+          const GiatHeaderCurvesOverlay(),
           Padding(
             padding: EdgeInsets.fromLTRB(
               20,
@@ -867,33 +850,6 @@ class _HomeTopographyPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _HeaderCurvePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
-
-    for (int i = 0; i < 4; i++) {
-      final path = Path();
-      final yOffset = 40.0 + (i * 40);
-      path.moveTo(0, yOffset);
-      path.cubicTo(
-        size.width * 0.25,
-        yOffset + 30,
-        size.width * 0.75,
-        yOffset - 30,
-        size.width,
-        yOffset + 20,
-      );
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 class _SubtleCardOverlayPainter extends CustomPainter {
   @override
