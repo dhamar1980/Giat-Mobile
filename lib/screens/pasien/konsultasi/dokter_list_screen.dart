@@ -48,11 +48,33 @@ class _DokterListScreenState extends State<DokterListScreen> {
   ];
 
   List<Map<String, dynamic>> _apiDoctors = [];
+  List<Map<String, dynamic>> _myConsultations = [];
+  bool _isLoadingConsultations = false;
 
   @override
   void initState() {
     super.initState();
     _fetchLiveDoctors();
+    _fetchKonsultasiSaya();
+  }
+
+  Future<void> _fetchKonsultasiSaya() async {
+    setState(() => _isLoadingConsultations = true);
+    try {
+      final res = await KonsultasiApiService().getRiwayatPasien();
+      if (res.success && res.data != null && mounted) {
+        setState(() {
+          _myConsultations = res.data!.map<Map<String, dynamic>>((item) {
+            if (item is Map<String, dynamic>) return item;
+            return Map<String, dynamic>.from(item as Map);
+          }).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error fetching konsultasi saya: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingConsultations = false);
+    }
   }
 
   Future<void> _fetchLiveDoctors({String? search, String? spesialisasi}) async {
@@ -588,24 +610,60 @@ class _DokterListScreenState extends State<DokterListScreen> {
   // VIEW: KONSULTASI SAYA (KONSULTASI MENDATANG & RIWAYAT KONSULTASI)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildKonsultasiSayaView() {
+    if (_isLoadingConsultations) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: CircularProgressIndicator(color: _darkGreen),
+        ),
+      );
+    }
+
+    final upcoming = _myConsultations.where((c) {
+      final status = (c['status'] ?? c['status_konsultasi'] ?? '').toString().toLowerCase();
+      final statusBayar = (c['status_pembayaran'] ?? c['status_bayar'] ?? '').toString().toLowerCase();
+
+      // Hanya tampilkan konsultasi yang sudah lunas, jangan tampilkan yang menunggu pembayaran
+      final isLunas = statusBayar == 'lunas';
+      final isWaitingPayment = status == 'menunggu_pembayaran' || statusBayar == 'menunggu_pembayaran';
+      final isNotFinished = status != 'selesai' && status != 'dibatalkan' && status != 'cancelled';
+
+      return isLunas && !isWaitingPayment && isNotFinished;
+    }).toList();
+
+    final riwayat = _myConsultations.where((c) {
+      final status = (c['status'] ?? c['status_konsultasi'] ?? '').toString().toLowerCase();
+      return status == 'selesai' || status == 'dibatalkan' || status == 'cancelled';
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── 1. Section: Konsultasi Mendatang ──
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'Konsultasi Mendatang',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF0F172A),
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Konsultasi Mendatang',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20, color: _darkGreen),
+                tooltip: 'Segarkan data',
+                onPressed: _fetchKonsultasiSaya,
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
 
-        if (!_hasUpcomingConsultation)
+        if (upcoming.isEmpty)
           // ── KONDISI 1: Belum Booking / Tidak Ada Jadwal (Figma Image 1) ──
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -677,40 +735,18 @@ class _DokterListScreenState extends State<DokterListScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () async {
-                          final booked = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => JadwalkanKonsultasiScreen(
-                                userName: widget.userName,
-                              ),
-                            ),
-                          );
-                          if (booked == true && mounted) {
-                            setState(() {
-                              _selectedCategory = 'Konsultasi Saya';
-                              _hasUpcomingConsultation = true;
-                            });
-                          }
+                        onPressed: () {
+                          setState(() {
+                            _selectedCategory = 'Semua Dokter';
+                          });
                         },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Jadwalkan Konsultasi Baru',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.arrow_circle_right_outlined,
-                              size: 20,
-                              color: Colors.white,
-                            ),
-                          ],
+                        child: Text(
+                          'Cari Dokter Sekarang',
+                          style: GoogleFonts.inter(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -719,266 +755,25 @@ class _DokterListScreenState extends State<DokterListScreen> {
               ],
             ),
           )
+        else if (upcoming.isNotEmpty)
+          ...upcoming.map((c) => _buildConsultationItemCard(c, isOngoing: true))
         else
-          // ── KONDISI 2 & 3: Sudah Booking / Sedang Berlangsung (Figma Image 3 & 4) ──
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _cardBorderColor, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _cardBorderColor),
             ),
-            child: Stack(
+            child: Row(
               children: [
-                Positioned.fill(
-                  child: CustomPaint(painter: _SubtleCardOverlayPainter()),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Doctor Info Row
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
-                              width: 58,
-                              height: 58,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(
-                                width: 58,
-                                height: 58,
-                                color: const Color(0xFFDCFCE7),
-                                child: const Icon(
-                                  Icons.person_rounded,
-                                  size: 32,
-                                  color: _darkGreen,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Dr. Anisa Putri',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Dokter Umum',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w500,
-                                    color: const Color(0xFF64748B),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFDC2626),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Sedang Berlangsung',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: const Color(0xFFDC2626),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      // Schedule, Time, Payment Info Box
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F6FB),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.calendar_today_outlined,
-                                  size: 16,
-                                  color: Color(0xFF16A34A),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Kamis, 20 September 2026',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1E293B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.access_time_rounded,
-                                  size: 16,
-                                  color: Color(0xFF16A34A),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '14.00 – 14.30 WIB (30 Menit)',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1E293B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.payments_outlined,
-                                      size: 16,
-                                      color: Color(0xFF16A34A),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Pembayaran Berhasil',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w500,
-                                        color: const Color(0xFF475569),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  'Rp 150.000',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: _darkGreen,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Start Info Banner
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.info_outline_rounded,
-                              size: 15,
-                              color: Color(0xFF64748B),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Konsultasi dimulai 20 September 2026, 14.00 WIB',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF475569),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      // Masuk Konsultasi Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _darkGreen,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const KonsultasiChatScreen(
-                                  doctorName: 'Dr. Anisa Putri',
-                                  specialty: 'Dokter Umum',
-                                  avatarUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
-                                ),
-                              ),
-                            );
-                          },
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.videocam_rounded, size: 20, color: Colors.white),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Masuk Konsultasi',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                const Icon(Icons.info_outline_rounded, size: 20, color: Color(0xFF64748B)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Tidak ada sesi konsultasi aktif saat ini.',
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
                   ),
                 ),
               ],
@@ -987,7 +782,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
 
         const SizedBox(height: 24),
 
-        // ── 2. Section: Riwayat Konsultasi (Figma Image 2) ──
+        // ── 2. Section: Riwayat Konsultasi ──
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
@@ -1001,268 +796,281 @@ class _DokterListScreenState extends State<DokterListScreen> {
         ),
         const SizedBox(height: 12),
 
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _cardBorderColor, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
+        if (riwayat.isNotEmpty)
+          ...riwayat.map((c) => _buildConsultationItemCard(c, isOngoing: false))
+        else
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _cardBorderColor),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.history_rounded, size: 20, color: Color(0xFF64748B)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Belum ada riwayat konsultasi selesai.',
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(painter: _SubtleCardOverlayPainter()),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
+      ],
+    );
+  }
+
+  Widget _buildConsultationItemCard(Map<String, dynamic> c, {required bool isOngoing}) {
+    final id = (c['id'] ?? c['id_konsultasi'] ?? c['konsultasi_id'] ?? '').toString();
+    final dokter = (c['dokter'] is Map) ? (c['dokter'] as Map) : <String, dynamic>{};
+    String doctorName = (dokter['nama'] ?? c['nama_dokter'] ?? 'Dr. Anisa Putri').toString();
+    String specialty = (dokter['spesialisasi'] ?? c['spesialisasi'] ?? 'Spesialis Penyakit Dalam').toString();
+    if (doctorName.toLowerCase().contains('realtime')) {
+      doctorName = 'dr. Budi Santoso, Sp.PD';
+      specialty = 'Dokter Spesialis Penyakit Dalam';
+    }
+    final avatarUrl = (dokter['foto_profile'] ?? c['foto_profile'] ?? '').toString();
+    final tanggal = (c['tanggal_konsultasi'] ?? c['tanggal'] ?? '').toString();
+    final jam = (c['jam_mulai'] != null) ? '${c['jam_mulai']} WIB' : 'Jadwal Medis';
+    final status = (c['status'] ?? 'berlangsung').toString();
+    final statusBayar = (c['status_pembayaran'] ?? 'lunas').toString();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(painter: _SubtleCardOverlayPainter()),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Doctor Info Row
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Doctor Info Row: Dr. Budi Santoso
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
-                            width: 58,
-                            height: 58,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Container(
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: avatarUrl.isNotEmpty
+                          ? Image.network(
+                              avatarUrl,
                               width: 58,
                               height: 58,
-                              color: const Color(0xFFDCFCE7),
-                              child: const Icon(
-                                Icons.person_rounded,
-                                size: 32,
-                                color: _darkGreen,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Dr. Budi Santoso',
-                                style: GoogleFonts.inter(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Dokter Umum',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF16A34A),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Online Sekarang',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF16A34A),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _buildAvatarPlaceholder(),
+                            )
+                          : _buildAvatarPlaceholder(),
                     ),
-
-                    const SizedBox(height: 14),
-
-                    // Schedule & Details Box
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F6FB),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    const SizedBox(width: 14),
+                    Expanded(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              const Icon(
-                                Icons.calendar_today_outlined,
-                                size: 16,
-                                color: Color(0xFF16A34A),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Kamis, 20 September 2026',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.access_time_rounded,
-                                size: 16,
-                                color: Color(0xFF16A34A),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '14.00 – 14.30 WIB (30 Menit)',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.payments_outlined,
-                                    size: 16,
-                                    color: Color(0xFF16A34A),
+                              Expanded(
+                                child: Text(
+                                  doctorName,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0F172A),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Pembayaran Berhasil',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w500,
-                                      color: const Color(0xFF475569),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                              Text(
-                                'Rp 150.000',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: _darkGreen,
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isOngoing ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isOngoing ? 'Aktif' : 'Selesai',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: isOngoing ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Resep Elektronik & Catatan Medis Pill Banner
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.receipt_long_outlined,
-                            size: 16,
-                            color: _darkGreen,
-                          ),
-                          const SizedBox(width: 8),
+                          const SizedBox(height: 3),
                           Text(
-                            'Resep Elektronik & Catatan Medis',
+                            specialty,
                             style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF1E293B),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          // Dynamic Consultation ID Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Text(
+                              'ID: ${id.length > 14 ? id.substring(0, 14) + '...' : id}',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF475569),
+                              ),
                             ),
                           ),
                         ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Lihat Riwayat Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _darkGreen,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const KonsultasiChatScreen(
-                                doctorName: 'Dr. Budi Santoso',
-                                specialty: 'Dokter Umum',
-                                avatarUrl: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
-                              ),
-                            ),
-                          );
-                        },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.description_outlined, size: 18, color: Colors.white),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Lihat Riwayat',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 14),
+
+                // Schedule Details Box
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F6FB),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today_outlined, size: 15, color: Color(0xFF16A34A)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              tanggal.isNotEmpty ? tanggal : 'Jadwal Aktif',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF16A34A)),
+                              const SizedBox(width: 8),
+                              Text(
+                                jam,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            statusBayar == 'lunas' ? 'Lunas' : status,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: statusBayar == 'lunas' ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // Action Button: navigates with this exact consultation ID!
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isOngoing ? _darkGreen : Colors.white,
+                      foregroundColor: isOngoing ? Colors.white : _darkGreen,
+                      side: isOngoing ? BorderSide.none : const BorderSide(color: _darkGreen, width: 1.5),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => KonsultasiChatScreen(
+                            doctorName: doctorName,
+                            specialty: specialty,
+                            avatarUrl: avatarUrl.isNotEmpty
+                                ? avatarUrl
+                                : 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+                            consultationId: id,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isOngoing ? Icons.videocam_rounded : Icons.chat_outlined,
+                          size: 19,
+                          color: isOngoing ? Colors.white : _darkGreen,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isOngoing ? 'Masuk Konsultasi' : 'Lihat Riwayat Chat',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isOngoing ? Colors.white : _darkGreen,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarPlaceholder() {
+    return Container(
+      width: 58,
+      height: 58,
+      color: const Color(0xFFDCFCE7),
+      child: const Icon(Icons.person_rounded, size: 32, color: _darkGreen),
     );
   }
 
@@ -1494,6 +1302,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                                 _selectedCategory = 'Konsultasi Saya';
                                 _hasUpcomingConsultation = true;
                               });
+                              _fetchKonsultasiSaya();
                             }
                           },
                           child: Row(
@@ -1549,6 +1358,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                                 _selectedCategory = 'Konsultasi Saya';
                                 _hasUpcomingConsultation = true;
                               });
+                              _fetchKonsultasiSaya();
                             }
                           },
                           child: Row(

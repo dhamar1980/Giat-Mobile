@@ -84,6 +84,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
       MaterialPageRoute(
         builder: (_) => DokterRoomChatScreen(
           patient: patient,
+          consultationId: item.id,
         ),
       ),
     );

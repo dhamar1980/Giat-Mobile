@@ -16,6 +16,7 @@ class MenungguPembayaranQrisScreen extends StatefulWidget {
   final String selectedTime;
   final String price;
   final String userName;
+  final String? idKonsultasi;
 
   const MenungguPembayaranQrisScreen({
     super.key,
@@ -24,6 +25,7 @@ class MenungguPembayaranQrisScreen extends StatefulWidget {
     required this.selectedTime,
     required this.price,
     this.userName = 'Pasien',
+    this.idKonsultasi,
   });
 
   @override
@@ -821,14 +823,26 @@ class _MenungguPembayaranQrisScreenState extends State<MenungguPembayaranQrisScr
               ),
               onPressed: () async {
                 // Konfirmasi status pembayaran konsultasi ke REST API backend
-                final docId = widget.doctor['id'] ?? '1';
-                KonsultasiApiService().bayarKonsultasi(docId, {
-                  'metode': 'qris',
-                  'biaya': widget.price,
-                  'status': 'berhasil',
-                });
-                KonsultasiApiService().cekStatusPembayaran(docId);
+                final konsultasiId = widget.idKonsultasi ??
+                    widget.doctor['id_konsultasi']?.toString() ??
+                    widget.doctor['konsultasi_id']?.toString();
+                if (konsultasiId != null &&
+                    konsultasiId.isNotEmpty &&
+                    konsultasiId != 'anisa_putri' &&
+                    konsultasiId != 'budi_santoso') {
+                  try {
+                    await KonsultasiApiService().bayarKonsultasi(konsultasiId, {
+                      'metode_pembayaran': 'qris',
+                      'biaya': widget.price,
+                      'status': 'berhasil',
+                    });
+                    await KonsultasiApiService().cekStatusPembayaran(konsultasiId);
+                  } catch (e) {
+                    debugPrint('Notice bayar konsultasi API: $e');
+                  }
+                }
 
+                if (!mounted) return;
                 final success = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(

@@ -20,6 +20,7 @@ class MenungguPembayaranVaScreen extends StatefulWidget {
   final String bankName;
   final String accountName;
   final String paymentDeadline;
+  final String? idKonsultasi;
 
   const MenungguPembayaranVaScreen({
     super.key,
@@ -32,6 +33,7 @@ class MenungguPembayaranVaScreen extends StatefulWidget {
     this.bankName = 'BCA Virtual Account',
     this.accountName = 'A.N. GIAT Farma / Encep Suryana',
     this.paymentDeadline = '01 September 2026, 23:59 WIB',
+    this.idKonsultasi,
   });
 
   @override
@@ -1077,16 +1079,28 @@ class _MenungguPembayaranVaScreenState extends State<MenungguPembayaranVaScreen>
               ),
               onPressed: () async {
                 // Konfirmasi status pembayaran VA ke REST API backend
-                final docId = widget.doctor['id'] ?? '1';
-                KonsultasiApiService().bayarKonsultasi(docId, {
-                  'metode': 'va',
-                  'bank': widget.bankName,
-                  'nomor_va': widget.vaNumber,
-                  'biaya': widget.price,
-                  'status': 'berhasil',
-                });
-                KonsultasiApiService().cekStatusPembayaran(docId);
+                final konsultasiId = widget.idKonsultasi ??
+                    widget.doctor['id_konsultasi']?.toString() ??
+                    widget.doctor['konsultasi_id']?.toString();
+                if (konsultasiId != null &&
+                    konsultasiId.isNotEmpty &&
+                    konsultasiId != 'anisa_putri' &&
+                    konsultasiId != 'budi_santoso') {
+                  try {
+                    await KonsultasiApiService().bayarKonsultasi(konsultasiId, {
+                      'metode_pembayaran': 'va',
+                      'bank': widget.bankName,
+                      'nomor_va': widget.vaNumber,
+                      'biaya': widget.price,
+                      'status': 'berhasil',
+                    });
+                    await KonsultasiApiService().cekStatusPembayaran(konsultasiId);
+                  } catch (e) {
+                    debugPrint('Notice bayar konsultasi VA: $e');
+                  }
+                }
 
+                if (!mounted) return;
                 final success = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(

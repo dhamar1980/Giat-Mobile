@@ -1,21 +1,34 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'dart:async';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
 import '../resep/dokter_review_resep_sheet.dart';
 import 'dokter_video_call_screen.dart';
+import '../../../models/user_model.dart';
+import '../../../models/chat_message_model.dart';
+import '../../../models/call_signal_model.dart';
+import '../../../services/konsultasi_api_service.dart';
+import '../../../services/firebase_realtime_service.dart';
+import '../../../services/jitsi_video_service.dart';
+import '../../../services/ringtone_player.dart';
+import '../../../services/storage_service.dart';
+import '../../../widgets/incoming_call_dialog.dart';
+import '../../../widgets/typing_indicator_widget.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RUANG CHAT DOKTER-PASIEN (Desain Konsisten Sesuai Pasien Chat & Figma GIAT)
+// RUANG CHAT DOKTER-PASIEN (Realtime Chat & Video Call GIAT Telemedicine)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ChatMessage {
+  final String? id;
   final String sender; // 'doctor' | 'patient' | 'prescription'
   final String text;
   final String time;
   final List<DokterPrescriptionItem>? prescriptionItems;
 
   const _ChatMessage({
+    this.id,
     required this.sender,
     required this.text,
     required this.time,
@@ -25,10 +38,12 @@ class _ChatMessage {
 
 class DokterRoomChatScreen extends StatefulWidget {
   final DokterPatient patient;
+  final String? consultationId;
 
   const DokterRoomChatScreen({
     super.key,
     required this.patient,
+    this.consultationId,
   });
 
   @override
@@ -41,11 +56,30 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
 
+  final KonsultasiApiService _apiService = KonsultasiApiService();
+  final FirebaseRealtimeService _firebaseService = FirebaseRealtimeService();
+  final JitsiVideoService _jitsiService = JitsiVideoService();
+  final RingtonePlayer _ringtonePlayer = RingtonePlayer();
+
+  UserModel? _currentUser;
+  StreamSubscription? _msgSub;
+  StreamSubscription? _typingSub;
+  StreamSubscription? _callSub;
+  Timer? _typingDebounce;
+
+  bool _isPatientTyping = false;
+  bool _isIncomingCallModalShowing = false;
+  DateTime? _callStartTime;
+
+  late String _activeConsultationId;
+  String get _consultationId => _activeConsultationId;
+
   late List<_ChatMessage> _messages;
 
   @override
   void initState() {
     super.initState();
+    _activeConsultationId = widget.consultationId ?? widget.patient.id;
     _messages = [
       const _ChatMessage(
         sender: 'doctor',
@@ -58,13 +92,346 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
         time: '12.00',
       ),
     ];
+
+    _initSessionAndListeners();
+  }
+
+  Future<void> _initSessionAndListeners() async {
+    _currentUser = await StorageService().getUser();
+    _setupRealtimeListeners();
+    _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final List<_ChatMessage> loaded = [];
+      final Set<String> loadedIds = {};
+
+      final res = await _apiService.getMessages(_consultationId);
+      if (res.success && res.data != null && res.data!.isNotEmpty) {
+        for (var item in res.data!) {
+          if (item is Map) {
+            final senderRole = (item['sender_role'] ?? item['role'] ?? '').toString().toLowerCase();
+            final senderId = (item['id_sender'] ?? item['sender_id'] ?? '').toString();
+            final myId = _currentUser?.id?.toString() ?? '';
+            final id = (item['id'] ?? item['id_pesan'] ?? '').toString();
+
+            final bool isDoctor = (senderRole == 'dokter') ||
+                (myId.isNotEmpty && senderId.isNotEmpty && senderId == myId);
+            final text = item['pesan'] ?? item['message'] ?? item['text'] ?? '';
+            final time = item['created_at'] != null
+                ? item['created_at'].toString().split('T').last.substring(0, 5)
+                : '12.00';
+
+            if (id.isNotEmpty) loadedIds.add(id);
+            loaded.add(_ChatMessage(
+              id: id,
+              sender: isDoctor ? 'doctor' : 'patient',
+              text: text.toString(),
+              time: time,
+            ));
+          }
+        }
+      }
+
+      final fbMessages = await _firebaseService.fetchMessagesDirectly(_consultationId);
+      for (var fbMsg in fbMessages) {
+        final isDoctor = (fbMsg.senderRole.toLowerCase() == 'dokter') ||
+            (_currentUser != null && fbMsg.idSender.isNotEmpty && fbMsg.idSender == _currentUser!.id.toString());
+        final senderKey = isDoctor ? 'doctor' : 'patient';
+
+        final bool alreadyExists = (fbMsg.id.isNotEmpty && loadedIds.contains(fbMsg.id)) ||
+            loaded.any((m) => m.text == fbMsg.pesan && m.sender == senderKey);
+
+        if (!alreadyExists) {
+          if (fbMsg.id.isNotEmpty) loadedIds.add(fbMsg.id);
+          final timeStr = fbMsg.createdAt.contains('T')
+              ? fbMsg.createdAt.split('T').last.substring(0, 5)
+              : (fbMsg.createdAt.contains(' ')
+                  ? fbMsg.createdAt.split(' ').last.substring(0, 5).replaceAll(':', '.')
+                  : (fbMsg.createdAt.isNotEmpty ? fbMsg.createdAt : '12.00'));
+
+          loaded.add(_ChatMessage(
+            id: fbMsg.id,
+            sender: senderKey,
+            text: fbMsg.pesan,
+            time: timeStr,
+          ));
+        }
+      }
+
+      if (mounted && loaded.isNotEmpty) {
+        setState(() {
+          _messages = loaded;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error _loadMessages (Doctor): $e');
+    }
+  }
+
+  void _setupRealtimeListeners() {
+    // 1. Mendengarkan pesan realtime dari Firebase (<100ms)
+    _msgSub = _firebaseService.listenMessages(_consultationId).listen((ChatMessage msg) {
+      if (!mounted) return;
+      final isDoctor = (msg.senderRole.toLowerCase() == 'dokter') ||
+          (_currentUser != null && msg.idSender.isNotEmpty && msg.idSender == _currentUser!.id.toString());
+      final senderKey = isDoctor ? 'doctor' : 'patient';
+
+      final exists = _messages.any((m) =>
+          (m.id != null && msg.id.isNotEmpty && m.id == msg.id) ||
+          (m.text == msg.pesan && m.sender == senderKey));
+
+      if (!exists) {
+        final timeStr = msg.createdAt.contains('T')
+            ? msg.createdAt.split('T').last.substring(0, 5)
+            : (msg.createdAt.contains(' ')
+                ? msg.createdAt.split(' ').last.substring(0, 5).replaceAll(':', '.')
+                : (msg.createdAt.isNotEmpty ? msg.createdAt : '12.00'));
+
+        setState(() {
+          _messages.add(_ChatMessage(
+            id: msg.id,
+            sender: senderKey,
+            text: msg.pesan,
+            time: timeStr,
+          ));
+        });
+        _scrollToBottom();
+      }
+    });
+
+    // 2. Mendengarkan status pasien sedang mengetik
+    _typingSub = _firebaseService.listenTyping(_consultationId, 'pasien').listen((isTyping) {
+      if (!mounted) return;
+      setState(() {
+        _isPatientTyping = isTyping;
+      });
+    });
+
+    // 3. Mendengarkan Call Signaling dari Firebase RTDB
+    _callSub = _firebaseService.listenCallSignaling(_consultationId).listen((signal) {
+      if (!mounted || signal == null) return;
+
+      final status = signal.status.toLowerCase();
+      final callerRole = signal.callerRole.toLowerCase();
+
+      if (status == 'ringing' && callerRole != 'dokter' && !_isIncomingCallModalShowing) {
+        _showIncomingCallModal(signal);
+      } else if (status == 'ended' || status == 'rejected') {
+        _ringtonePlayer.stop();
+        if (_isIncomingCallModalShowing && Navigator.canPop(context)) {
+          _isIncomingCallModalShowing = false;
+          Navigator.pop(context);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _msgSub?.cancel();
+    _typingSub?.cancel();
+    _callSub?.cancel();
+    _typingDebounce?.cancel();
+    _ringtonePlayer.stop();
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _onTextChanged(String text) {
+    _apiService.sendTypingStatus(_consultationId, true);
+    _firebaseService.updateTypingStatus(_consultationId, 'dokter', true);
+
+    if (_typingDebounce?.isActive ?? false) _typingDebounce!.cancel();
+    _typingDebounce = Timer(const Duration(seconds: 2), () {
+      _apiService.sendTypingStatus(_consultationId, false);
+      _firebaseService.updateTypingStatus(_consultationId, 'dokter', false);
+    });
+  }
+
+  void _sendMessage() async {
+    final text = _textCtrl.text.trim();
+    if (text.isEmpty) return;
+    _textCtrl.clear();
+
+    _typingDebounce?.cancel();
+    _apiService.sendTypingStatus(_consultationId, false);
+    _firebaseService.updateTypingStatus(_consultationId, 'dokter', false);
+
+    final now = DateTime.now();
+    final timeStr = '${now.hour.toString().padLeft(2, '0')}.${now.minute.toString().padLeft(2, '0')}';
+    final formattedCreatedAt = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    final tempMsgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
+
+    setState(() {
+      _messages.add(_ChatMessage(
+        id: tempMsgId,
+        sender: 'doctor',
+        text: text,
+        time: timeStr,
+      ));
+    });
+    _scrollToBottom();
+
+    final myId = _currentUser?.id?.toString() ?? '1';
+    final myName = _currentUser?.nama.isNotEmpty == true ? _currentUser!.nama : 'Dokter GIAT';
+
+    // 1. Langsung push ke Firebase RTDB (<100ms sync)
+    final chatMsg = ChatMessage(
+      id: tempMsgId,
+      idSender: myId,
+      senderName: myName,
+      senderRole: 'dokter',
+      pesan: text,
+      tipe: 'text',
+      createdAt: formattedCreatedAt,
+    );
+    await _firebaseService.pushMessage(_consultationId, chatMsg);
+
+    // 2. Kirim pesan ke API backend Laravel (audit log, validasi & persistensi DB relasional)
+    try {
+      final res = await _apiService.sendMessage(_consultationId, pesan: text);
+      if (res.success && res.data != null) {
+        final serverId = res.data!['id'] ?? res.data!['id_pesan'];
+        if (serverId != null && mounted) {
+          final idx = _messages.indexWhere((m) => m.id == tempMsgId);
+          if (idx != -1) {
+            _messages[idx] = _ChatMessage(
+              id: serverId.toString(),
+              sender: 'doctor',
+              text: text,
+              time: timeStr,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Gagal simpan pesan ke REST API: $e');
+    }
+  }
+
+  Future<void> _startOutgoingCall() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Menghubungi ${widget.patient.name} untuk video call...'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    String roomId = 'giat-consult-$_consultationId';
+    try {
+      final res = await _apiService.startVideoCall(_consultationId);
+      if (res.data != null && res.data!['room_id'] != null) {
+        roomId = res.data!['room_id'].toString();
+      }
+    } catch (_) {}
+
+    await _firebaseService.updateCallSignal(
+      _consultationId,
+      CallSignalModel(
+        status: 'ringing',
+        callerId: _currentUser?.id?.toString() ?? '1',
+        callerName: _currentUser?.nama ?? 'Dokter GIAT',
+        callerRole: 'dokter',
+        roomId: roomId,
+      ),
+    );
+
+    _callStartTime = DateTime.now();
+    try {
+      await _jitsiService.joinRoom(
+        roomId: roomId,
+        userName: _currentUser?.nama ?? 'Dokter GIAT',
+        userEmail: _currentUser?.email ?? 'dokter@giat.id',
+        onTerminated: _handleCallEnded,
+      );
+    } catch (e) {
+      debugPrint('⚠️ Jitsi error, launching fallback video screen: $e');
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DokterVideoCallScreen(
+              patientName: widget.patient.name,
+              specialty: 'Spesialis Ginjal & Hipertensi',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showIncomingCallModal(CallSignalModel signal) {
+    _isIncomingCallModalShowing = true;
+    _ringtonePlayer.playRingtone();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => IncomingCallDialog(
+        callerName: signal.callerName.isNotEmpty ? signal.callerName : widget.patient.name,
+        callerRole: 'Pasien GIAT',
+        onReject: () async {
+          _ringtonePlayer.stop();
+          _isIncomingCallModalShowing = false;
+          Navigator.pop(ctx);
+          await _apiService.respondCallSignal(_consultationId, 'reject');
+          await _firebaseService.updateCallSignal(
+            _consultationId,
+            CallSignalModel(
+              status: 'rejected',
+              callerId: _currentUser?.id?.toString() ?? '',
+              callerName: _currentUser?.nama ?? 'Dokter',
+              callerRole: 'dokter',
+              roomId: signal.roomId,
+            ),
+          );
+        },
+        onAccept: () async {
+          _ringtonePlayer.stop();
+          _isIncomingCallModalShowing = false;
+          Navigator.pop(ctx);
+          await _apiService.respondCallSignal(_consultationId, 'accept');
+
+          _callStartTime = DateTime.now();
+          try {
+            await _jitsiService.joinRoom(
+              roomId: signal.roomId.isNotEmpty ? signal.roomId : 'giat-consult-$_consultationId',
+              userName: _currentUser?.nama ?? 'Dokter GIAT',
+              userEmail: _currentUser?.email ?? 'dokter@giat.id',
+              onTerminated: _handleCallEnded,
+            );
+          } catch (e) {
+            debugPrint('⚠️ Fallback to doctor call screen: $e');
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DokterVideoCallScreen(
+                    patientName: widget.patient.name,
+                    specialty: 'Spesialis Ginjal & Hipertensi',
+                  ),
+                ),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  void _handleCallEnded() {
+    int durationMinutes = 1;
+    if (_callStartTime != null) {
+      durationMinutes = DateTime.now().difference(_callStartTime!).inMinutes;
+      if (durationMinutes < 1) durationMinutes = 1;
+    }
+    _apiService.endVideoCall(_consultationId, durasiMenit: durationMinutes);
+    _firebaseService.clearCallSignal(_consultationId);
   }
 
   void _scrollToBottom() {
@@ -77,24 +444,6 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
         );
       }
     });
-  }
-
-  void _sendMessage() {
-    final text = _textCtrl.text.trim();
-    if (text.isEmpty) return;
-
-    final now = TimeOfDay.now();
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}.${now.minute.toString().padLeft(2, '0')}';
-
-    setState(() {
-      _messages.add(_ChatMessage(
-        sender: 'doctor',
-        text: text,
-        time: timeStr,
-      ));
-      _textCtrl.clear();
-    });
-    _scrollToBottom();
   }
 
   void _openPrescriptionModal() async {
@@ -192,6 +541,13 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                     ],
                   ),
                 ),
+
+                // Indikator Pasien Sedang Mengetik
+                if (_isPatientTyping)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TypingIndicatorWidget(partnerName: p.name),
+                  ),
 
                 // ── Bottom Chat Input Bar (Identik dengan Room Chat Pasien) ──
                 _buildInputBar(),
@@ -326,6 +682,34 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: _showEditConsultationIdDialog,
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '#${_activeConsultationId.length > 8 ? '${_activeConsultationId.substring(0, 8)}...' : _activeConsultationId}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: _darkGreen,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  const Icon(Icons.edit_rounded, size: 9, color: _darkGreen),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -339,17 +723,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
 
           // Tombol Video Call (Hanya Video Call, Tanpa Telepon Suara)
           GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DokterVideoCallScreen(
-                    patientName: p.name,
-                    specialty: 'Spesialis Ginjal & Hipertensi',
-                  ),
-                ),
-              );
-            },
+            onTap: _startOutgoingCall,
             child: Container(
               width: 44,
               height: 44,
@@ -373,6 +747,84 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditConsultationIdDialog() {
+    final ctrl = TextEditingController(text: _activeConsultationId);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.tune_rounded, color: _darkGreen, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Ganti Consultation ID',
+              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ID sesi konsultasi saat ini:',
+              style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: ctrl,
+              style: GoogleFonts.jetBrainsMono(fontSize: 12),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                hintText: 'Contoh UUID: 2940f5ab-...',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _darkGreen,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              final newId = ctrl.text.trim();
+              if (newId.isNotEmpty && newId != _activeConsultationId) {
+                Navigator.pop(ctx);
+                setState(() {
+                  _activeConsultationId = newId;
+                });
+                _msgSub?.cancel();
+                _typingSub?.cancel();
+                _callSub?.cancel();
+                _setupRealtimeListeners();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('ID Konsultasi diganti ke: $_activeConsultationId'),
+                    backgroundColor: _darkGreen,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else {
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Terapkan'),
           ),
         ],
       ),
@@ -693,6 +1145,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _textCtrl,
+                      onChanged: _onTextChanged,
                       onSubmitted: (_) => _sendMessage(),
                       style: GoogleFonts.inter(
                         fontSize: 14,

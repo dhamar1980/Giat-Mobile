@@ -2,6 +2,7 @@
   "project_info": {
     "project_number": "100000000000",
     "project_id": "giat-3ac67",
+    "firebase_url": "https://giat-3ac67-default-rtdb.asia-southeast1.firebasedatabase.app",
     "storage_bucket": "giat-3ac67.firebasestorage.app"
   },
   "client": [

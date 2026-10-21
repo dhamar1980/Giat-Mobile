@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>GIAT memerlukan akses kamera untuk melakukan konsultasi video call bersama dokter.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>GIAT memerlukan akses mikrofon untuk komunikasi suara saat konsultasi video call.</string>
 </dict>
 </plist>

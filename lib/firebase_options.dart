@@ -38,6 +38,7 @@ class DefaultFirebaseOptions {
     projectId: 'giat-3ac67',
     authDomain: 'giat-3ac67.firebaseapp.com',
     storageBucket: 'giat-3ac67.firebasestorage.app',
+    databaseURL: 'https://giat-3ac67-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -46,6 +47,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '100000000000',
     projectId: 'giat-3ac67',
     storageBucket: 'giat-3ac67.firebasestorage.app',
+    databaseURL: 'https://giat-3ac67-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -55,6 +57,7 @@ class DefaultFirebaseOptions {
     projectId: 'giat-3ac67',
     storageBucket: 'giat-3ac67.firebasestorage.app',
     iosBundleId: 'com.example.giat',
+    databaseURL: 'https://giat-3ac67-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -64,6 +67,7 @@ class DefaultFirebaseOptions {
     projectId: 'giat-3ac67',
     storageBucket: 'giat-3ac67.firebasestorage.app',
     iosBundleId: 'com.example.giat',
+    databaseURL: 'https://giat-3ac67-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
@@ -73,5 +77,6 @@ class DefaultFirebaseOptions {
     projectId: 'giat-3ac67',
     authDomain: 'giat-3ac67.firebaseapp.com',
     storageBucket: 'giat-3ac67.firebasestorage.app',
+    databaseURL: 'https://giat-3ac67-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 }

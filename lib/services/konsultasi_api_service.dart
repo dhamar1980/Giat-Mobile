@@ -151,6 +151,8 @@ class KonsultasiApiService {
       List<dynamic> list = [];
       if (raw?['data'] is List) {
         list = raw['data'] as List;
+      } else if (raw?['data'] is Map && raw['data']['messages'] is List) {
+        list = raw['data']['messages'] as List;
       } else if (raw is List) {
         list = raw;
       }
@@ -164,11 +166,47 @@ class KonsultasiApiService {
     }
   }
 
+  /// GET /konsultasi/{id}/pesan (Mengambil detail konsultasi + info dokter + pesan)
+  Future<ApiResponse<Map<String, dynamic>>> getConsultationChatDetail(dynamic id) async {
+    try {
+      final response = await _client.dio.get('/konsultasi/$id/pesan');
+      final raw = response.data;
+      Map<String, dynamic> data = {};
+      if (raw?['data'] is Map<String, dynamic>) {
+        data = raw['data'] as Map<String, dynamic>;
+      } else if (raw?['data'] is List) {
+        data = {'messages': raw['data']};
+      }
+      return ApiResponse.success(
+        message: raw?['message'] ?? 'Berhasil memuat rincian chat dan dokter.',
+        data: data,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// GET /konsultasi/{id}/firebase-channel
+  Future<ApiResponse<Map<String, dynamic>>> getFirebaseChannel(dynamic id) async {
+    try {
+      final response = await _client.dio.get('/konsultasi/$id/firebase-channel');
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Konfigurasi channel Firebase berhasil dimuat.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
   /// POST /konsultasi/{id}/pesan
-  /// Body: {"pesan": "...", "attachment": null}
+  /// Body: {"pesan": "...", "tipe": "text", "attachment": null}
   Future<ApiResponse<Map<String, dynamic>>> sendMessage(
     dynamic id, {
     required String pesan,
+    String tipe = 'text',
     dynamic attachment,
   }) async {
     try {
@@ -176,13 +214,17 @@ class KonsultasiApiService {
       if (attachment != null && attachment is File) {
         payload = FormData.fromMap({
           'pesan': pesan,
+          'tipe': tipe == 'text' ? 'image' : tipe,
           'attachment': await MultipartFile.fromFile(
             attachment.path,
             filename: attachment.path.split(Platform.pathSeparator).last,
           ),
         });
       } else {
-        final Map<String, dynamic> data = {'pesan': pesan};
+        final Map<String, dynamic> data = {
+          'pesan': pesan,
+          'tipe': tipe,
+        };
         if (attachment != null) {
           data['attachment'] = attachment;
         }
@@ -200,12 +242,66 @@ class KonsultasiApiService {
     }
   }
 
+  /// POST /konsultasi/{id}/typing
+  /// Body: {"is_typing": bool}
+  Future<ApiResponse<Map<String, dynamic>>> sendTypingStatus(dynamic id, bool isTyping) async {
+    try {
+      final response = await _client.dio.post(
+        '/konsultasi/$id/typing',
+        data: {'is_typing': isTyping},
+      );
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Status mengetik berhasil diperbarui.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
   /// GET /konsultasi/{id}/video-call
   Future<ApiResponse<Map<String, dynamic>>> getVideoCall(dynamic id) async {
     try {
       final response = await _client.dio.get('/konsultasi/$id/video-call');
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Berhasil memuat sesi video call.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// POST /konsultasi/{id}/video-call/start
+  /// Body: {"notify_chat": true}
+  Future<ApiResponse<Map<String, dynamic>>> startVideoCall(dynamic id, {bool notifyChat = true}) async {
+    try {
+      final response = await _client.dio.post(
+        '/konsultasi/$id/video-call/start',
+        data: {'notify_chat': notifyChat},
+      );
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Panggilan video call dimulai.',
+        data: response.data?['data'] as Map<String, dynamic>?,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// POST /konsultasi/{id}/video-call/signal
+  /// Body: {"signal": "accept" | "reject" | "busy"}
+  Future<ApiResponse<Map<String, dynamic>>> respondCallSignal(dynamic id, String signal) async {
+    try {
+      final response = await _client.dio.post(
+        '/konsultasi/$id/video-call/signal',
+        data: {'signal': signal},
+      );
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Sinyal panggilan terkirim.',
         data: response.data?['data'] as Map<String, dynamic>?,
         statusCode: response.statusCode,
       );

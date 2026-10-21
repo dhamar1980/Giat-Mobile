@@ -925,15 +925,42 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
             ),
           ),
           onPressed: () async {
-            // Sinkronisasi pemesanan konsultasi ke REST API Konsultasi Laravel Sanctum
-            KonsultasiApiService().bookingDokter({
-              'dokter_id': widget.doctor['id'],
-              'dokter_nama': widget.doctor['name'],
-              'tanggal': widget.selectedDate,
-              'jam': widget.selectedTime,
-              'biaya': widget.price,
-              'metode_pembayaran': _selectedMethod,
-            });
+            String? createdKonsultasiId;
+            try {
+              String validDoctorId = widget.doctor['id_dokter']?.toString() ??
+                  widget.doctor['id']?.toString() ??
+                  '';
+              // Jika doctor ID bukan UUID atau berupa mock slug ('anisa_putri', 'budi_santoso'), lookup dokter dari database backend
+              if (validDoctorId.isEmpty ||
+                  validDoctorId == 'anisa_putri' ||
+                  validDoctorId == 'budi_santoso' ||
+                  validDoctorId.length < 10) {
+                final docListRes = await KonsultasiApiService().getDokterList();
+                if (docListRes.success &&
+                    docListRes.data != null &&
+                    docListRes.data!.isNotEmpty) {
+                  final firstDoc = docListRes.data!.first;
+                  validDoctorId = (firstDoc['id_dokter'] ?? firstDoc['id'])?.toString() ?? validDoctorId;
+                }
+              }
+
+              if (validDoctorId.isNotEmpty && validDoctorId.length >= 10) {
+                final bookingRes = await KonsultasiApiService().bookingDokter({
+                  'id_dokter': validDoctorId,
+                  'tanggal_konsultasi': DateTime.now().toIso8601String().substring(0, 10),
+                  'isi_konsultasi': 'Konsultasi keluhan kesehatan pasien GIAT',
+                });
+                if (bookingRes.success && bookingRes.data != null) {
+                  createdKonsultasiId = (bookingRes.data!['id_konsultasi'] ??
+                          bookingRes.data!['id'])
+                      ?.toString();
+                }
+              }
+            } catch (e) {
+              debugPrint('Booking dokter notice: $e');
+            }
+
+            if (!context.mounted) return;
 
             bool? result;
             if (_selectedMethod == 'qris') {
@@ -946,6 +973,7 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
                     selectedTime: widget.selectedTime,
                     price: widget.price,
                     userName: widget.userName,
+                    idKonsultasi: createdKonsultasiId,
                   ),
                 ),
               );
@@ -959,6 +987,7 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
                     selectedTime: widget.selectedTime,
                     price: widget.price,
                     userName: widget.userName,
+                    idKonsultasi: createdKonsultasiId,
                   ),
                 ),
               );
