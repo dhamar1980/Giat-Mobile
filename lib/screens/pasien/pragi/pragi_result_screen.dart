@@ -252,7 +252,7 @@ class PragiResultScreen extends StatelessWidget {
     return PragiRingCard(
       progress: ckdVal / 100.0,
       centerLabel: 'Risiko',
-      centerValue: '${ckdVal.toStringAsFixed(0)}%',
+      centerValue: '${ckdVal.toStringAsFixed(1)}%',
       ringColor: _kategoriColor,
       titleColor: _kategoriColor,
       title: _kategoriLabel,
