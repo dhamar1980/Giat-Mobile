@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../models/pragi_model.dart';
 import '../../../services/pasien_api_service.dart';
-import 'pragi_topography_background.dart';
+import 'pragi_ui_kit.dart';
 import 'pragi_processing_screen.dart';
 
 class PragiScreeningScreen extends StatefulWidget {
@@ -13,10 +13,6 @@ class PragiScreeningScreen extends StatefulWidget {
 }
 
 class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
-  static const _darkGreen = Color(0xFF065A37);
-  static const _accentGreen = Color(0xFF10B981);
-  static const _selectedCardBg = Color(0xFFE0F2FE);
-
   bool _isLoading = true;
   List<PragiPertanyaan> _questions = [];
   int _currentStep = 1; // 1-based (1 to 16)
@@ -30,7 +26,6 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
   // Helper kalkulator BMI (Tinggi & Berat Badan)
   final TextEditingController _tbController = TextEditingController(text: '168');
   final TextEditingController _bbController = TextEditingController(text: '65');
-  bool _showBmiCalculator = false;
 
   @override
   void initState() {
@@ -202,6 +197,7 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
     return true;
   }
 
+  // ignore: unused_element
   int get _answeredCount {
     int count = 0;
     for (var q in _questions) {
@@ -306,41 +302,33 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ▼▼▼  DI BAWAH INI HANYA TAMPILAN (UI)  ▼▼▼
+  // ═══════════════════════════════════════════════════════════════════════════
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF7F9FF),
-        body: Stack(
-          children: [
-            Positioned.fill(child: CustomPaint(painter: PragiTopographyPainter())),
-            SafeArea(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(_darkGreen),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Memuat 16 Kuesioner AI PRAGI...',
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Menghubungkan ke API Backend GIAT',
-                      style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
+      return PragiScaffold(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(PragiUi.green),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              Text(
+                'Memuat 16 Kuesioner AI PRAGI...',
+                style: PragiUi.text(size: 15, weight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Menghubungkan ke API Backend GIAT',
+                style: PragiUi.text(size: 12.5, color: PragiUi.muted),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -356,352 +344,232 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
 
     final int totalQuestions = _questions.length;
     final double progressRatio = _currentStep / totalQuestions;
+    final bool isLastStep = _currentStep == totalQuestions;
+    final String? note = _getQuestionNote(q.kodeField);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FF),
-      body: Stack(
+    return PragiScaffold(
+      child: Column(
         children: [
-          // Background Topography
-          Positioned.fill(
-            child: CustomPaint(
-              painter: PragiTopographyPainter(),
-            ),
+          PragiHeader(
+            chipLabel: _getCategoryForStep(_currentStep),
+            onBack: _previousStep,
           ),
-
-          SafeArea(
-            child: Column(
-              children: [
-                // Top Navigation Bar
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Back Pill
-                          GestureDetector(
-                            onTap: _previousStep,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFFCBD5E1)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.arrow_back, size: 16, color: Color(0xFF1E293B)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Kembali',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF1E293B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          // Step Counter Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE0F2FE),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              '$_answeredCount / $totalQuestions Terisi',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0369A1),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Center Category Pill
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: _darkGreen,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _darkGreen.withValues(alpha: 0.25),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _getCategoryForStep(_currentStep),
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Main Step Content
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Progress Card
-                        _buildProgressCard(progressRatio, totalQuestions),
-
-                        const SizedBox(height: 16),
-
-                        // Question Chat Bubble with PRAGI Avatar
-                        _buildQuestionBubble(q),
-
-                        const SizedBox(height: 18),
-
-                        // Section Title: Jawaban Anda
-                        Center(
-                          child: Text(
-                            'Pilihan Jawaban Anda',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF0F172A),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        // Dynamic Input Component
-                        _buildDynamicInput(q),
-
-                        const SizedBox(height: 20),
-
-                        // Medical Info Card ("Mengapa data ini dibutuhkan?")
-                        _buildStepInfoCard(q),
-
-                        const SizedBox(height: 24),
-
-                        // Next / Submit Button
-                        _buildActionButton(totalQuestions),
-
-                        const SizedBox(height: 28),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // PROGRESS CARD
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildProgressCard(double progress, int total) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Circular Progress Arc
-          SizedBox(
-            width: 52,
-            height: 52,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 5,
-                  valueColor: const AlwaysStoppedAnimation<Color>(_accentGreen),
-                  backgroundColor: const Color(0xFFE2E8F0),
-                ),
-                Center(
-                  child: Text(
-                    '${(progress * 100).toInt()}%',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: _darkGreen,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pertanyaan $_currentStep dari $total',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Kartu progres (persentase langkah selesai)
+                  PragiRingCard(
+                    progress: progressRatio,
+                    centerLabel: 'Selesai',
+                    centerValue: '${(progressRatio * 100).toInt()}%',
+                    title: isLastStep
+                        ? 'Langkah Terakhir'
+                        : 'Langkah $_currentStep Dari $totalQuestions',
+                    subtitle:
+                        'Mohon isi sesuai dengan kondisi atau data yang sesuai adanya!',
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _currentStep == total
-                      ? 'Langkah Terakhir: Siap untuk analisis AI'
-                      : 'Isi dengan jujur sesuai kondisi aktual tubuh Anda',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+                  const SizedBox(height: 16),
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // QUESTION SPEECH BUBBLE WITH MASCOT
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildQuestionBubble(PragiPertanyaan q) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // PRAGI Mascot Circle
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: _darkGreen.withValues(alpha: 0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              'assets/images/pragi.png',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: const Color(0xFFDCFCE7),
-                child: const Icon(Icons.smart_toy_rounded, size: 26, color: _darkGreen),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Speech Bubble
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(18),
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(18),
-              ),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
+                  // Bubble pertanyaan + maskot
+                  PragiBubble(
+                    title: q.pertanyaan,
+                    hint: _getQuestionHint(q),
+                  ),
+
+                  if (note != null) ...[
+                    const SizedBox(height: 8),
                     Text(
-                      'PRAGI AI ASSISTANT',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: _darkGreen,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        q.kodeField,
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF64748B),
-                        ),
+                      note,
+                      style: PragiUi.text(
+                        size: 11.5,
+                        color: PragiUi.muted,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  q.pertanyaan,
-                  style: GoogleFonts.inter(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF0F172A),
-                    height: 1.45,
+
+                  const SizedBox(height: 16),
+                  const PragiSectionLabel('Jawaban Anda'),
+                  const SizedBox(height: 14),
+
+                  // Input dinamis
+                  _buildDynamicInput(q),
+
+                  const SizedBox(height: 14),
+
+                  // Kartu "Mengapa data ini dibutuhkan?"
+                  PragiInfoCard(
+                    title: _getInfoTitle(q.kodeField),
+                    body: _getMedicalExplanation(q.kodeField),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 16),
+
+                  // Tombol lanjut / selesai
+                  _buildActionButton(totalQuestions),
+
+                  const SizedBox(height: 28),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // TEKS PENDUKUNG (hanya tampilan)
+  // ───────────────────────────────────────────────────────────────────────────
+  String? _getQuestionHint(PragiPertanyaan q) {
+    switch (q.kodeField) {
+      case 'HeartDisease':
+        return '(Termasuk riwayat serangan jantung atau penyakit jantung koroner)';
+      case 'BMI':
+        return '(Sistem akan menghitung Indeks Massa Tubuh / BMI secara otomatis)';
+      case 'Smoking':
+        return '(Total konsumsi rokok mencapai minimal 100 batang sepanjang hidup)';
+      case 'AlcoholDrinking':
+        return '(Pria >14 takaran/minggu, wanita >7 takaran/minggu)';
+      case 'Stroke':
+        return '(Pernah mengalami stroke iskemik/hemoragik atau stroke ringan/TIA)';
+      case 'DiffWalking':
+        return '(Keterbatasan fisik, kelemahan tungkai, atau butuh bantuan saat berjalan)';
+      case 'Sex':
+        return '(Pilih jenis kelamin sesuai identitas KTP Bapak/Ibu.)';
+      case 'AgeCategory':
+        return '(Pilih kelompok rentang usia Bapak/Ibu saat ini.)';
+      case 'Race':
+        return '(Pilih salah satu kelompok ras atau etnis)';
+      case 'Diabetic':
+        return '(Pilih kondisi yang paling sesuai dengan riwayat diabetes)';
+      case 'PhysicalActivity':
+        return '(Aktivitas fisik teratur minimal 20-30 menit dalam sebulan terakhir)';
+      case 'GenHealth':
+        return '(Evaluasi subjektif terhadap kondisi kebugaran dan kesehatan Anda)';
+      case 'Asthma':
+        return '(Riwayat asma bronkial atau masalah penyempitan saluran napas kronis)';
+      default:
+        if (q.tipeInput == 'number' && (q.min != null || q.max != null)) {
+          final unit = (q.satuan ?? '').trim();
+          return '(Pilihan angka ${q.min ?? 0} hingga ${q.max ?? 100}${unit.isNotEmpty ? ' $unit' : ''})';
+        }
+        return null;
+    }
+  }
+
+  String? _getQuestionNote(String kodeField) {
+    if (kodeField == 'DiffWalking') {
+      return '*Meliputi kesulitan menaiki tangga, kelemahan sendi, atau keterbatasan mobilitas harian.';
+    }
+    return null;
+  }
+
+  String _getInfoTitle(String kodeField) {
+    switch (kodeField) {
+      case 'HeartDisease':
+        return 'Mengapa faktor ini penting?';
+      case 'BMI':
+        return 'Mengapa IMT penting?';
+      case 'Smoking':
+        return 'Mengapa riwayat merokok penting?';
+      case 'AlcoholDrinking':
+        return 'Mengapa konsumsi alkohol diperhatikan?';
+      case 'Stroke':
+        return 'Mengapa informasi stroke penting?';
+      case 'PhysicalHealth':
+        return 'Mengapa data kesehatan fisik dibutuhkan?';
+      case 'MentalHealth':
+        return 'Mengapa data kesehatan mental dibutuhkan?';
+      case 'DiffWalking':
+        return 'Mengapa mobilitas penting?';
+      case 'Race':
+        return 'Mengapa data ras/etnis dibutuhkan?';
+      case 'Diabetic':
+        return 'Mengapa riwayat diabetes penting?';
+      case 'PhysicalActivity':
+        return 'Mengapa aktivitas fisik penting?';
+      case 'GenHealth':
+        return 'Mengapa evaluasi kesehatan umum penting?';
+      case 'SleepTime':
+        return 'Mengapa durasi tidur penting?';
+      case 'Asthma':
+        return 'Mengapa data asma dibutuhkan?';
+      default:
+        return 'Mengapa data ini dibutuhkan?';
+    }
+  }
+
+  /// Deskripsi (Ya, Tidak) untuk pertanyaan bertipe binary.
+  List<String> _getBinaryDescriptions(String kodeField) {
+    switch (kodeField) {
+      case 'HeartDisease':
+        return [
+          'Pernah diberitahu tenaga medis menderita penyakit jantung koroner atau serangan jantung',
+          'Tidak pernah mengalami atau diberitahu menderita penyakit jantung',
+        ];
+      case 'Smoking':
+        return [
+          'Pernah merokok minimal 100 batang (sekitar 5 bungkus) sepanjang hidup',
+          'Kurang dari 100 batang atau tidak pernah merokok sama sekali',
+        ];
+      case 'AlcoholDrinking':
+        return [
+          'Mengonsumsi alkohol melebihi ambang batas yang disebutkan',
+          'Di bawah ambang batas tersebut atau tidak mengonsumsi alkohol',
+        ];
+      case 'Stroke':
+        return [
+          'Pernah diberitahu dokter/tenaga medis pernah mengalami stroke',
+          'Tidak pernah mengalami atau didiagnosis stroke',
+        ];
+      case 'DiffWalking':
+        return [
+          'Mengalami kesulitan serius atau butuh bantuan saat berjalan atau menaiki anak tangga',
+          'Dapat berjalan dan menaiki tangga secara mandiri tanpa kesulitan serius',
+        ];
+      case 'PhysicalActivity':
+        return [
+          'Rutin berolahraga atau beraktivitas fisik (jalan kaki, bersepeda, senam, dll) dalam 30 hari terakhir',
+          'Hanya aktivitas sedentari / tidak melakukan olahraga teratur dalam 30 hari terakhir',
+        ];
+      case 'Asthma':
+        return [
+          'Pernah diberitahu dokter atau tenaga medis bahwa menderita asma',
+          'Tidak memiliki riwayat asma bronkial',
+        ];
+      default:
+        return [
+          'Ya, sesuai dengan kondisi Bapak/Ibu',
+          'Tidak, tidak sesuai dengan kondisi Bapak/Ibu',
+        ];
+    }
+  }
+
+  String _getNumberHint(PragiPertanyaan q, num value) {
+    switch (q.kodeField) {
+      case 'PhysicalHealth':
+        if (value <= 0) return 'Kesehatan fisik terasa prima dan tidak ada kendala sakit fisik.';
+        if (value <= 7) return 'Kendala kesehatan fisik tergolong ringan.';
+        if (value <= 14) return 'Kendala kesehatan fisik cukup sering dirasakan.';
+        return 'Kesehatan fisik sering terganggu, pertimbangkan berkonsultasi dengan tenaga medis.';
+      case 'MentalHealth':
+        if (value <= 0) return 'Kondisi mental dan suasana hati terasa tenang, stabil, dan prima.';
+        if (value <= 7) return 'Gangguan suasana hati tergolong ringan.';
+        if (value <= 14) return 'Gangguan suasana hati cukup sering dirasakan.';
+        return 'Kesehatan mental sering terganggu, pertimbangkan berkonsultasi dengan tenaga profesional.';
+      case 'SleepTime':
+        if (value < 6) return 'Durasi tidur tergolong kurang dari kebutuhan ideal.';
+        if (value <= 9) return 'Durasi tidur berada dalam rentang yang ideal.';
+        return 'Durasi tidur tergolong berlebihan.';
+      default:
+        return 'Geser slider atau gunakan tombol + / − untuk mengatur nilai.';
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -720,671 +588,88 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
     }
   }
 
-  // 1. Tipe Input: BINARY (Switch Card / Radio Buttons: Yes & No)
+  // 1. Tipe Input: BINARY (Ya / Tidak)
   Widget _buildBinaryInput(PragiPertanyaan q) {
     final currentVal = _jawaban[q.kodeField]?.toString();
     final bool isYes = currentVal == 'Yes';
     final bool isNo = currentVal == 'No';
-
-    return Row(
-      children: [
-        // Pilihan: YA (Yes)
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _jawaban[q.kodeField] = 'Yes';
-              });
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-              decoration: BoxDecoration(
-                color: isYes ? _selectedCardBg : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isYes ? _darkGreen : const Color(0xFFE2E8F0),
-                  width: isYes ? 2 : 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isYes
-                        ? _darkGreen.withValues(alpha: 0.12)
-                        : Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isYes ? _darkGreen : const Color(0xFFF1F5F9),
-                    ),
-                    child: Icon(
-                      Icons.check_rounded,
-                      color: isYes ? Colors.white : const Color(0xFF94A3B8),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Ya',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isYes ? _darkGreen : const Color(0xFF1E293B),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Benar / Sesuai',
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 14),
-
-        // Pilihan: TIDAK (No)
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _jawaban[q.kodeField] = 'No';
-              });
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-              decoration: BoxDecoration(
-                color: isNo ? _selectedCardBg : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isNo ? _darkGreen : const Color(0xFFE2E8F0),
-                  width: isNo ? 2 : 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isNo
-                        ? _darkGreen.withValues(alpha: 0.12)
-                        : Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isNo ? _darkGreen : const Color(0xFFF1F5F9),
-                    ),
-                    child: Icon(
-                      Icons.close_rounded,
-                      color: isNo ? Colors.white : const Color(0xFF94A3B8),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Tidak',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isNo ? _darkGreen : const Color(0xFF1E293B),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Tidak Pernah',
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 2. Tipe Input: NUMBER (Numeric Stepper, Direct TextField, Range Check, Satuan, & BMI Helper)
-  Widget _buildNumberInput(PragiPertanyaan q) {
-    final num currentNum = num.tryParse(_numberController.text) ?? (q.min ?? 0);
-    final String satuan = q.satuan ?? '';
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Input Display Row
-          Row(
-            children: [
-              // Decrement Button
-              IconButton(
-                onPressed: () {
-                  final double step = (q.kodeField == 'BMI') ? 0.5 : 1.0;
-                  final double next = currentNum.toDouble() - step;
-                  if (q.min != null && next < q.min!) return;
-                  final formatted = (q.kodeField == 'BMI')
-                      ? next.toStringAsFixed(1)
-                      : next.toInt().toString();
-                  _numberController.text = formatted;
-                  _jawaban[q.kodeField] = num.parse(formatted);
-                  setState(() {});
-                },
-                icon: const Icon(Icons.remove_circle_outline_rounded),
-                color: _darkGreen,
-                iconSize: 32,
-              ),
-
-              // Digital Value Input
-              Expanded(
-                child: TextField(
-                  controller: _numberController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: _darkGreen,
-                  ),
-                  decoration: InputDecoration(
-                    suffixText: satuan.isNotEmpty ? ' $satuan' : null,
-                    suffixStyle: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF64748B),
-                    ),
-                    border: InputBorder.none,
-                    isDense: true,
-                  ),
-                  onChanged: (val) {
-                    final parsed = num.tryParse(val);
-                    if (parsed != null) {
-                      _jawaban[q.kodeField] = parsed;
-                      setState(() {});
-                    }
-                  },
-                ),
-              ),
-
-              // Increment Button
-              IconButton(
-                onPressed: () {
-                  final double step = (q.kodeField == 'BMI') ? 0.5 : 1.0;
-                  final double next = currentNum.toDouble() + step;
-                  if (q.max != null && next > q.max!) return;
-                  final formatted = (q.kodeField == 'BMI')
-                      ? next.toStringAsFixed(1)
-                      : next.toInt().toString();
-                  _numberController.text = formatted;
-                  _jawaban[q.kodeField] = num.parse(formatted);
-                  setState(() {});
-                },
-                icon: const Icon(Icons.add_circle_outline_rounded),
-                color: _darkGreen,
-                iconSize: 32,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Range Info Badge
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Rentang valid: ${q.min ?? 0} s/d ${q.max ?? 100} $satuan',
-                style: GoogleFonts.inter(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-            ),
-          ),
-
-          // Helper Kalkulator BMI Khusus Field BMI
-          if (q.kodeField == 'BMI') ...[
-            const SizedBox(height: 16),
-            const Divider(color: Color(0xFFF1F5F9)),
-            const SizedBox(height: 8),
-
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _showBmiCalculator = !_showBmiCalculator;
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calculate_outlined, color: _darkGreen, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Kalkulator IMT dari Tinggi & Berat Badan',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: _darkGreen,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      _showBmiCalculator ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                      color: _darkGreen,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            if (_showBmiCalculator) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Tinggi Badan (cm)', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _tbController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: '168',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onChanged: (_) => _calculateAndSetBmi(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Berat Badan (kg)', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _bbController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: '65',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onChanged: (_) => _calculateAndSetBmi(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-
-          // Preset Chips untuk PhysicalHealth / MentalHealth / SleepTime
-          if (q.kodeField == 'SleepTime') ...[
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [5, 6, 7, 8, 9].map((hours) {
-                final isSel = currentNum == hours;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: ChoiceChip(
-                    label: Text('$hours Jam'),
-                    selected: isSel,
-                    showCheckmark: false,
-                    selectedColor: _darkGreen,
-                    labelStyle: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isSel ? Colors.white : const Color(0xFF334155),
-                    ),
-                    onSelected: (selected) {
-                      if (selected) {
-                        _numberController.text = hours.toString();
-                        _jawaban[q.kodeField] = hours;
-                        setState(() {});
-                      }
-                    },
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // 3. Tipe Input: SELECT (Card Options & Bottom Sheet Selector)
-  Widget _buildSelectInput(PragiPertanyaan q) {
-    final currentVal = _jawaban[q.kodeField]?.toString();
-    final options = q.opsiJawaban;
-
-    // Jika opsi lebih dari 4 (seperti AgeCategory atau Race), sertakan tombol pemilih Bottom Sheet
-    final bool hasManyOptions = options.length > 4;
+    final desc = _getBinaryDescriptions(q.kodeField);
 
     return Column(
       children: [
-        if (hasManyOptions) ...[
-          // Bottom Sheet trigger button
-          GestureDetector(
-            onTap: () => _showSelectBottomSheet(q),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _darkGreen, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: _darkGreen.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.list_alt_rounded, color: _darkGreen, size: 22),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Pilihan Terpilih:',
-                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                        ),
-                        Text(
-                          _getOptionLabel(q, currentVal),
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0F2FE),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Buka Daftar',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0369A1),
-                          ),
-                        ),
-                        const Icon(Icons.arrow_drop_down, color: Color(0xFF0369A1), size: 18),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
+        if (q.kodeField == 'AlcoholDrinking') ...[
+          _buildAlcoholCriteriaCard(),
+          const SizedBox(height: 14),
         ],
-
-        // List kartu pilihan langsung
-        ...options.map((opt) {
-          final isSelected = currentVal == opt.nilai.toString();
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _jawaban[q.kodeField] = opt.nilai;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: isSelected ? _selectedCardBg : Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isSelected ? _darkGreen : const Color(0xFFE2E8F0),
-                    width: isSelected ? 1.8 : 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isSelected
-                          ? _darkGreen.withValues(alpha: 0.1)
-                          : Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected ? _darkGreen : const Color(0xFFCBD5E1),
-                          width: 2,
-                        ),
-                        color: isSelected ? _darkGreen : Colors.transparent,
-                      ),
-                      child: isSelected
-                          ? const Icon(Icons.circle, size: 10, color: Colors.white)
-                          : null,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        opt.label,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? _darkGreen : const Color(0xFF1E293B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
+        PragiOptionCard(
+          letter: 'A',
+          title: 'Ya',
+          description: desc[0],
+          selected: isYes,
+          onTap: () {
+            setState(() {
+              _jawaban[q.kodeField] = 'Yes';
+            });
+          },
+        ),
+        const SizedBox(height: 10),
+        PragiOptionCard(
+          letter: 'B',
+          title: 'Tidak',
+          description: desc[1],
+          selected: isNo,
+          onTap: () {
+            setState(() {
+              _jawaban[q.kodeField] = 'No';
+            });
+          },
+        ),
       ],
     );
   }
 
-  String _getOptionLabel(PragiPertanyaan q, String? val) {
-    if (val == null || val.isEmpty) return 'Belum dipilih (Ketuk untuk memilih)';
-    for (var opt in q.opsiJawaban) {
-      if (opt.nilai.toString() == val) return opt.label;
-    }
-    return val;
-  }
-
-  void _showSelectBottomSheet(PragiPertanyaan q) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.65,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildAlcoholCriteriaCard() {
+    return PragiCard(
+      padding: const EdgeInsets.all(14),
+      radius: 12,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: PragiUi.cardDecoration(radius: 8),
+                child: const Icon(Icons.info_outline_rounded,
+                    size: 18, color: PragiUi.green),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Pilih Opsi untuk ${q.kodeField}',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                q.pertanyaan,
-                style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 14),
-              const Divider(height: 1),
+              const SizedBox(width: 10),
               Expanded(
-                child: ListView.separated(
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: q.opsiJawaban.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final opt = q.opsiJawaban[index];
-                    final isSel = _jawaban[q.kodeField]?.toString() == opt.nilai.toString();
-
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      title: Text(
-                        opt.label,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                          color: isSel ? _darkGreen : const Color(0xFF1E293B),
-                        ),
-                      ),
-                      trailing: isSel
-                          ? const Icon(Icons.check_circle_rounded, color: _darkGreen)
-                          : null,
-                      onTap: () {
-                        setState(() {
-                          _jawaban[q.kodeField] = opt.nilai;
-                        });
-                        Navigator.pop(ctx);
-                      },
-                    );
-                  },
+                child: Text(
+                  'Kriteria Konsumsi Alkohol Berlebihan:',
+                  style: PragiUi.text(size: 12.5, weight: FontWeight.w600),
                 ),
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // STEP INFO CARD
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildStepInfoCard(PragiPertanyaan q) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline_rounded, size: 18, color: _darkGreen),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Mengapa data ini dibutuhkan?',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1E293B),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _getMedicalExplanation(q.kodeField),
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    color: const Color(0xFF64748B),
-                    height: 1.4,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 10),
+          Text(
+            'Pria: Lebih dari 14 gelas / takaran standar per minggu',
+            style: PragiUi.text(size: 12, height: 1.4),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Wanita: Lebih dari 7 gelas / takaran standar per minggu',
+            style: PragiUi.text(size: 12, height: 1.4),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '*1 takaran standar setara ±330 ml bir (5%) atau ±150 ml anggur (12%).',
+            style: PragiUi.text(
+              size: 11.5,
+              fontStyle: FontStyle.italic,
+              height: 1.4,
             ),
           ),
         ],
@@ -1392,46 +677,382 @@ class _PragiScreeningScreenState extends State<PragiScreeningScreen> {
     );
   }
 
+  // 2. Tipe Input: NUMBER (Slider + tombol +/−, atau kalkulator IMT untuk BMI)
+  Widget _buildNumberInput(PragiPertanyaan q) {
+    if (q.kodeField == 'BMI') {
+      return _buildBmiInput(q);
+    }
+
+    final num minVal = q.min ?? 0;
+    final num maxVal = q.max ?? 100;
+    final num currentNum = num.tryParse(_numberController.text) ?? minVal;
+    final String satuan = q.satuan ?? '';
+    final String unitLabel =
+        satuan.isEmpty ? '' : satuan[0].toUpperCase() + satuan.substring(1);
+    final bool canSlide = maxVal > minVal;
+    final double sliderValue =
+        currentNum.toDouble().clamp(minVal.toDouble(), maxVal.toDouble());
+    final int divisions = (maxVal - minVal).round();
+    final String displayNumber = currentNum % 1 == 0
+        ? currentNum.toInt().toString()
+        : currentNum.toString();
+
+    void applyValue(num next) {
+      final formatted = next.toInt().toString();
+      _numberController.text = formatted;
+      _jawaban[q.kodeField] = num.parse(formatted);
+      setState(() {});
+    }
+
+    return PragiCard(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+      radius: 12,
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                displayNumber,
+                style: PragiUi.text(
+                  size: 44,
+                  weight: FontWeight.w700,
+                  color: PragiUi.green,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                unitLabel,
+                style: PragiUi.text(size: 16, color: PragiUi.muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              // Tombol kurang
+              GestureDetector(
+                onTap: () {
+                  final double next = currentNum.toDouble() - 1.0;
+                  if (q.min != null && next < q.min!) return;
+                  applyValue(next);
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFFE5E7EB),
+                  ),
+                  child: const Icon(Icons.remove, color: PragiUi.ink, size: 24),
+                ),
+              ),
+              Expanded(
+                child: canSlide
+                    ? SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 5,
+                          activeTrackColor: PragiUi.green,
+                          inactiveTrackColor: const Color(0xFFE0E0E0),
+                          thumbColor: PragiUi.green,
+                          overlayColor: PragiUi.green.withValues(alpha: 0.12),
+                          thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 10),
+                        ),
+                        child: Slider(
+                          value: sliderValue,
+                          min: minVal.toDouble(),
+                          max: maxVal.toDouble(),
+                          divisions: divisions > 0 ? divisions : null,
+                          onChanged: (v) => applyValue(v.round()),
+                        ),
+                      )
+                    : const SizedBox(height: 44),
+              ),
+              // Tombol tambah
+              GestureDetector(
+                onTap: () {
+                  final double next = currentNum.toDouble() + 1.0;
+                  if (q.max != null && next > q.max!) return;
+                  applyValue(next);
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFFD7F5E4),
+                  ),
+                  child: const Icon(Icons.add, color: PragiUi.green, size: 24),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _getNumberHint(q, currentNum),
+            textAlign: TextAlign.center,
+            style: PragiUi.text(size: 12.5, color: PragiUi.muted, height: 1.45),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Input khusus BMI: Tinggi & Berat Badan → IMT otomatis
+  Widget _buildBmiInput(PragiPertanyaan q) {
+    final double bmiValue = double.tryParse(_numberController.text) ??
+        (num.tryParse(_jawaban['BMI']?.toString() ?? '')?.toDouble() ?? 0.0);
+    final _BmiCategory cat = _BmiCategory.from(bmiValue);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildMeasureField(
+          label: 'Tinggi Badan',
+          unit: 'CM',
+          controller: _tbController,
+          hint: '168',
+        ),
+        const SizedBox(height: 14),
+        _buildMeasureField(
+          label: 'Berat Badan',
+          unit: 'KG',
+          controller: _bbController,
+          hint: '65',
+        ),
+        const SizedBox(height: 14),
+        PragiCard(
+          padding: const EdgeInsets.all(12),
+          radius: 12,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: PragiUi.cardDecoration(radius: 12),
+                child: const Icon(Icons.calculate_outlined,
+                    size: 24, color: PragiUi.green),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Indeks Massa Tubuh (IMT / BMI)',
+                      style: PragiUi.text(size: 12.5, weight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          bmiValue.toStringAsFixed(1),
+                          style: PragiUi.text(
+                            size: 24,
+                            weight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'kg/m²',
+                          style: PragiUi.text(size: 12.5, color: PragiUi.muted),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: cat.background,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: cat.color.withValues(alpha: 0.35)),
+                        ),
+                        child: Text(
+                          cat.label,
+                          style: PragiUi.text(
+                            size: 11,
+                            weight: FontWeight.w600,
+                            color: cat.color,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMeasureField({
+    required String label,
+    required String unit,
+    required TextEditingController controller,
+    required String hint,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: PragiUi.text(size: 13, weight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          style: PragiUi.text(size: 14),
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: PragiUi.selectedBg,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            suffixIcon: Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                widthFactor: 1,
+                child: Text(
+                  unit,
+                  style: PragiUi.text(size: 13, weight: FontWeight.w700),
+                ),
+              ),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: PragiUi.green, width: 1.5),
+            ),
+          ),
+          onChanged: (_) => _calculateAndSetBmi(),
+        ),
+      ],
+    );
+  }
+
+  // 3. Tipe Input: SELECT (daftar pilihan A, B, C ... atau grid 2 kolom)
+  Widget _buildSelectInput(PragiPertanyaan q) {
+    final currentVal = _jawaban[q.kodeField]?.toString();
+    final options = q.opsiJawaban;
+    final bool useGrid = options.length > 6;
+
+    void select(PragiPertanyaanOption opt) {
+      setState(() {
+        _jawaban[q.kodeField] = opt.nilai;
+      });
+    }
+
+    if (useGrid) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          const double gap = 10;
+          final double itemWidth = (constraints.maxWidth - gap) / 2;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: List.generate(options.length, (i) {
+              final opt = options[i];
+              return SizedBox(
+                width: itemWidth,
+                child: PragiOptionCard(
+                  letter: String.fromCharCode(65 + i),
+                  title: opt.label,
+                  compact: true,
+                  selected: currentVal == opt.nilai.toString(),
+                  onTap: () => select(opt),
+                ),
+              );
+            }),
+          );
+        },
+      );
+    }
+
+    return Column(
+      children: List.generate(options.length, (i) {
+        final opt = options[i];
+        IconData? icon;
+        if (q.kodeField == 'Sex') {
+          final v = opt.nilai.toString().toLowerCase();
+          icon = v == 'male' ? Icons.male_rounded : Icons.female_rounded;
+        }
+        return Padding(
+          padding: EdgeInsets.only(bottom: i == options.length - 1 ? 0 : 10),
+          child: PragiOptionCard(
+            letter: String.fromCharCode(65 + i),
+            title: opt.label,
+            leadingIcon: icon,
+            selected: currentVal == opt.nilai.toString(),
+            onTap: () => select(opt),
+          ),
+        );
+      }),
+    );
+  }
+
   // ───────────────────────────────────────────────────────────────────────────
-  // ACTION BUTTON: LANJUTKAN / ANALISIS DENGAN AI PRAGI
+  // ACTION BUTTON: LANJUTKAN / SELESAI DAN ANALISIS
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildActionButton(int total) {
     final bool isLastStep = _currentStep == total;
     final bool canSubmit = isLastStep && _areAllQuestionsAnswered;
 
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: _nextStep,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isLastStep
-              ? (canSubmit ? _darkGreen : const Color(0xFF047857))
-              : _darkGreen,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          elevation: 2,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              isLastStep ? 'Analisis dengan AI PRAGI' : 'Lanjutkan',
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              isLastStep ? Icons.auto_awesome_rounded : Icons.arrow_forward_rounded,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
+    return PragiPrimaryButton(
+      label: isLastStep ? 'Selesai dan Analisis' : 'Lanjutkan',
+      icon: isLastStep
+          ? Icons.check_circle_outline_rounded
+          : Icons.arrow_circle_right_outlined,
+      color: isLastStep && !canSubmit ? PragiUi.greenDeep : PragiUi.green,
+      onPressed: _nextStep,
     );
+  }
+}
+
+/// Kategori IMT untuk label berwarna pada kartu IMT (tampilan saja).
+class _BmiCategory {
+  final String label;
+  final Color color;
+  final Color background;
+
+  const _BmiCategory(this.label, this.color, this.background);
+
+  static _BmiCategory from(double bmi) {
+    if (bmi <= 0) {
+      return const _BmiCategory(
+          'Belum dihitung', Color(0xFF64748B), Color(0xFFF1F5F9));
+    }
+    if (bmi < 18.5) {
+      return const _BmiCategory(
+          'Berat Badan Kurang', Color(0xFF2563EB), Color(0xFFEFF6FF));
+    }
+    if (bmi < 23) {
+      return const _BmiCategory(
+          'Berat Badan Normal', Color(0xFF059669), Color(0xFFECFDF5));
+    }
+    if (bmi < 25) {
+      return const _BmiCategory(
+          'Kelebihan Berat Badan', Color(0xFFEA7A4B), Color(0xFFFFF1EA));
+    }
+    return const _BmiCategory(
+        'Obesitas', Color(0xFFDC2626), Color(0xFFFEF2F2));
   }
 }
