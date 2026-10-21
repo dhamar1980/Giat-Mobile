@@ -276,82 +276,47 @@ class _UbahNomorTeleponScreenState extends State<UbahNomorTeleponScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Row(
         children: [
-          // Badge "✓ Terverifikasi"
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
-              borderRadius: BorderRadius.circular(16),
+              color: _darkGreen,
+              borderRadius: BorderRadius.circular(11),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: const Center(
+              child: Icon(
+                Icons.phone_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.check_circle_rounded,
-                  size: 13,
-                  color: Color(0xFF059669),
-                ),
-                const SizedBox(width: 4),
                 Text(
-                  'Terverifikasi',
+                  widget.currentPhone,
                   style: GoogleFonts.inter(
-                    fontSize: 11.5,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF059669),
+                    color: const Color(0xFF0F172A),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Terhubung dengan akun ${widget.userName}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    color: const Color(0xFF64748B),
                   ),
                 ),
               ],
             ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _darkGreen,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.phone_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.currentPhone,
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Terhubung dengan akun ${widget.userName}',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ],
       ),
