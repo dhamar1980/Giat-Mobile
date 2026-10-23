@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../notifikasi/pasien_notifikasi_screen.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/storage_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCREEN: CATAT KONDISI KESEHATAN (Figma Mockup: Catat Kondisi)
@@ -63,10 +64,12 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
   ];
 
   bool _isSaving = false;
+  int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _unreadCount = StorageService().getUnreadNotificationCount();
     _weightCtrl = TextEditingController(
       text: widget.currentWeight.toStringAsFixed(1).replaceAll('.', ','),
     );
@@ -74,6 +77,18 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
       text: widget.heightCm.toInt().toString(),
     );
     _detailKeluhanCtrl = TextEditingController();
+    _fetchUnreadNotif();
+  }
+
+  Future<void> _fetchUnreadNotif() async {
+    try {
+      final res = await PasienApiService().getNotifikasiUnreadCount();
+      if (res.success && mounted) {
+        final c = res.data ?? 0;
+        setState(() => _unreadCount = c);
+        StorageService().saveUnreadNotificationCount(c);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -192,13 +207,13 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
 
                       // Floating Top Action Pill (Bell & Avatar)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: Colors.black.withValues(alpha: 0.12),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -206,23 +221,55 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            IconButton(
-                              constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(4),
-                              icon: const Icon(
-                                Icons.notifications_none_rounded,
-                                size: 22,
-                                color: Color(0xFF1F2937),
-                              ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PasienNotifikasiScreen(),
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(5),
+                                  icon: const Icon(
+                                    Icons.notifications_none_rounded,
+                                    size: 24,
+                                    color: Color(0xFF1F2937),
                                   ),
-                                );
-                              },
+                                  tooltip: 'Notifikasi',
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PasienNotifikasiScreen(),
+                                      ),
+                                    ).then((_) {
+                                      if (mounted) _fetchUnreadNotif();
+                                    });
+                                  },
+                                ),
+                                if (_unreadCount > 0)
+                                  Positioned(
+                                    right: 2,
+                                    top: 2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFEF4444),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          _unreadCount > 9 ? '9+' : '$_unreadCount',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
@@ -235,13 +282,13 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
                                 );
                               },
                               child: Container(
-                                width: 32,
-                                height: 32,
+                                width: 36,
+                                height: 36,
                                 decoration: const BoxDecoration(
                                   color: Color(0xFF044E2F),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                                child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
                               ),
                             ),
                           ],

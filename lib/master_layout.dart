@@ -13,6 +13,7 @@ import 'screens/pasien/widgets/pasien_bottom_navbar.dart';
 import 'widgets/giat_background.dart';
 import 'widgets/app_brand_title.dart';
 import 'services/pasien_api_service.dart';
+import 'services/storage_service.dart';
 import 'screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,6 +75,7 @@ class _MasterLayoutState extends State<MasterLayout> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _unreadCount = StorageService().getUnreadNotificationCount();
     _fetchNotificationState();
   }
 
@@ -84,6 +86,7 @@ class _MasterLayoutState extends State<MasterLayout> {
         setState(() {
           _unreadCount = countRes.data ?? 0;
         });
+        StorageService().saveUnreadNotificationCount(_unreadCount);
       }
     } catch (_) {}
 

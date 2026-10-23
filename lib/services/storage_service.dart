@@ -345,5 +345,24 @@ class StorageService {
     }
     return null;
   }
+
+  static const _unreadNotifKey = 'giat_unread_notif_count';
+
+  /// Menyimpan unread notification count
+  Future<void> saveUnreadNotificationCount(int count) async {
+    if (_isTest) {
+      _testMemoryStorage[_unreadNotifKey] = count.toString();
+      return;
+    }
+    await _prefs?.setInt(_unreadNotifKey, count);
+  }
+
+  /// Mengambil unread notification count
+  int getUnreadNotificationCount() {
+    if (_isTest) {
+      return int.tryParse(_testMemoryStorage[_unreadNotifKey] ?? '0') ?? 0;
+    }
+    return _prefs?.getInt(_unreadNotifKey) ?? 0;
+  }
 }
 
