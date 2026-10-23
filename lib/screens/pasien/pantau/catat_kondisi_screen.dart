@@ -62,6 +62,8 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
     'Keluhan lainnya',
   ];
 
+  bool _isSaving = false;
+
   @override
   void initState() {
     super.initState();
@@ -94,9 +96,13 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
     return 'Obesitas';
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
+    if (_isSaving) return;
+
     final parsedWeight = double.tryParse(_weightCtrl.text.replaceAll(',', '.')) ?? widget.currentWeight;
     final parsedHeight = double.tryParse(_heightCtrl.text.replaceAll(',', '.')) ?? widget.heightCm;
+
+    setState(() => _isSaving = true);
 
     final data = {
       'bb': parsedWeight,
@@ -114,8 +120,13 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
       'catatan': _detailKeluhanCtrl.text.trim(),
     };
 
-    PasienApiService().storePantau(data);
-    Navigator.pop(context, data);
+    final res = await PasienApiService().storePantau(data);
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    final returnData = res.data ?? data;
+    Navigator.pop(context, returnData);
   }
 
   @override
@@ -742,21 +753,30 @@ class _CatatKondisiScreenState extends State<CatatKondisiScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      onPressed: _handleSave,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.check_circle_outline_rounded, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Simpan Catatan',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                      onPressed: _isSaving ? null : _handleSave,
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.2,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.check_circle_outline_rounded, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Simpan Catatan',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                 ],

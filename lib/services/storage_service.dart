@@ -263,4 +263,87 @@ class StorageService {
     }
     return null;
   }
+
+  // =========================================================================
+  // PANTAU LOCAL CACHE (OFFLINE FIRST & PERSISTENCE)
+  // =========================================================================
+  static const String _pantauHistoryKey = 'giat_pantau_history_cache';
+  static const String _pantauSummaryKey = 'giat_pantau_summary_cache';
+
+  /// Menyimpan riwayat pantau ke local storage cache
+  Future<void> savePantauHistoryCache(List<Map<String, dynamic>> records) async {
+    final raw = jsonEncode(records);
+    if (_isTest) {
+      _testMemoryStorage[_pantauHistoryKey] = raw;
+      return;
+    }
+    await _prefs?.setString(_pantauHistoryKey, raw);
+  }
+
+  /// Mengambil riwayat pantau dari cache lokal
+  List<Map<String, dynamic>> getPantauHistoryCache() {
+    String? raw;
+    if (_isTest) {
+      raw = _testMemoryStorage[_pantauHistoryKey];
+    } else {
+      raw = _prefs?.getString(_pantauHistoryKey);
+    }
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  /// Menambahkan 1 catatan kondisi pantau baru ke paling atas cache lokal
+  Future<void> addPantauRecordToCache(Map<String, dynamic> record) async {
+    final list = getPantauHistoryCache();
+    if (record['id'] != null) {
+      list.removeWhere((item) => item['id'] != null && item['id'].toString() == record['id'].toString());
+    }
+    list.insert(0, record);
+    await savePantauHistoryCache(list);
+  }
+
+  /// Menghapus catatan pantau dari cache lokal berdasarkan id
+  Future<void> deletePantauRecordFromCache(dynamic id) async {
+    if (id == null) return;
+    final list = getPantauHistoryCache();
+    list.removeWhere((item) => item['id']?.toString() == id.toString());
+    await savePantauHistoryCache(list);
+  }
+
+  /// Menyimpan summary pantau ke cache lokal
+  Future<void> savePantauSummaryCache(Map<String, dynamic> summary) async {
+    final raw = jsonEncode(summary);
+    if (_isTest) {
+      _testMemoryStorage[_pantauSummaryKey] = raw;
+      return;
+    }
+    await _prefs?.setString(_pantauSummaryKey, raw);
+  }
+
+  /// Mengambil summary pantau dari cache lokal
+  Map<String, dynamic>? getPantauSummaryCache() {
+    String? raw;
+    if (_isTest) {
+      raw = _testMemoryStorage[_pantauSummaryKey];
+    } else {
+      raw = _prefs?.getString(_pantauSummaryKey);
+    }
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
 }
+

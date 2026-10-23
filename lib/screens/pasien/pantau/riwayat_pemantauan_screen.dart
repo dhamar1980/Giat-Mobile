@@ -5,6 +5,7 @@ import '../profile/profile_pasien_screen.dart';
 import '../notifikasi/pasien_notifikasi_screen.dart';
 
 import '../../../services/pasien_api_service.dart';
+import '../../../services/storage_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA RIWAYAT PEMANTAUAN
@@ -62,8 +63,33 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
   @override
   void initState() {
     super.initState();
-    _records = widget.records ??
-        [
+    if (widget.records != null && widget.records!.isNotEmpty) {
+      _records = List.from(widget.records!);
+    } else {
+      final cached = StorageService().getPantauHistoryCache();
+      if (cached.isNotEmpty) {
+        final List<PemantauanRecord> cachedList = [];
+        for (int i = 0; i < cached.length; i++) {
+          final item = cached[i];
+          final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
+          final localDt = dt?.toLocal();
+          final dateStr = localDt != null
+              ? '${localDt.day.toString().padLeft(2, '0')}/${localDt.month.toString().padLeft(2, '0')}/${localDt.year} • ${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')} WIB'
+              : (item['tanggal']?.toString() ?? 'Hari ini');
+          cachedList.add(PemantauanRecord(
+            id: item['id'],
+            dateStr: dateStr,
+            badgeText: i == 0 ? 'Terbaru' : '$i hari lalu',
+            imt: double.tryParse((item['imt'] ?? item['bmi'])?.toString() ?? '22.5') ?? 22.5,
+            heightCm: int.tryParse((item['tb'] ?? item['tinggi_badan'])?.toString() ?? '170') ?? 170,
+            weightKg: double.tryParse((item['bb'] ?? item['berat_badan'])?.toString() ?? '65.0') ?? 65.0,
+            kondisiTubuh: (item['kondisi'] ?? item['kondisi_tubuh'])?.toString() ?? 'Baik',
+            keluhan: item['keluhan']?.toString() ?? 'Tidak ada keluhan',
+          ));
+        }
+        _records = cachedList;
+      } else {
+        _records = [
           const PemantauanRecord(
             dateStr: '06 September 2026 • 07:30 WIB',
             badgeText: 'Terbaru',
@@ -92,6 +118,8 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
             keluhan: 'Tidak ada keluhan',
           ),
         ];
+      }
+    }
     _fetchRecords();
   }
 
@@ -148,8 +176,9 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
     );
 
     if (confirm == true) {
+      await StorageService().deletePantauRecordFromCache(record.id);
       final res = await PasienApiService().deletePantau(record.id);
-      if (res.success && mounted) {
+      if (mounted) {
         setState(() {
           _records.removeWhere((r) => r.id == record.id);
         });

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../models/pragi_model.dart';
 import 'api_client.dart';
 import 'api_response.dart';
+import 'storage_service.dart';
 
 /// Service for all Pasien, Pantau, PRAGI, Obat, Reminder, Edukasi, and Notifikasi endpoints
 class PasienApiService {
@@ -373,12 +374,27 @@ class PasienApiService {
       } else if (raw is List) {
         list = raw;
       }
+
+      // Simpan ke local cache
+      if (list.isNotEmpty) {
+        final cacheList = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        await StorageService().savePantauHistoryCache(cacheList);
+      }
+
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat riwayat pemantauan.',
         data: list,
         statusCode: response.statusCode,
       );
     } catch (e) {
+      // Fallback ke cache lokal jika server offline / timeout
+      final cached = StorageService().getPantauHistoryCache();
+      if (cached.isNotEmpty) {
+        return ApiResponse.success(
+          message: 'Memuat riwayat pemantauan dari penyimpanan lokal.',
+          data: cached,
+        );
+      }
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
     }
   }
@@ -401,13 +417,47 @@ class PasienApiService {
   Future<ApiResponse<Map<String, dynamic>>> storePantau(Map<String, dynamic> data) async {
     try {
       final response = await _client.dio.post('/pasien/pantau', data: data);
+      final resData = response.data?['data'] as Map<String, dynamic>?;
+      if (resData != null) {
+        await StorageService().addPantauRecordToCache(resData);
+      }
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Catatan kondisi berhasil disimpan.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: response.data?['message'] ?? 'Catatan kondisi berhasil disimpan ke server.',
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      // Fallback: simpan ke cache lokal agar data pasien tidak hilang saat restart / offline
+      final now = DateTime.now();
+      final bb = double.tryParse((data['bb'] ?? data['berat_badan'] ?? '0').toString()) ?? 0.0;
+      final tb = double.tryParse((data['tb'] ?? data['tinggi_badan'] ?? '0').toString()) ?? 0.0;
+      final tbMeter = tb > 0 ? tb / 100.0 : 1.7;
+      final imt = tbMeter > 0 ? double.parse((bb / (tbMeter * tbMeter)).toStringAsFixed(1)) : 22.5;
+
+      final localRecord = <String, dynamic>{
+        'id': 'local_${now.millisecondsSinceEpoch}',
+        'bb': bb,
+        'tb': tb,
+        'berat_badan': bb,
+        'tinggi_badan': tb,
+        'imt': imt,
+        'bmi': imt,
+        'kondisi': (data['kondisi'] ?? data['kondisi_tubuh'] ?? 'Baik').toString(),
+        'kondisi_tubuh': (data['kondisi'] ?? data['kondisi_tubuh'] ?? 'Baik').toString(),
+        'keluhan': (data['keluhan'] ?? 'Tidak Ada').toString(),
+        'detail_keluhan': data['detail_keluhan']?.toString() ?? '',
+        'catatan': data['catatan']?.toString() ?? '',
+        'created_at': now.toIso8601String(),
+        'tanggal_pantau': now.toIso8601String(),
+        'tanggal': '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}',
+      };
+
+      await StorageService().addPantauRecordToCache(localRecord);
+
+      return ApiResponse.success(
+        message: 'Catatan kondisi berhasil disimpan di perangkat.',
+        data: localRecord,
+      );
     }
   }
 
@@ -427,6 +477,7 @@ class PasienApiService {
 
   /// DELETE /pasien/pantau/{id}
   Future<ApiResponse<void>> deletePantau(dynamic id) async {
+    await StorageService().deletePantauRecordFromCache(id);
     try {
       final response = await _client.dio.delete('/pasien/pantau/$id');
       return ApiResponse.success(
@@ -434,7 +485,10 @@ class PasienApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      // Hapus lokal sudah berhasil
+      return ApiResponse.success(
+        message: 'Catatan pemantauan dihapus dari perangkat.',
+      );
     }
   }
 
@@ -442,12 +496,23 @@ class PasienApiService {
   Future<ApiResponse<Map<String, dynamic>>> getPantauSummary() async {
     try {
       final response = await _client.dio.get('/pasien/pantau/summary');
+      final summaryData = response.data?['data'] as Map<String, dynamic>?;
+      if (summaryData != null) {
+        await StorageService().savePantauSummaryCache(summaryData);
+      }
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Berhasil memuat ringkasan pantau.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        data: summaryData,
         statusCode: response.statusCode,
       );
     } catch (e) {
+      final cachedSummary = StorageService().getPantauSummaryCache();
+      if (cachedSummary != null) {
+        return ApiResponse.success(
+          message: 'Memuat ringkasan pantau dari penyimpanan lokal.',
+          data: cachedSummary,
+        );
+      }
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
     }
   }

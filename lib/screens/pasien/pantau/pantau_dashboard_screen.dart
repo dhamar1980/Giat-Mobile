@@ -10,6 +10,39 @@ import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/storage_service.dart';
+
+String _formatIndonesianDate(String str) {
+  return str
+      .replaceAll('October', 'Oktober')
+      .replaceAll('october', 'Oktober')
+      .replaceAll('Oct', 'Okt')
+      .replaceAll('oct', 'Okt')
+      .replaceAll('OCT', 'Okt')
+      .replaceAll('August', 'Agustus')
+      .replaceAll('august', 'Agustus')
+      .replaceAll('Aug', 'Agu')
+      .replaceAll('aug', 'Agu')
+      .replaceAll('AUG', 'Agu')
+      .replaceAll('May', 'Mei')
+      .replaceAll('may', 'Mei')
+      .replaceAll('December', 'Desember')
+      .replaceAll('december', 'Desember')
+      .replaceAll('Dec', 'Des')
+      .replaceAll('dec', 'Des')
+      .replaceAll('DEC', 'Des')
+      .replaceAll('March', 'Maret')
+      .replaceAll('march', 'Maret')
+      .replaceAll('Mar', 'Mar')
+      .replaceAll('June', 'Juni')
+      .replaceAll('june', 'Juni')
+      .replaceAll('July', 'Juli')
+      .replaceAll('july', 'Juli')
+      .replaceAll('January', 'Januari')
+      .replaceAll('january', 'Januari')
+      .replaceAll('February', 'Februari')
+      .replaceAll('february', 'Februari');
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA PENCATATAN BERAT BADAN
@@ -67,43 +100,129 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _loadCachedPantauData();
     _fetchLivePantauData();
-    _weightRecords = [
-      const WeightRecord(date: '01 Sep', weight: 65.0, note: 'Normal'),
-      const WeightRecord(date: '05 Sep', weight: 65.5, note: 'Pola makan teratur'),
-      const WeightRecord(date: '10 Sep', weight: 64.8, note: 'Aktivitas cukup'),
-      const WeightRecord(date: '15 Sep', weight: 65.2, note: 'Terakhir dicatat'),
-    ];
+  }
 
-    _allHistoryRecords = [
-      const PemantauanRecord(
-        dateStr: '06 September 2026 • 07:30 WIB',
-        badgeText: 'Terbaru',
-        imt: 22.5,
-        heightCm: 170,
-        weightKg: 65.0,
-        kondisiTubuh: 'Baik',
-        keluhan: 'Tidak ada keluhan',
-      ),
-      const PemantauanRecord(
-        dateStr: '06 September 2026 • 07:15 WIB',
-        badgeText: '1 hari lalu',
-        imt: 22.6,
-        heightCm: 170,
-        weightKg: 65.5,
-        kondisiTubuh: 'Kurang Baik',
-        keluhan: 'Mudah lelah',
-      ),
-      const PemantauanRecord(
-        dateStr: '07 September 2026 • 06:15 WIB',
-        badgeText: '2 hari lalu',
-        imt: 22.5,
-        heightCm: 170,
-        weightKg: 65.0,
-        kondisiTubuh: 'Baik',
-        keluhan: 'Tidak ada keluhan',
-      ),
-    ];
+  void _loadCachedPantauData() {
+    final cached = StorageService().getPantauHistoryCache();
+    if (cached.isNotEmpty) {
+      final List<PemantauanRecord> cachedList = [];
+      for (int i = 0; i < cached.length; i++) {
+        final item = cached[i];
+        final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
+        final localDt = dt?.toLocal();
+        final dateStr = localDt != null
+            ? '${localDt.day.toString().padLeft(2, '0')}/${localDt.month.toString().padLeft(2, '0')}/${localDt.year} • ${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')} WIB'
+            : (item['tanggal']?.toString() ?? 'Hari ini');
+        cachedList.add(PemantauanRecord(
+          id: item['id'],
+          dateStr: dateStr,
+          badgeText: i == 0 ? 'Terbaru' : '$i hari lalu',
+          imt: double.tryParse((item['imt'] ?? item['bmi'])?.toString() ?? '22.5') ?? 22.5,
+          heightCm: int.tryParse((item['tb'] ?? item['tinggi_badan'])?.toString() ?? '170') ?? 170,
+          weightKg: double.tryParse((item['bb'] ?? item['berat_badan'])?.toString() ?? '65.0') ?? 65.0,
+          kondisiTubuh: (item['kondisi'] ?? item['kondisi_tubuh'])?.toString() ?? 'Baik',
+          keluhan: item['keluhan']?.toString() ?? 'Tidak ada keluhan',
+        ));
+      }
+      _allHistoryRecords = cachedList;
+
+      final latest = cachedList.first;
+      _currentWeight = latest.weightKg;
+      _heightCm = latest.heightCm.toDouble();
+      _kondisiTubuh = latest.kondisiTubuh;
+      _keluhan = latest.keluhan;
+
+      final List<WeightRecord> chartRecords = [];
+      final rev = cachedList.reversed.toList();
+      for (int i = 0; i < rev.length && i < 14; i++) {
+        final item = rev[i];
+        String shortDate = '';
+        if (item.dateStr.contains('•')) {
+          final dPart = item.dateStr.split('•')[0].trim();
+          final parts = dPart.split('/');
+          if (parts.length == 3) {
+            final day = parts[0];
+            final monthInt = int.tryParse(parts[1]) ?? 1;
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            final mStr = (monthInt >= 1 && monthInt <= 12) ? months[monthInt - 1] : parts[1];
+            shortDate = '$day $mStr';
+          } else {
+            shortDate = _formatIndonesianDate(dPart);
+          }
+        } else {
+          shortDate = _formatIndonesianDate(item.dateStr);
+        }
+        chartRecords.add(WeightRecord(
+          date: shortDate,
+          weight: item.weightKg,
+          note: item.kondisiTubuh,
+        ));
+      }
+      if (chartRecords.isNotEmpty) {
+        _weightRecords = chartRecords;
+      } else {
+        final now = DateTime.now();
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        _weightRecords = [
+          WeightRecord(date: '${now.day.toString().padLeft(2, '0')} ${months[now.month - 1]}', weight: _currentWeight, note: _kondisiTubuh),
+        ];
+      }
+    } else {
+      _weightRecords = [
+        const WeightRecord(date: '01 Sep', weight: 65.0, note: 'Normal'),
+        const WeightRecord(date: '05 Sep', weight: 65.5, note: 'Pola makan teratur'),
+        const WeightRecord(date: '10 Sep', weight: 64.8, note: 'Aktivitas cukup'),
+        const WeightRecord(date: '15 Sep', weight: 65.2, note: 'Terakhir dicatat'),
+      ];
+
+      _allHistoryRecords = [
+        const PemantauanRecord(
+          dateStr: '06 September 2026 • 07:30 WIB',
+          badgeText: 'Terbaru',
+          imt: 22.5,
+          heightCm: 170,
+          weightKg: 65.0,
+          kondisiTubuh: 'Baik',
+          keluhan: 'Tidak ada keluhan',
+        ),
+        const PemantauanRecord(
+          dateStr: '06 September 2026 • 07:15 WIB',
+          badgeText: '1 hari lalu',
+          imt: 22.6,
+          heightCm: 170,
+          weightKg: 65.5,
+          kondisiTubuh: 'Kurang Baik',
+          keluhan: 'Mudah lelah',
+        ),
+        const PemantauanRecord(
+          dateStr: '07 September 2026 • 06:15 WIB',
+          badgeText: '2 hari lalu',
+          imt: 22.5,
+          heightCm: 170,
+          weightKg: 65.0,
+          kondisiTubuh: 'Baik',
+          keluhan: 'Tidak ada keluhan',
+        ),
+      ];
+    }
+
+    final cachedSummary = StorageService().getPantauSummaryCache();
+    if (cachedSummary != null) {
+      if (cachedSummary['berat_badan'] != null || cachedSummary['bb'] != null || cachedSummary['rata_rata_bb'] != null) {
+        _currentWeight = double.tryParse((cachedSummary['berat_badan'] ?? cachedSummary['bb'] ?? cachedSummary['rata_rata_bb']).toString()) ?? _currentWeight;
+      }
+      if (cachedSummary['tinggi_badan'] != null || cachedSummary['tb'] != null) {
+        _heightCm = double.tryParse((cachedSummary['tinggi_badan'] ?? cachedSummary['tb']).toString()) ?? _heightCm;
+      }
+      if (cachedSummary['kondisi_tubuh'] != null || cachedSummary['kondisi'] != null) {
+        _kondisiTubuh = (cachedSummary['kondisi_tubuh'] ?? cachedSummary['kondisi']).toString();
+      }
+      if (cachedSummary['keluhan'] != null) {
+        _keluhan = cachedSummary['keluhan'].toString();
+      }
+    }
   }
 
   Future<void> _fetchLivePantauData() async {
@@ -139,7 +258,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
           final List<WeightRecord> chartRecords = [];
           for (int i = 0; i < labels.length && i < weights.length; i++) {
             chartRecords.add(WeightRecord(
-              date: labels[i].toString(),
+              date: _formatIndonesianDate(labels[i].toString()),
               weight: double.tryParse(weights[i].toString()) ?? 65.0,
               note: '',
             ));
@@ -161,8 +280,9 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
           final item = historyRes.data![i];
           if (item is Map) {
             final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
-            final dateStr = dt != null
-                ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} • ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WIB'
+            final localDt = dt?.toLocal();
+            final dateStr = localDt != null
+                ? '${localDt.day.toString().padLeft(2, '0')}/${localDt.month.toString().padLeft(2, '0')}/${localDt.year} • ${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')} WIB'
                 : (item['tanggal']?.toString() ?? 'Hari ini');
             historyList.add(PemantauanRecord(
               id: item['id'],
@@ -179,6 +299,11 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
         if (historyList.isNotEmpty) {
           setState(() {
             _allHistoryRecords = historyList;
+            final latest = historyList.first;
+            _currentWeight = latest.weightKg;
+            _heightCm = latest.heightCm.toDouble();
+            _kondisiTubuh = latest.kondisiTubuh;
+            _keluhan = latest.keluhan;
           });
         }
       }
@@ -205,6 +330,29 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
     return val.toStringAsFixed(1).replaceAll('.', ',');
   }
 
+  String _getLatestRecordedDateString() {
+    if (_allHistoryRecords.isNotEmpty) {
+      final first = _allHistoryRecords.first;
+      if (first.dateStr.contains('•')) {
+        final dPart = first.dateStr.split('•')[0].trim();
+        final parts = dPart.split('/');
+        if (parts.length == 3) {
+          final day = parts[0];
+          final monthInt = int.tryParse(parts[1]) ?? 1;
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+          final mStr = (monthInt >= 1 && monthInt <= 12) ? months[monthInt - 1] : parts[1];
+          return '$day $mStr';
+        }
+        return _formatIndonesianDate(dPart);
+      }
+      return _formatIndonesianDate(first.dateStr);
+    }
+    if (_weightRecords.isNotEmpty) {
+      return _formatIndonesianDate(_weightRecords.last.date);
+    }
+    return '15 Sep';
+  }
+
   Future<void> _handleOpenCatatKondisi() async {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
@@ -218,10 +366,10 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
     );
 
     if (result != null && mounted) {
-      final double newWeight = (result['weight'] as num).toDouble();
-      final double newHeight = (result['height'] as num).toDouble();
-      final String newKondisi = result['kondisi'] as String;
-      final String newKeluhan = result['keluhan'] as String;
+      final double newWeight = double.tryParse((result['bb'] ?? result['berat_badan'] ?? result['weight'] ?? '0').toString()) ?? _currentWeight;
+      final double newHeight = double.tryParse((result['tb'] ?? result['tinggi_badan'] ?? result['height'] ?? '0').toString()) ?? _heightCm;
+      final String newKondisi = (result['kondisi'] ?? result['kondisi_tubuh'] ?? 'Baik').toString();
+      final String newKeluhan = (result['keluhan'] ?? 'Tidak Ada').toString();
 
       setState(() {
         _currentWeight = newWeight;
@@ -230,18 +378,24 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
         _keluhan = newKeluhan;
 
         // Add to line chart points
+        final now = DateTime.now();
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        final todayShort = '${now.day.toString().padLeft(2, '0')} ${months[now.month - 1]}';
         _weightRecords = List.from(_weightRecords)
-          ..removeAt(0)
           ..add(WeightRecord(
-            date: 'Hari Ini',
+            date: todayShort,
             weight: newWeight,
             note: newKondisi,
           ));
+        if (_weightRecords.length > 6) {
+          _weightRecords.removeAt(0);
+        }
 
         // Add to history records
         _allHistoryRecords = [
           PemantauanRecord(
-            dateStr: 'Hari Ini • ${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')} WIB',
+            id: result['id'],
+            dateStr: '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} • ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB',
             badgeText: 'Terbaru',
             imt: _calculatedImt,
             heightCm: newHeight.toInt(),
@@ -259,11 +413,13 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
           backgroundColor: _darkGreen,
         ),
       );
+
+      _fetchLivePantauData();
     }
   }
 
-  void _handleOpenRiwayat() {
-    Navigator.push(
+  Future<void> _handleOpenRiwayat() async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => RiwayatPemantauanScreen(
@@ -272,6 +428,12 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
         ),
       ),
     );
+    if (mounted) {
+      setState(() {
+        _loadCachedPantauData();
+      });
+      _fetchLivePantauData();
+    }
   }
 
   @override
@@ -936,7 +1098,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Terakhir dicatat (15 Sep)',
+                          'Terakhir dicatat (${_getLatestRecordedDateString()})',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -1017,7 +1179,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
 
               const SizedBox(height: 12),
 
-              // ── Highlight Status Tubuh Container ──
+              // ── IMT Saat Ini Container ──
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
@@ -1025,30 +1187,19 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFE0F2FE)),
                 ),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
-                  runSpacing: 6,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Highlight Status Tubuh:   ',
+                      'IMT Saat Ini : ${_formatNumber(_calculatedImt)}',
                       style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF475569),
-                      ),
-                    ),
-                    Text(
-                      'IMT Saat Ini: ${_formatNumber(_calculatedImt)}',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
+                        fontSize: 13,
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFF0F172A),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: const Color(0xFFA7F3D0),
                         borderRadius: BorderRadius.circular(6),
@@ -1056,7 +1207,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                       child: Text(
                         _imtCategory,
                         style: GoogleFonts.inter(
-                          fontSize: 11,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                           color: const Color(0xFF065F46),
                         ),
@@ -1292,7 +1443,7 @@ class _WeightLineChartPainter extends CustomPainter {
 
       // Draw X-axis date label
       final dateSpan = TextSpan(
-        text: rec.date,
+        text: _formatIndonesianDate(rec.date),
         style: GoogleFonts.inter(
           fontSize: 11.5,
           fontWeight: isLatest ? FontWeight.w700 : FontWeight.w500,
