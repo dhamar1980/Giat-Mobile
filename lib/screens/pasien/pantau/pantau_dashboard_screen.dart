@@ -11,6 +11,7 @@ import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
 import '../../../services/pasien_api_service.dart';
 import '../../../services/storage_service.dart';
+import '../../../utils/time_utils.dart';
 
 String _formatIndonesianDate(String str) {
   return str
@@ -112,11 +113,9 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
       final List<PemantauanRecord> cachedList = [];
       for (int i = 0; i < cached.length; i++) {
         final item = cached[i];
-        final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
-        final localDt = dt?.toLocal();
-        final dateStr = localDt != null
-            ? '${localDt.day.toString().padLeft(2, '0')}/${localDt.month.toString().padLeft(2, '0')}/${localDt.year} • ${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')} WIB'
-            : (item['tanggal']?.toString() ?? 'Hari ini');
+        final dateStr = item['created_at'] != null
+            ? TimeUtils.formatDateTimeWithZone(item['created_at'])
+            : (item['tanggal'] != null ? TimeUtils.replaceTimezoneSuffix(item['tanggal'].toString()) : 'Hari ini');
         cachedList.add(PemantauanRecord(
           id: item['id'],
           dateStr: dateStr,
@@ -179,9 +178,10 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
         const WeightRecord(date: '15 Sep', weight: 65.2, note: 'Terakhir dicatat'),
       ];
 
+      final zone = TimeUtils.getTimeZoneName();
       _allHistoryRecords = [
-        const PemantauanRecord(
-          dateStr: '06 September 2026 • 07:30 WIB',
+        PemantauanRecord(
+          dateStr: '06 September 2026 • 07:30 $zone',
           badgeText: 'Terbaru',
           imt: 22.5,
           heightCm: 170,
@@ -189,8 +189,8 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
           kondisiTubuh: 'Baik',
           keluhan: 'Tidak ada keluhan',
         ),
-        const PemantauanRecord(
-          dateStr: '06 September 2026 • 07:15 WIB',
+        PemantauanRecord(
+          dateStr: '06 September 2026 • 07:15 $zone',
           badgeText: '1 hari lalu',
           imt: 22.6,
           heightCm: 170,
@@ -198,8 +198,8 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
           kondisiTubuh: 'Kurang Baik',
           keluhan: 'Mudah lelah',
         ),
-        const PemantauanRecord(
-          dateStr: '07 September 2026 • 06:15 WIB',
+        PemantauanRecord(
+          dateStr: '07 September 2026 • 06:15 $zone',
           badgeText: '2 hari lalu',
           imt: 22.5,
           heightCm: 170,
@@ -281,11 +281,9 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
         for (int i = 0; i < historyRes.data!.length; i++) {
           final item = historyRes.data![i];
           if (item is Map) {
-            final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
-            final localDt = dt?.toLocal();
-            final dateStr = localDt != null
-                ? '${localDt.day.toString().padLeft(2, '0')}/${localDt.month.toString().padLeft(2, '0')}/${localDt.year} • ${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')} WIB'
-                : (item['tanggal']?.toString() ?? 'Hari ini');
+            final dateStr = item['created_at'] != null
+                ? TimeUtils.formatDateTimeWithZone(item['created_at'])
+                : (item['tanggal'] != null ? TimeUtils.replaceTimezoneSuffix(item['tanggal'].toString()) : 'Hari ini');
             historyList.add(PemantauanRecord(
               id: item['id'],
               dateStr: dateStr,
@@ -405,7 +403,7 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
         _allHistoryRecords = [
           PemantauanRecord(
             id: result['id'],
-            dateStr: '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} • ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB',
+            dateStr: TimeUtils.formatDateTimeWithZone(now),
             badgeText: 'Terbaru',
             imt: _calculatedImt,
             heightCm: newHeight.toInt(),

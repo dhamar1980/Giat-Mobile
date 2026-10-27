@@ -11,6 +11,7 @@ import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
 import '../../../services/konsultasi_api_service.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI: DAFTAR DOKTER & KONSULTASI SAYA (Sesuai Desain Figma)
@@ -50,6 +51,158 @@ class _DokterListScreenState extends State<DokterListScreen> {
   List<Map<String, dynamic>> _apiDoctors = [];
   List<Map<String, dynamic>> _myConsultations = [];
   bool _isLoadingConsultations = false;
+
+  /// Helper untuk menormalisasi data dokter dari backend API maupun fallback
+  static Map<String, dynamic> _normalizeDoctor(Map<String, dynamic> raw) {
+    final id = (raw['id_dokter'] ?? raw['id'] ?? '').toString();
+    final nama = (raw['nama'] ?? raw['name'] ?? 'Dokter GIAT').toString();
+    final spesialisasi = (raw['spesialisasi'] ?? raw['specialty'] ?? 'Dokter Umum').toString();
+    final foto = (raw['foto_profile'] ?? raw['foto_profil'] ?? raw['avatarUrl'] ?? '').toString();
+    final tarif = raw['tarif_konsultasi'] ?? raw['biaya_konsultasi'] ?? raw['price'];
+    final institusi = (raw['institusi'] ?? raw['instansi'] ?? raw['hospital'] ?? 'Klinik Layanan GIAT').toString();
+
+    // Normalisasi kategori spesialisasi dokter
+    final specLower = spesialisasi.toLowerCase();
+    String category = 'Dokter Umum';
+    if (specLower.contains('ginjal') || specLower.contains('kgh') || specLower.contains('nefro')) {
+      category = 'Dokter Ginjal';
+    } else if (specLower.contains('penyakit dalam') || specLower.contains('sp.pd') || specLower.contains('dalam')) {
+      category = 'Dokter Spesialis Penyakit Dalam';
+    } else {
+      category = 'Dokter Umum';
+    }
+
+    // Format harga
+    String formattedPrice = 'Rp 150.000';
+    if (tarif != null) {
+      if (tarif is num) {
+        formattedPrice = 'Rp ${tarif.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+      } else {
+        final s = tarif.toString();
+        if (s.startsWith('Rp')) {
+          formattedPrice = s;
+        } else {
+          final val = double.tryParse(s.replaceAll(RegExp(r'[^0-9.]'), ''))?.toInt();
+          if (val != null) {
+            formattedPrice = 'Rp ${val.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+          }
+        }
+      }
+    }
+
+    final avatar = foto.isNotEmpty
+        ? foto
+        : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300';
+
+    return {
+      ...raw,
+      'id': id,
+      'id_dokter': id,
+      'name': nama,
+      'nama': nama,
+      'specialty': spesialisasi,
+      'spesialisasi': spesialisasi,
+      'category': category,
+      'avatarUrl': avatar,
+      'foto_profile': avatar,
+      'hospital': institusi,
+      'institusi': institusi,
+      'price': formattedPrice,
+      'schedule': TimeUtils.replaceTimezoneSuffix(raw['schedule']?.toString() ?? 'Tersedia Hari Ini, 14:00 WIB'),
+      'isOnline': raw['isOnline'] ?? true,
+      'isVerified': raw['isVerified'] ?? true,
+      'isOngoing': raw['isOngoing'] ?? false,
+      'status': raw['status'] ?? 'Online Sekarang',
+      'experience': raw['experience'] ?? '8 tahun',
+      'rating': raw['rating'] != null ? double.tryParse(raw['rating'].toString()) ?? 4.9 : 4.9,
+      'bio': raw['bio'] ?? '',
+    };
+  }
+
+  /// Data dokter default dengan spesialisasi otentik masing-masing
+  static final List<Map<String, dynamic>> _defaultDoctors = [
+    // 1. Dokter Umum
+    _normalizeDoctor({
+      'id': 'anisa_putri',
+      'id_dokter': 'anisa_putri',
+      'name': 'dr. Anisa Putri',
+      'nama': 'dr. Anisa Putri',
+      'specialty': 'Dokter Umum',
+      'spesialisasi': 'Dokter Umum',
+      'hospital': 'Klinik Layanan GIAT',
+      'price': 'Rp 75.000',
+      'avatarUrl': 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+      'experience': '7 tahun',
+      'rating': 4.9,
+    }),
+    _normalizeDoctor({
+      'id': 'dedi_pratama',
+      'id_dokter': 'dedi_pratama',
+      'name': 'dr. Dedi Pratama',
+      'nama': 'dr. Dedi Pratama',
+      'specialty': 'Dokter Umum',
+      'spesialisasi': 'Dokter Umum',
+      'hospital': 'Klinik Pratama Sehat Ginjal',
+      'price': 'Rp 50.000',
+      'avatarUrl': 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&q=80&w=300',
+      'experience': '5 tahun',
+      'rating': 4.8,
+    }),
+    // 2. Dokter Spesialis Penyakit Dalam
+    _normalizeDoctor({
+      'id': 'ce5355fd-3da3-4cd4-953a-bdb1729d75cd',
+      'id_dokter': 'ce5355fd-3da3-4cd4-953a-bdb1729d75cd',
+      'name': 'dr. Budi Santoso, Sp.PD',
+      'nama': 'dr. Budi Santoso, Sp.PD',
+      'specialty': 'Dokter Spesialis Penyakit Dalam',
+      'spesialisasi': 'Dokter Spesialis Penyakit Dalam',
+      'hospital': 'RS Santo Borromeus Bandung',
+      'price': 'Rp 120.000',
+      'avatarUrl': 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=300',
+      'experience': '12 tahun',
+      'rating': 4.9,
+    }),
+    _normalizeDoctor({
+      'id': 'eka_rahmawati',
+      'id_dokter': 'eka_rahmawati',
+      'name': 'dr. Eka Rahmawati, Sp.PD',
+      'nama': 'dr. Eka Rahmawati, Sp.PD',
+      'specialty': 'Dokter Spesialis Penyakit Dalam',
+      'spesialisasi': 'Dokter Spesialis Penyakit Dalam',
+      'hospital': 'RS Hermina Pasteur Bandung',
+      'price': 'Rp 130.000',
+      'avatarUrl': 'https://images.unsplash.com/photo-1594824813629-87a70197d19a?auto=format&fit=crop&q=80&w=300',
+      'experience': '8 tahun',
+      'rating': 4.8,
+    }),
+    // 3. Dokter Ginjal
+    _normalizeDoctor({
+      'id': 'andi_wijaya',
+      'id_dokter': 'andi_wijaya',
+      'name': 'dr. Andi Wijaya, Sp.PD-KGH',
+      'nama': 'dr. Andi Wijaya, Sp.PD-KGH',
+      'specialty': 'Dokter Ginjal',
+      'spesialisasi': 'Dokter Ginjal',
+      'hospital': 'RSUP Dr. Hasan Sadikin Bandung',
+      'price': 'Rp 150.000',
+      'avatarUrl': 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
+      'experience': '12 tahun',
+      'rating': 4.9,
+    }),
+    _normalizeDoctor({
+      'id': 'hendra_setiawan',
+      'id_dokter': 'hendra_setiawan',
+      'name': 'dr. Hendra Setiawan, Sp.PD-KGH',
+      'nama': 'dr. Hendra Setiawan, Sp.PD-KGH',
+      'specialty': 'Dokter Ginjal',
+      'spesialisasi': 'Dokter Ginjal',
+      'hospital': 'Pusat Nutrisi & Ginjal Sehat',
+      'price': 'Rp 150.000',
+      'avatarUrl': 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=300',
+      'experience': '9 tahun',
+      'rating': 4.9,
+    }),
+  ];
 
   @override
   void initState() {
@@ -103,8 +256,8 @@ class _DokterListScreenState extends State<DokterListScreen> {
       if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
         setState(() {
           _apiDoctors = res.data!.map<Map<String, dynamic>>((d) {
-            if (d is Map<String, dynamic>) return d;
-            return Map<String, dynamic>.from(d as Map);
+            final raw = d is Map<String, dynamic> ? d : Map<String, dynamic>.from(d as Map);
+            return _normalizeDoctor(raw);
           }).toList();
         });
       }
@@ -124,129 +277,37 @@ class _DokterListScreenState extends State<DokterListScreen> {
       statusBarIconBrightness: Brightness.dark,
     ));
 
-    // Build dynamic doctor list matching Figma screenshots for each category
-    String anisaSpecialty = 'Dokter Umum';
-    if (_selectedCategory == 'Dokter Spesialis Penyakit Dalam') {
-      anisaSpecialty = 'Spesialis Penyakit Dalam';
-    } else if (_selectedCategory == 'Dokter Ginjal') {
-      anisaSpecialty = 'Spesialis Ginjal & Hipertensi';
-    }
-
-    final anisaPutri = {
-      'id': 'anisa_putri',
-      'name': 'Dr. Anisa Putri',
-      'specialty': anisaSpecialty,
-      'category': _selectedCategory,
-      'hospital': 'Klinik Layanan GIAT',
-      'schedule': 'Tersedia Hari Ini, 14:00 WIB',
-      'price': 'Rp 150.000',
-      'isOnline': true,
-      'isVerified': true,
-      'isOngoing': true,
-      'status': 'Sedang Berlangsung',
-      'avatarUrl': 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
-      'experience': '7 tahun',
-      'rating': 4.9,
-    };
-
-    String budiSpecialty = 'Spesialis Ginjal & Hipertensi';
-    if (_selectedCategory == 'Dokter Umum') {
-      budiSpecialty = 'Dokter Umum';
-    } else if (_selectedCategory == 'Dokter Spesialis Penyakit Dalam') {
-      budiSpecialty = 'Spesialis Penyakit Dalam';
-    }
-
-    final budiSantoso = {
-      'id': 'budi_santoso',
-      'name': 'Dr. Budi Santoso',
-      'specialty': budiSpecialty,
-      'category': _selectedCategory == 'Semua Dokter' ? 'Dokter Ginjal' : _selectedCategory,
-      'hospital': 'RS Jantung & Ginjal Sehat',
-      'schedule': 'Tersedia Hari Ini, 14:00 WIB',
-      'price': 'Rp 150.000',
-      'isOnline': true,
-      'isVerified': true,
-      'isOngoing': false,
-      'status': 'Online Sekarang',
-      'avatarUrl': 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
-      'experience': '12 tahun',
-      'rating': 4.9,
-    };
-
-    final otherDoctors = [
-      {
-        'id': '2',
-        'name': 'dr. Rina Wijaya',
-        'specialty': 'Dokter Spesialis Penyakit Dalam',
-        'category': 'Dokter Spesialis Penyakit Dalam',
-        'hospital': 'RS Cipta Husada',
-        'schedule': 'Tersedia Hari Ini, 14:00 WIB',
-        'price': 'Rp 150.000',
-        'isOnline': true,
-        'isVerified': true,
-        'isOngoing': false,
-        'status': 'Online Sekarang',
-        'avatarUrl': 'https://images.unsplash.com/photo-1594824813629-87a70197d19a?auto=format&fit=crop&q=80&w=300',
-        'experience': '8 tahun',
-        'rating': 4.8,
-      },
-      {
-        'id': '3',
-        'name': 'dr. Maya Kartika',
-        'specialty': 'Dokter Umum',
-        'category': 'Dokter Umum',
-        'hospital': 'Klinik Layanan GIAT',
-        'schedule': 'Tersedia Hari Ini, 14:00 WIB',
-        'price': 'Rp 150.000',
-        'isOnline': true,
-        'isVerified': true,
-        'isOngoing': false,
-        'status': 'Online Sekarang',
-        'avatarUrl': 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
-        'experience': '5 tahun',
-        'rating': 4.9,
-      },
-      {
-        'id': '4',
-        'name': 'dr. Hendra Setiawan',
-        'specialty': 'Dokter Ginjal',
-        'category': 'Dokter Ginjal',
-        'hospital': 'Pusat Nutrisi & Ginjal',
-        'schedule': 'Tersedia Hari Ini, 14:00 WIB',
-        'price': 'Rp 150.000',
-        'isOnline': true,
-        'isVerified': true,
-        'isOngoing': false,
-        'status': 'Online Sekarang',
-        'avatarUrl': 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=300',
-        'experience': '9 tahun',
-        'rating': 4.9,
-      },
-    ];
+    // List dokter bersumber dari database API, atau fallback ke default list
+    final List<Map<String, dynamic>> sourceList =
+        _apiDoctors.isNotEmpty ? _apiDoctors : _defaultDoctors;
 
     List<Map<String, dynamic>> combinedList = [];
-    if (_apiDoctors.isNotEmpty) {
-      if (_selectedCategory == 'Semua Dokter' || _selectedCategory == 'Konsultasi Saya') {
-        combinedList.addAll(_apiDoctors);
-      } else {
-        combinedList.addAll(_apiDoctors.where((d) =>
-            (d['kategori'] ?? d['specialty'] ?? '').toString().toLowerCase().contains(_selectedCategory.toLowerCase())));
-      }
-    }
-    if (combinedList.isEmpty) {
-      combinedList = [anisaPutri, budiSantoso];
-      if (_selectedCategory == 'Semua Dokter') {
-        combinedList.addAll(otherDoctors);
-      } else {
-        combinedList.addAll(otherDoctors.where((d) => d['category'] == _selectedCategory));
-      }
+    if (_selectedCategory == 'Semua Dokter' || _selectedCategory == 'Konsultasi Saya') {
+      combinedList = List<Map<String, dynamic>>.from(sourceList);
+    } else {
+      final selected = _selectedCategory.toLowerCase();
+      combinedList = sourceList.where((doc) {
+        final cat = (doc['category'] ?? '').toString().toLowerCase();
+        final spec = (doc['specialty'] ?? doc['spesialisasi'] ?? '').toString().toLowerCase();
+
+        if (selected.contains('ginjal')) {
+          return cat.contains('ginjal') || spec.contains('ginjal') || spec.contains('kgh') || spec.contains('nefro');
+        } else if (selected.contains('penyakit dalam')) {
+          return cat.contains('penyakit dalam') || spec.contains('penyakit dalam') || spec.contains('sp.pd');
+        } else if (selected.contains('umum')) {
+          return cat.contains('umum') || spec.contains('umum');
+        }
+        return cat == selected || spec.contains(selected);
+      }).toList();
     }
 
     final query = _searchCtrl.text.toLowerCase().trim();
     final filteredDoctors = combinedList.where((doc) {
       if (query.isEmpty) return true;
-      return doc['name'].toString().toLowerCase().contains(query) ||
-          doc['specialty'].toString().toLowerCase().contains(query);
+      final name = (doc['name'] ?? doc['nama'] ?? '').toString().toLowerCase();
+      final spec = (doc['specialty'] ?? doc['spesialisasi'] ?? '').toString().toLowerCase();
+      final hosp = (doc['hospital'] ?? doc['institusi'] ?? '').toString().toLowerCase();
+      return name.contains(query) || spec.contains(query) || hosp.contains(query);
     }).toList();
 
     final content = Column(
@@ -834,10 +895,27 @@ class _DokterListScreenState extends State<DokterListScreen> {
       specialty = 'Dokter Spesialis Penyakit Dalam';
     }
     final avatarUrl = (dokter['foto_profile'] ?? c['foto_profile'] ?? '').toString();
-    final tanggal = (c['tanggal_konsultasi'] ?? c['tanggal'] ?? '').toString();
-    final jam = (c['jam_mulai'] != null) ? '${c['jam_mulai']} WIB' : 'Jadwal Medis';
-    final status = (c['status'] ?? 'berlangsung').toString();
-    final statusBayar = (c['status_pembayaran'] ?? 'lunas').toString();
+    final rawTanggal = (c['tanggal_konsultasi'] ?? c['tanggal'] ?? c['created_at'] ?? '').toString();
+    final tanggal = rawTanggal.isNotEmpty
+        ? TimeUtils.formatDate(rawTanggal, useIndonesianMonth: true, withDayName: true)
+        : 'Jadwal Aktif';
+
+    String jam;
+    if (c['jam_mulai'] != null && c['jam_mulai'].toString().isNotEmpty) {
+      final rawJam = c['jam_mulai'].toString().trim();
+      final parts = rawJam.split(':');
+      if (parts.length >= 2) {
+        final h = parts[0].padLeft(2, '0');
+        final m = parts[1].padLeft(2, '0');
+        jam = '$h:$m ${TimeUtils.getTimeZoneName()}';
+      } else {
+        jam = '$rawJam ${TimeUtils.getTimeZoneName()}';
+      }
+    } else if (c['created_at'] != null && c['created_at'].toString().isNotEmpty) {
+      jam = TimeUtils.formatTimeWithZone(c['created_at']);
+    } else {
+      jam = 'Jadwal Medis';
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -922,24 +1000,6 @@ class _DokterListScreenState extends State<DokterListScreen> {
                               color: const Color(0xFF64748B),
                             ),
                           ),
-                          const SizedBox(height: 5),
-                          // Dynamic Consultation ID Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Text(
-                              'ID: ${id.length > 14 ? id.substring(0, 14) + '...' : id}',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF475569),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -975,28 +1035,15 @@ class _DokterListScreenState extends State<DokterListScreen> {
                       ),
                       const SizedBox(height: 6),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF16A34A)),
-                              const SizedBox(width: 8),
-                              Text(
-                                jam,
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                              ),
-                            ],
-                          ),
+                          const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF16A34A)),
+                          const SizedBox(width: 8),
                           Text(
-                            statusBayar == 'lunas' ? 'Lunas' : status,
+                            jam,
                             style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: statusBayar == 'lunas' ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF1E293B),
                             ),
                           ),
                         ],
@@ -1113,6 +1160,13 @@ class _DokterListScreenState extends State<DokterListScreen> {
   }
 
   Widget _buildDokterOnlineCard(Map<String, dynamic> doc, {bool isOngoing = false}) {
+    final avatarUrl = (doc['avatarUrl'] ?? doc['foto_profile'] ?? doc['foto_profil'] ?? '').toString();
+    final doctorName = (doc['name'] ?? doc['nama'] ?? 'Dokter GIAT').toString();
+    final specialty = (doc['specialty'] ?? doc['spesialisasi'] ?? 'Dokter Umum').toString();
+    final schedule = TimeUtils.replaceTimezoneSuffix((doc['schedule'] ?? 'Tersedia Hari Ini, 14:00 WIB').toString());
+    final price = (doc['price'] ?? 'Rp 150.000').toString();
+    final status = (doc['status'] ?? 'Online Sekarang').toString();
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1150,22 +1204,15 @@ class _DokterListScreenState extends State<DokterListScreen> {
                     // Avatar
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        doc['avatarUrl'],
-                        width: 58,
-                        height: 58,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          width: 58,
-                          height: 58,
-                          color: const Color(0xFFDCFCE7),
-                          child: const Icon(
-                            Icons.person_rounded,
-                            size: 32,
-                            color: _darkGreen,
-                          ),
-                        ),
-                      ),
+                      child: avatarUrl.isNotEmpty && (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://'))
+                          ? Image.network(
+                              avatarUrl,
+                              width: 58,
+                              height: 58,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => _buildAvatarPlaceholder(),
+                            )
+                          : _buildAvatarPlaceholder(),
                     ),
                     const SizedBox(width: 14),
 
@@ -1175,7 +1222,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            doc['name'],
+                            doctorName,
                             style: GoogleFonts.inter(
                               fontSize: 15.5,
                               fontWeight: FontWeight.w700,
@@ -1184,7 +1231,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            doc['specialty'],
+                            specialty,
                             style: GoogleFonts.inter(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w500,
@@ -1208,7 +1255,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                               Text(
                                 isOngoing
                                     ? (doc['status'] ?? 'Sedang Berlangsung')
-                                    : 'Online Sekarang',
+                                    : status,
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -1243,7 +1290,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        doc['schedule'] ?? 'Tersedia Hari Ini, 14:00 WIB',
+                        schedule,
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -1259,7 +1306,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                         ),
                       ),
                       Text(
-                        doc['price'] ?? 'Rp 150.000',
+                        price,
                         style: GoogleFonts.inter(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w800,

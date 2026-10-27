@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/pasien_api_service.dart';
+import '../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRAGI AI ASSISTANT CHAT SCREEN (Prajurit Ginjal)
@@ -60,9 +61,7 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
             final sender = item['role'] ?? item['sender'] ?? 'user';
             final bool isUser = sender == 'user' || sender == 'pasien';
             final text = item['pesan'] ?? item['message'] ?? item['text'] ?? '';
-            final time = item['created_at'] != null
-                ? item['created_at'].toString().split('T').last.substring(0, 5)
-                : '12:00';
+            final time = TimeUtils.formatChatTime(item['created_at']);
             final saran = item['saran_tindakan']?.toString();
             if (text.toString().isNotEmpty) {
               loaded.add(_ChatMessage(
@@ -100,7 +99,7 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
     _msgCtrl.clear();
 
     final now = DateTime.now();
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final timeStr = TimeUtils.formatChatTime(now);
 
     setState(() {
       _messages.add(_ChatMessage(
@@ -137,7 +136,7 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
 
       if (!mounted) return;
       final respNow = DateTime.now();
-      final respTimeStr = '${respNow.hour.toString().padLeft(2, '0')}:${respNow.minute.toString().padLeft(2, '0')}';
+      final respTimeStr = TimeUtils.formatChatTime(respNow);
 
       setState(() {
         _isTyping = false;
@@ -160,7 +159,8 @@ class _PragiChatScreenState extends State<PragiChatScreen> {
     } else if (q.contains('makanan') || q.contains('pantangan') || q.contains('diet') || q.contains('makan')) {
       return '🥗 Pada kesehatan ginjal, batasi makanan tinggi natrium/garam, hindari makanan olahan/kaleng, dan batasi asupan kalium/fosfor tinggi (seperti pisang berlebih atau jeroan). Utamakan makanan segar yang dimasak sendiri!';
     } else if (q.contains('obat') || q.contains('jadwal')) {
-      return '💊 Anda memiliki pengingat obat hari ini pada pukul 08:00 WIB dan 20:00 WIB. Jangan lupa minum obat teratur dan catat di menu Obat ya!';
+      final zone = TimeUtils.getTimeZoneName();
+      return '💊 Anda memiliki pengingat obat hari ini pada pukul 08:00 $zone dan 20:00 $zone. Jangan lupa minum obat teratur dan catat di menu Obat ya!';
     } else if (q.contains('kreatinin') || q.contains('egfr') || q.contains('lab')) {
       return '🧪 Kadar kreatinin 1.8 menunjukkan adanya penurunan fungsi filtrasi ginjal. Segera konsultasikan hasil lab terbaru Anda dengan Dokter Spesialis Ginjal melalui menu Konsultasi.';
     } else {

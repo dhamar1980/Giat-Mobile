@@ -5,6 +5,7 @@ import '../models/dokter_models.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../profile/dokter_profile_screen.dart';
 import 'dokter_room_chat_screen.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DAFTAR KONSULTASI DOKTER (Sesuai Desain Figma / Image 1, 2, 3)
@@ -404,7 +405,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
 
                     const SizedBox(height: 4),
                     Text(
-                      'Waktu Konsultasi: ${item.scheduledTimeText}',
+                      'Waktu Konsultasi: ${TimeUtils.replaceTimezoneSuffix(item.scheduledTimeText)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(

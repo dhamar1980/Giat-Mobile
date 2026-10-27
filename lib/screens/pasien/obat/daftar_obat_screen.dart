@@ -10,6 +10,7 @@ import 'riwayat_obat_screen.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN OBAT & RESEP PASIEN (Figma Screen: Tab Obat Pasien)
@@ -1040,7 +1041,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
         builder: (_) => LacakObatScreen(
           userName: widget.userName,
           orderId: '#G-9021',
-          estimasiTiba: 'Hari ini, 15:30 WIB',
+          estimasiTiba: 'Hari ini, 15:30 ${TimeUtils.getTimeZoneName()}',
           status: 'Sedang Diproses',
         ),
       ),

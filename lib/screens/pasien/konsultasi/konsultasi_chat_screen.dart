@@ -13,6 +13,7 @@ import '../../../services/ringtone_player.dart';
 import '../../../services/storage_service.dart';
 import '../../../widgets/incoming_call_dialog.dart';
 import '../../../widgets/typing_indicator_widget.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI CHAT SCREEN (Realtime Chat & Video Call GIAT Telemedicine)
@@ -236,11 +237,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
           (m['text'] == msg.pesan && m['sender'] == senderKey));
 
       if (!exists) {
-        final timeStr = msg.createdAt.contains('T')
-            ? msg.createdAt.split('T').last.substring(0, 5)
-            : (msg.createdAt.contains(' ')
-                ? msg.createdAt.split(' ').last.substring(0, 5).replaceAll(':', '.')
-                : (msg.createdAt.isNotEmpty ? msg.createdAt : '12.00'));
+        final timeStr = TimeUtils.formatChatTime(msg.createdAt);
 
         setState(() {
           _messages.add({
@@ -290,11 +287,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
           final isMe = (fbMsg.senderRole.toLowerCase() == 'pasien') ||
               (_currentUser != null && fbMsg.idSender.isNotEmpty && fbMsg.idSender == _currentUser!.id.toString());
           final senderKey = isMe ? 'patient' : 'doctor';
-          final timeStr = fbMsg.createdAt.contains('T')
-              ? fbMsg.createdAt.split('T').last.substring(0, 5)
-              : (fbMsg.createdAt.contains(' ')
-                  ? fbMsg.createdAt.split(' ').last.substring(0, 5).replaceAll(':', '.')
-                  : (fbMsg.createdAt.isNotEmpty ? fbMsg.createdAt : '12.00'));
+          final timeStr = TimeUtils.formatChatTime(fbMsg.createdAt);
 
           loaded.add({
             'id': fbMsg.id,
@@ -358,9 +351,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
                   (myId.isNotEmpty && senderId.isNotEmpty && senderId == myId);
               final senderKey = isMe ? 'patient' : 'doctor';
               final text = (item['pesan'] ?? item['message'] ?? item['text'] ?? '').toString();
-              final time = item['created_at'] != null
-                  ? item['created_at'].toString().split('T').last.substring(0, 5)
-                  : '12.00';
+              final time = TimeUtils.formatChatTime(item['created_at']);
               final id = (item['id'] ?? item['id_pesan'] ?? '').toString();
 
               final exists = _messages.any((m) =>
@@ -424,7 +415,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
     _firebaseService.updateTypingStatus(_activeConsultationId, 'pasien', false);
 
     final now = DateTime.now();
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}.${now.minute.toString().padLeft(2, '0')}';
+    final timeStr = TimeUtils.formatChatTime(now);
     final formattedCreatedAt = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
     final tempMsgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';

@@ -12,6 +12,7 @@ import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/pasien_api_service.dart';
+import '../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PASIEN HOME SCREEN (Figma Node: 771-5845)
@@ -533,7 +534,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                 icon: Icons.medication_rounded,
                 iconBg: const Color(0xFF065A37),
                 title: rem['nama']?.toString() ?? rem['judul']?.toString() ?? rem['title']?.toString() ?? 'Minum Obat',
-                time: rem['waktu']?.toString() ?? rem['time']?.toString() ?? '08:00 WIB',
+                time: TimeUtils.replaceTimezoneSuffix(rem['waktu']?.toString() ?? rem['time']?.toString() ?? '08:00 WIB'),
                 onTap: _openReminderList,
               ),
               const SizedBox(height: 10),
@@ -544,7 +545,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
               icon: Icons.medication_rounded,
               iconBg: const Color(0xFF065A37),
               title: 'Minum Obat (Amlodipine)',
-              time: '08:00 WIB',
+              time: '08:00 ${TimeUtils.getTimeZoneName()}',
               onTap: _openReminderList,
             ),
             const SizedBox(height: 10),
@@ -552,7 +553,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
               icon: Icons.calendar_month_rounded,
               iconBg: const Color(0xFF065A37),
               title: 'Kontrol Kesehatan Ginjal',
-              time: 'Besok, 10:00 WIB',
+              time: 'Besok, 10:00 ${TimeUtils.getTimeZoneName()}',
               onTap: _openReminderList,
             ),
           ],

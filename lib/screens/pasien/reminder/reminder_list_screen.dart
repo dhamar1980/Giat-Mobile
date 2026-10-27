@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'tambah_reminder_screen.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PENGINGAT & ALARM KESEHATAN GINJAL (REMINDER SAYA)
@@ -23,26 +24,29 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
   static const _subtextColor = Color(0xFF475569);
 
   // Default fallback reminders matching Figma Node 771:5254
-  static final List<Map<String, dynamic>> _defaultReminders = [
-    {
-      'id': '1',
-      'type': 'obat',
-      'title': 'Minum Obat',
-      'subtitle': 'Losartan 50 mg',
-      'time': '08:00 WIB',
-      'date': 'Hari ini',
-      'isActive': true,
-    },
-    {
-      'id': '2',
-      'type': 'konsultasi',
-      'title': 'Konsultasi Dokter',
-      'subtitle': 'Dr. budi Santoso',
-      'time': '14:00 WIB',
-      'date': 'Hari ini',
-      'isActive': true,
-    },
-  ];
+  static List<Map<String, dynamic>> get _defaultReminders {
+    final zone = TimeUtils.getTimeZoneName();
+    return [
+      {
+        'id': '1',
+        'type': 'obat',
+        'title': 'Minum Obat',
+        'subtitle': 'Losartan 50 mg',
+        'time': '08:00 $zone',
+        'date': 'Hari ini',
+        'isActive': true,
+      },
+      {
+        'id': '2',
+        'type': 'konsultasi',
+        'title': 'Konsultasi Dokter',
+        'subtitle': 'Dr. budi Santoso',
+        'time': '14:00 $zone',
+        'date': 'Hari ini',
+        'isActive': true,
+      },
+    ];
+  }
 
   List<Map<String, dynamic>> _reminders = [];
   bool _isLoading = true;
@@ -55,20 +59,21 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
   }
 
   static String _formatApiTime(dynamic rawTime) {
-    if (rawTime == null) return '08:00 WIB';
+    final zone = TimeUtils.getTimeZoneName();
+    if (rawTime == null) return '08:00 $zone';
     final str = rawTime.toString().trim();
     if (str.toUpperCase().contains('WIB') ||
         str.toUpperCase().contains('WITA') ||
         str.toUpperCase().contains('WIT')) {
-      return str;
+      return TimeUtils.replaceTimezoneSuffix(str);
     }
     final parts = str.split(':');
     if (parts.length >= 2) {
       final h = parts[0].padLeft(2, '0');
       final m = parts[1].padLeft(2, '0');
-      return '$h:$m WIB';
+      return '$h:$m $zone';
     }
-    return str.isNotEmpty ? str : '08:00 WIB';
+    return str.isNotEmpty ? str : '08:00 $zone';
   }
 
   Future<void> _loadRemindersFromApi({bool isRefresh = false}) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../widgets/giat_background.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAMBAH REMINDER BARU (Figma Nodes: 771-4931 & 771-5091)
@@ -86,7 +87,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
   String _formatTime(TimeOfDay t) {
     final h = t.hour.toString().padLeft(2, '0');
     final m = t.minute.toString().padLeft(2, '0');
-    return '$h:$m WIB';
+    return '$h:$m ${TimeUtils.getTimeZoneName()}';
   }
 
   Future<void> _pickDate({required bool isObat}) async {

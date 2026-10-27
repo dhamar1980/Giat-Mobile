@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import 'pembayaran_berhasil_konsultasi_screen.dart';
 import '../../../services/konsultasi_api_service.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN MENUNGGU PEMBAYARAN VIRTUAL ACCOUNT (Sesuai Referensi UI GIAT)
@@ -466,7 +467,7 @@ class _MenungguPembayaranVaScreenState extends State<MenungguPembayaranVaScreen>
                         style: TextStyle(fontWeight: FontWeight.w500),
                       ),
                       TextSpan(
-                        text: widget.paymentDeadline,
+                        text: TimeUtils.replaceTimezoneSuffix(widget.paymentDeadline),
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ],

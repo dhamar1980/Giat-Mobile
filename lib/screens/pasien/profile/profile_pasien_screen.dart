@@ -9,6 +9,7 @@ import '../../../kebijakan_privasi_screen.dart';
 import 'kata_sandi_keamanan_screen.dart';
 import 'edit_informasi_pribadi_screen.dart';
 import '../../../widgets/giat_background.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFIL PASIEN - GIAT HEALTHCARE
@@ -148,6 +149,8 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
         }
         if (result['address'] != null && result['address']!.isNotEmpty) {
           _alamat = result['address']!;
+          final detected = TimeUtils.detectTimeZone(address: _alamat);
+          TimeUtils.setTimeZone(detected);
         }
         if (result['bloodType'] != null && result['bloodType']!.isNotEmpty) {
           _golonganDarah = result['bloodType']!;
@@ -512,6 +515,121 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showTimeZoneDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final current = TimeUtils.activeTimeZone;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Zona Waktu Indonesia',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Waktu chat, pemantauan, dan jadwal konsultasi disesuaikan dengan lokasi Anda.',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...IndonesianTimeZone.values.map((zone) {
+                final isSelected = current == zone;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFE8F5E9) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? _darkGreen : const Color(0xFFE2E8F0),
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? _darkGreen : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        zone.name,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: isSelected ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      zone.fullName,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    subtitle: Text(
+                      'UTC+0${zone.offsetHours}:00',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle_rounded, color: _darkGreen)
+                        : null,
+                    onTap: () async {
+                      final navigator = Navigator.of(ctx);
+                      final messenger = ScaffoldMessenger.of(context);
+                      await TimeUtils.setTimeZone(zone);
+                      navigator.pop();
+                      if (!mounted) return;
+                      setState(() {});
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Zona waktu berhasil diset ke ${zone.name} (${zone.fullName})'),
+                          backgroundColor: _darkGreen,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1009,6 +1127,16 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                   icon: Icons.home_rounded,
                   label: 'Alamat',
                   value: _alamat,
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: _showTimeZoneDialog,
+                  borderRadius: BorderRadius.circular(11),
+                  child: _buildPersonalItem(
+                    icon: Icons.schedule_rounded,
+                    label: 'Zona Waktu Indonesia',
+                    value: '${TimeUtils.getTimeZoneName()} (${TimeUtils.getTimeZoneFullName()})',
+                  ),
                 ),
               ],
             ),

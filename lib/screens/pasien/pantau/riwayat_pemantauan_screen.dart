@@ -6,6 +6,7 @@ import '../notifikasi/pasien_notifikasi_screen.dart';
 
 import '../../../services/pasien_api_service.dart';
 import '../../../services/storage_service.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA RIWAYAT PEMANTAUAN
@@ -73,11 +74,9 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
         final List<PemantauanRecord> cachedList = [];
         for (int i = 0; i < cached.length; i++) {
           final item = cached[i];
-          final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
-          final localDt = dt?.toLocal();
-          final dateStr = localDt != null
-              ? '${localDt.day.toString().padLeft(2, '0')}/${localDt.month.toString().padLeft(2, '0')}/${localDt.year} • ${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')} WIB'
-              : (item['tanggal']?.toString() ?? 'Hari ini');
+          final dateStr = item['created_at'] != null
+              ? TimeUtils.formatDateTimeWithZone(item['created_at'])
+              : (item['tanggal'] != null ? TimeUtils.replaceTimezoneSuffix(item['tanggal'].toString()) : 'Hari ini');
           cachedList.add(PemantauanRecord(
             id: item['id'],
             dateStr: dateStr,
@@ -91,9 +90,10 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
         }
         _records = cachedList;
       } else {
+        final zone = TimeUtils.getTimeZoneName();
         _records = [
-          const PemantauanRecord(
-            dateStr: '06 September 2026 • 07:30 WIB',
+          PemantauanRecord(
+            dateStr: '06 September 2026 • 07:30 $zone',
             badgeText: 'Terbaru',
             imt: 22.5,
             heightCm: 170,
@@ -101,8 +101,8 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
             kondisiTubuh: 'Baik',
             keluhan: 'Tidak ada keluhan',
           ),
-          const PemantauanRecord(
-            dateStr: '06 September 2026 • 07:15 WIB',
+          PemantauanRecord(
+            dateStr: '06 September 2026 • 07:15 $zone',
             badgeText: '1 hari lalu',
             imt: 22.6,
             heightCm: 170,
@@ -110,8 +110,8 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
             kondisiTubuh: 'Kurang Baik',
             keluhan: 'Mudah lelah',
           ),
-          const PemantauanRecord(
-            dateStr: '07 September 2026 • 06:15 WIB',
+          PemantauanRecord(
+            dateStr: '07 September 2026 • 06:15 $zone',
             badgeText: '2 hari lalu',
             imt: 22.5,
             heightCm: 170,
@@ -133,10 +133,9 @@ class _RiwayatPemantauanScreenState extends State<RiwayatPemantauanScreen> {
         for (int i = 0; i < res.data!.length; i++) {
           final item = res.data![i];
           if (item is Map) {
-            final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
-            final dateStr = dt != null
-                ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} • ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WIB'
-                : (item['tanggal']?.toString() ?? 'Hari ini');
+            final dateStr = item['created_at'] != null
+                ? TimeUtils.formatDateTimeWithZone(item['created_at'])
+                : (item['tanggal'] != null ? TimeUtils.replaceTimezoneSuffix(item['tanggal'].toString()) : 'Hari ini');
             fetched.add(PemantauanRecord(
               id: item['id'],
               dateStr: dateStr,

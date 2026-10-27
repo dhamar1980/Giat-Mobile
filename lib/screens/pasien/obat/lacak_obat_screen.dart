@@ -2,6 +2,7 @@ import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN LACAK OBAT (Figma Node: 977:10969)
@@ -350,6 +351,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
   // 3. TIMELINE PELACAKAN PENGIRIMAN
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildTimelineCard() {
+    final zone = TimeUtils.getTimeZoneName();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -381,7 +383,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           // Step 1: Resep Diterima
           _buildTrackingStep(
             title: 'Resep Diterima & Terverifikasi Digital',
-            time: '01 Sep 2026 • 09:15 WIB',
+            time: '01 Sep 2026 • 09:15 $zone',
             desc: 'Resep dokter diverifikasi oleh sistem GIAT Smart Pharmacy.',
             isCompleted: true,
           ),
@@ -389,7 +391,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           // Step 2: Telaah Resep Apoteker
           _buildTrackingStep(
             title: 'Telaah Resep oleh Apoteker Mitra Selesai',
-            time: '01 Sep 2026 • 10:30 WIB',
+            time: '01 Sep 2026 • 10:30 $zone',
             desc: 'apt. Budi Santoso, S.Farm telah memvalidasi dosis aman ginjal.',
             isCompleted: true,
           ),
@@ -397,7 +399,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           // Step 3: Pengemasan Kedap Suhu (Current)
           _buildTrackingStep(
             title: 'Obat Sedang Dikemas Kedap Suhu',
-            time: '01 Sep 2026 • 11:10 WIB',
+            time: '01 Sep 2026 • 11:10 $zone',
             desc: 'Kemasan tersegel rapi dan higienis dari Apotek Kimia Farma Veteran.',
             isCompleted: true,
             isCurrent: true,
@@ -406,7 +408,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           // Step 4: Penjemputan Kurir
           _buildTrackingStep(
             title: 'Kurir GIAT Mengambil Paket Obat',
-            time: 'Estimasi 14:00 WIB',
+            time: 'Estimasi 14:00 $zone',
             desc: 'Driver spesialis logistik medis GIAT ditugaskan menuju apotek.',
             isCompleted: false,
           ),
@@ -414,7 +416,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           // Step 5: Dalam Perjalanan
           _buildTrackingStep(
             title: 'Kurir Menuju Alamat Tujuan',
-            time: 'Estimasi 14:45 WIB',
+            time: 'Estimasi 14:45 $zone',
             desc: 'Paket dalam perjalanan ke Jl. Dharmahusada Indah No. 42.',
             isCompleted: false,
           ),
@@ -422,7 +424,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           // Step 6: Selesai
           _buildTrackingStep(
             title: 'Pesanan Selesai Diterima',
-            time: 'Estimasi 15:30 WIB',
+            time: 'Estimasi 15:30 $zone',
             desc: 'Tanda tangan konfirmasi dan verifikasi fisik obat oleh pasien.',
             isCompleted: false,
             isLast: true,

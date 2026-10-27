@@ -11,6 +11,7 @@ import 'screens/dokter/models/dokter_models.dart';
 import 'services/navigation_service.dart';
 import 'services/auth_service.dart';
 import 'services/storage_service.dart';
+import 'utils/time_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +54,9 @@ void main() async {
       await StorageService().clearAuth();
     }
   }
+
+  // Inisialisasi Zona Waktu Indonesia (WIB/WITA/WIT)
+  await TimeUtils.init(savedUser);
 
   if (savedUser != null && savedUser.role.toLowerCase() == 'dokter') {
     DokterProfileState.instance.syncFromUser(

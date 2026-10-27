@@ -1,8 +1,9 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import 'pembayaran_konsultasi_screen.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN JADWALKAN KONSULTASI BARU (Sesuai Referensi UI GIAT)
@@ -51,21 +52,7 @@ class _JadwalkanKonsultasiScreenState extends State<JadwalkanKonsultasiScreen> {
   ];
 
   String _formatTimeRange(String startTime) {
-    final parts = startTime.split('.');
-    if (parts.length == 2) {
-      int hour = int.tryParse(parts[0]) ?? 14;
-      int minute = int.tryParse(parts[1]) ?? 0;
-      int endMinute = minute + 30;
-      int endHour = hour;
-      if (endMinute >= 60) {
-        endHour += 1;
-        endMinute -= 60;
-      }
-      final endHourStr = endHour.toString().padLeft(2, '0');
-      final endMinStr = endMinute.toString().padLeft(2, '0');
-      return '$startTime – $endHourStr.$endMinStr WIB (30 Menit)';
-    }
-    return '$startTime – 14.30 WIB (30 Menit)';
+    return TimeUtils.formatScheduleRange(startTime, durationMinutes: 30);
   }
 
   @override

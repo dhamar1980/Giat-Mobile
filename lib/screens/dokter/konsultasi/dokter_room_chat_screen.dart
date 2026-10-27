@@ -15,6 +15,7 @@ import '../../../services/ringtone_player.dart';
 import '../../../services/storage_service.dart';
 import '../../../widgets/incoming_call_dialog.dart';
 import '../../../widgets/typing_indicator_widget.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RUANG CHAT DOKTER-PASIEN (Realtime Chat & Video Call GIAT Telemedicine)
@@ -119,9 +120,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
             final bool isDoctor = (senderRole == 'dokter') ||
                 (myId.isNotEmpty && senderId.isNotEmpty && senderId == myId);
             final text = item['pesan'] ?? item['message'] ?? item['text'] ?? '';
-            final time = item['created_at'] != null
-                ? item['created_at'].toString().split('T').last.substring(0, 5)
-                : '12.00';
+            final time = TimeUtils.formatChatTime(item['created_at']);
 
             if (id.isNotEmpty) loadedIds.add(id);
             loaded.add(_ChatMessage(
@@ -145,11 +144,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
 
         if (!alreadyExists) {
           if (fbMsg.id.isNotEmpty) loadedIds.add(fbMsg.id);
-          final timeStr = fbMsg.createdAt.contains('T')
-              ? fbMsg.createdAt.split('T').last.substring(0, 5)
-              : (fbMsg.createdAt.contains(' ')
-                  ? fbMsg.createdAt.split(' ').last.substring(0, 5).replaceAll(':', '.')
-                  : (fbMsg.createdAt.isNotEmpty ? fbMsg.createdAt : '12.00'));
+          final timeStr = TimeUtils.formatChatTime(fbMsg.createdAt);
 
           loaded.add(_ChatMessage(
             id: fbMsg.id,
@@ -184,11 +179,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
           (m.text == msg.pesan && m.sender == senderKey));
 
       if (!exists) {
-        final timeStr = msg.createdAt.contains('T')
-            ? msg.createdAt.split('T').last.substring(0, 5)
-            : (msg.createdAt.contains(' ')
-                ? msg.createdAt.split(' ').last.substring(0, 5).replaceAll(':', '.')
-                : (msg.createdAt.isNotEmpty ? msg.createdAt : '12.00'));
+        final timeStr = TimeUtils.formatChatTime(msg.createdAt);
 
         setState(() {
           _messages.add(_ChatMessage(
@@ -262,7 +253,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
     _firebaseService.updateTypingStatus(_consultationId, 'dokter', false);
 
     final now = DateTime.now();
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}.${now.minute.toString().padLeft(2, '0')}';
+    final timeStr = TimeUtils.formatChatTime(now);
     final formattedCreatedAt = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
     final tempMsgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
@@ -456,8 +447,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
     );
 
     if (publishedItems != null && publishedItems.isNotEmpty && mounted) {
-      final now = TimeOfDay.now();
-      final timeStr = '${now.hour.toString().padLeft(2, '0')}.${now.minute.toString().padLeft(2, '0')}';
+      final timeStr = TimeUtils.formatChatTime(DateTime.now());
 
       setState(() {
         _messages.add(_ChatMessage(

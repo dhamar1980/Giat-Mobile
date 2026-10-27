@@ -7,6 +7,7 @@ import 'pembayaran_model.dart';
 import 'pembayaran_qris_screen.dart';
 import 'pembayaran_transfer_bank_screen.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN CHECKOUT RESEP DOKTER (Sesuai Desain Figma / 3 Screenshot Checkout)
@@ -1320,12 +1321,12 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
       totalAmountFormatted: _formatCurrency(_totalPembayaran),
       paymentMethod: _metodePembayaran == 'qris' ? 'QRIS' : 'BCA Virtual Account',
       virtualAccountNumber: '8077 0812 3456 7890',
-      transactionTime: '01 Sept 2026, 14:32 WIB',
+      transactionTime: '01 Sept 2026, 14:32 ${TimeUtils.getTimeZoneName()}',
       pickupMethod: _metodePengambilan == 'antar' ? 'Antar ke Alamat' : 'Ambil di Apotek',
       recipientName: _recipientName,
       recipientPhone: _recipientPhone,
       recipientAddress: _recipientAddress,
-      estimatedArrival: 'Hari ini, 16:30 - 17:00 WIB',
+      estimatedArrival: 'Hari ini, 16:30 - 17:00 ${TimeUtils.getTimeZoneName()}',
     );
 
     // Kirim konfirmasi tebus resep ke REST API Pasien Laravel Sanctum

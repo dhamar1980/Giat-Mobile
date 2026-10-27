@@ -1,7 +1,8 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PEMBAYARAN BERHASIL (Sesuai Referensi UI GIAT)
@@ -595,7 +596,7 @@ class PembayaranBerhasilKonsultasiScreen extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF047857)),
                 ),
                 TextSpan(
-                  text: ' pada $selectedDate, ${selectedTime.split(' ').first} WIB.',
+                  text: ' pada $selectedDate, ${selectedTime.split(' ').first} ${TimeUtils.getTimeZoneName()}.',
                 ),
               ],
             ),

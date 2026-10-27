@@ -1,4 +1,4 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +7,7 @@ import 'pembayaran_model.dart';
 import 'pembayaran_berhasil_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../../apotek/models/apotek_models.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PEMBAYARAN TRANSFER BANK / VIRTUAL ACCOUNT (Figma Node: 977:9580)
@@ -506,7 +507,7 @@ class _PembayaranTransferBankScreenState extends State<PembayaranTransferBankScr
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Bayar sebelum: 01 September 2026, 23:59 WIB',
+                  'Bayar sebelum: 01 September 2026, 23:59 ${TimeUtils.getTimeZoneName()}',
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w500,

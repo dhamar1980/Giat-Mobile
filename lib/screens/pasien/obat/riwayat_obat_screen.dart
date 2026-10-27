@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN RIWAYAT PEMBELIAN OBAT (Sesuai Desain Halaman Obat GIAT)
@@ -85,12 +86,13 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
     if (widget.autoFetch) {
       _fetchRiwayatFromApi();
     }
+    final zone = TimeUtils.getTimeZoneName();
     _allOrders = [
       // 1. Pesanan #G-9021 (Sedang Diproses - Melalui Resep)
-      const RiwayatPesananData(
+      RiwayatPesananData(
         orderId: '#G-9021',
         orderDate: '01 September 2026',
-        orderTime: '14:30 WIB',
+        orderTime: '14:30 $zone',
         status: 'Sedang Diproses',
         statusColor: _amberStatus,
         isMelaluiResep: true,
@@ -118,10 +120,10 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
       ),
 
       // 2. Pesanan #G-8812 (Selesai - Melalui Resep)
-      const RiwayatPesananData(
+      RiwayatPesananData(
         orderId: '#G-8812',
         orderDate: '18 Agustus 2026',
-        orderTime: '10:15 WIB',
+        orderTime: '10:15 $zone',
         status: 'Selesai Diterima',
         statusColor: _darkGreen,
         isMelaluiResep: true,
@@ -149,10 +151,10 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
       ),
 
       // 3. Pesanan #G-8450 (Selesai - Tanpa Resep / Obat Bebas)
-      const RiwayatPesananData(
+      RiwayatPesananData(
         orderId: '#G-8450',
         orderDate: '02 Agustus 2026',
-        orderTime: '16:45 WIB',
+        orderTime: '16:45 $zone',
         status: 'Selesai Diterima',
         statusColor: _darkGreen,
         isMelaluiResep: false,
@@ -178,10 +180,10 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
       ),
 
       // 4. Pesanan #G-7930 (Selesai - Melalui Resep)
-      const RiwayatPesananData(
+      RiwayatPesananData(
         orderId: '#G-7930',
         orderDate: '15 Juli 2026',
-        orderTime: '11:20 WIB',
+        orderTime: '11:20 $zone',
         status: 'Selesai Diterima',
         statusColor: _darkGreen,
         isMelaluiResep: true,
@@ -220,9 +222,12 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
             final id = item['id']?.toString() ?? item['order_id']?.toString() ?? '#G-000';
             final status = item['status']?.toString() ?? 'Selesai';
             final total = int.tryParse(item['total_harga']?.toString() ?? item['total']?.toString() ?? '0') ?? 0;
-            final dt = item['created_at'] != null ? DateTime.tryParse(item['created_at'].toString()) : null;
-            final dateStr = dt != null ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}' : 'Hari ini';
-            final timeStr = dt != null ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WIB' : '14:00 WIB';
+            final dateStr = item['created_at'] != null
+                ? TimeUtils.formatDate(item['created_at'])
+                : (item['tanggal']?.toString() ?? 'Hari ini');
+            final timeStr = item['created_at'] != null
+                ? TimeUtils.formatTimeWithZone(item['created_at'])
+                : TimeUtils.replaceTimezoneSuffix(item['waktu']?.toString() ?? '14:00 WIB');
 
             list.add(RiwayatPesananData(
               orderId: id.startsWith('#') ? id : '#$id',

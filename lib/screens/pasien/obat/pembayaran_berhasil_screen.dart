@@ -1,9 +1,10 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'pembayaran_model.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../../../master_layout.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PEMBAYARAN BERHASIL (Figma Nodes: 977:9343 & 977:9794)
@@ -475,7 +476,7 @@ class PembayaranBerhasilScreen extends StatelessWidget {
           _buildStepperItem(
             stepNum: 1,
             title: 'Pesanan Dibuat',
-            subtitle: '01 Sep 2026, 14:30 WIB',
+            subtitle: '01 Sep 2026, 14:30 ${TimeUtils.getTimeZoneName()}',
             isCompleted: true,
             isCurrent: false,
             isLast: false,

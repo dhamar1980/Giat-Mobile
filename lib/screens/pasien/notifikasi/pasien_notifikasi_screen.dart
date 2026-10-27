@@ -7,6 +7,7 @@ import '../reminder/reminder_list_screen.dart';
 import '../konsultasi/dokter_list_screen.dart';
 import '../pragi/pragi_home_view.dart';
 import '../obat/riwayat_obat_screen.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFIKASI PASIEN SCREEN
@@ -159,20 +160,8 @@ class _PasienNotifikasiScreenState extends State<PasienNotifikasiScreen> {
   }
 
   PasienNotificationItem _mapModelToItem(NotifikasiModel model) {
-    String timeStr = 'Baru saja';
-    DateTime? dt = DateTime.tryParse(model.createdAt);
-    if (dt != null) {
-      final diff = DateTime.now().difference(dt);
-      if (diff.inMinutes < 60) {
-        timeStr = '${diff.inMinutes <= 0 ? 1 : diff.inMinutes} menit lalu';
-      } else if (diff.inHours < 24) {
-        timeStr = '${diff.inHours} jam lalu';
-      } else if (diff.inDays < 7) {
-        timeStr = '${diff.inDays} hari lalu';
-      } else {
-        timeStr = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-      }
-    }
+    final dt = model.createdAt.isNotEmpty ? TimeUtils.toIndonesianTime(model.createdAt) : null;
+    final timeStr = TimeUtils.formatRelativeTime(model.createdAt);
 
     String type = (model.tipe ?? '').toLowerCase();
     if (type.contains('obat') || type.contains('reminder')) {

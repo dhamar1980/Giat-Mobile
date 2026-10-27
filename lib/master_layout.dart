@@ -15,6 +15,7 @@ import 'widgets/app_brand_title.dart';
 import 'services/pasien_api_service.dart';
 import 'services/storage_service.dart';
 import 'screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
+import 'utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER LAYOUT GIAT (Persistent TopBar, Content Switcher, & Navbar)
@@ -100,8 +101,7 @@ class _MasterLayoutState extends State<MasterLayout> {
             final title = e['judul'] ?? e['title'] ?? 'Notifikasi GIAT';
             final body = e['pesan'] ?? e['body'] ?? e['message'] ?? '';
             final isRead = e['is_read'] == true || e['read_at'] != null || e['is_read'] == 1;
-            final dt = e['created_at'] != null ? DateTime.tryParse(e['created_at'].toString()) : null;
-            final timeStr = dt != null ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}' : 'Baru saja';
+            final timeStr = TimeUtils.formatRelativeTime(e['created_at']);
             parsedList.add({
               'id': id,
               'title': title,
