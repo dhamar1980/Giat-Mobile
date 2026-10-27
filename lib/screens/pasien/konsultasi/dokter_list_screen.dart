@@ -34,7 +34,6 @@ class DokterListScreen extends StatefulWidget {
 class _DokterListScreenState extends State<DokterListScreen> {
   String _selectedCategory = 'Konsultasi Saya';
   final TextEditingController _searchCtrl = TextEditingController();
-  bool _hasUpcomingConsultation = true;
 
   static const _darkGreen = Color(0xFF065A37);
   static const _bgColor = Color(0xFFF7F9FF);
@@ -51,6 +50,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
   List<Map<String, dynamic>> _apiDoctors = [];
   List<Map<String, dynamic>> _myConsultations = [];
   bool _isLoadingConsultations = false;
+  String? _consultationErrorMessage;
 
   /// Helper untuk menormalisasi data dokter dari backend API maupun fallback
   static Map<String, dynamic> _normalizeDoctor(Map<String, dynamic> raw) {
@@ -212,7 +212,10 @@ class _DokterListScreenState extends State<DokterListScreen> {
   }
 
   Future<void> _fetchKonsultasiSaya() async {
-    setState(() => _isLoadingConsultations = true);
+    setState(() {
+      _isLoadingConsultations = true;
+      _consultationErrorMessage = null;
+    });
     try {
       final res = await KonsultasiApiService().getRiwayatPasien();
       if (res.success && res.data != null && mounted) {
@@ -222,9 +225,19 @@ class _DokterListScreenState extends State<DokterListScreen> {
             return Map<String, dynamic>.from(item as Map);
           }).toList();
         });
+      } else if (!res.success && mounted) {
+        setState(() {
+          _consultationErrorMessage = res.message;
+        });
+        debugPrint('⚠️ Gagal getRiwayatPasien: ${res.message}');
       }
     } catch (e) {
       debugPrint('⚠️ Error fetching konsultasi saya: $e');
+      if (mounted) {
+        setState(() {
+          _consultationErrorMessage = e.toString();
+        });
+      }
     } finally {
       if (mounted) setState(() => _isLoadingConsultations = false);
     }
@@ -680,22 +693,75 @@ class _DokterListScreenState extends State<DokterListScreen> {
       );
     }
 
-    final upcoming = _myConsultations.where((c) {
+    final upcomingRaw = _myConsultations.where((c) {
       final status = (c['status'] ?? c['status_konsultasi'] ?? '').toString().toLowerCase();
       final statusBayar = (c['status_pembayaran'] ?? c['status_bayar'] ?? '').toString().toLowerCase();
 
-      // Hanya tampilkan konsultasi yang sudah lunas, jangan tampilkan yang menunggu pembayaran
-      final isLunas = statusBayar == 'lunas';
+      // Tampilkan konsultasi yang berstatus lunas atau yang sudah aktif berlangsung
+      final isLunas = statusBayar == 'lunas' ||
+          statusBayar == 'paid' ||
+          statusBayar == 'success' ||
+          (statusBayar.isEmpty && (status == 'berlangsung' || status == 'aktif'));
       final isWaitingPayment = status == 'menunggu_pembayaran' || statusBayar == 'menunggu_pembayaran';
       final isNotFinished = status != 'selesai' && status != 'dibatalkan' && status != 'cancelled';
 
       return isLunas && !isWaitingPayment && isNotFinished;
     }).toList();
 
-    final riwayat = _myConsultations.where((c) {
+    // Urutkan upcoming: yang sedang 'berlangsung'/'aktif' diutamakan, lalu urutkan dari waktu terbaru
+    upcomingRaw.sort((a, b) {
+      final statusA = (a['status'] ?? a['status_konsultasi'] ?? '').toString().toLowerCase();
+      final statusB = (b['status'] ?? b['status_konsultasi'] ?? '').toString().toLowerCase();
+
+      final isOngoingA = statusA == 'berlangsung' || statusA == 'aktif';
+      final isOngoingB = statusB == 'berlangsung' || statusB == 'aktif';
+
+      if (isOngoingA && !isOngoingB) return -1;
+      if (!isOngoingA && isOngoingB) return 1;
+
+      final timeA = TimeUtils.toIndonesianTime(a['created_at'] ?? a['tanggal_konsultasi'] ?? a['tanggal'] ?? '');
+      final timeB = TimeUtils.toIndonesianTime(b['created_at'] ?? b['tanggal_konsultasi'] ?? b['tanggal'] ?? '');
+
+      final compTime = timeB.compareTo(timeA);
+      if (compTime != 0) return compTime;
+
+      final idA = (a['id'] ?? a['id_konsultasi'] ?? '').toString();
+      final idB = (b['id'] ?? b['id_konsultasi'] ?? '').toString();
+      return idB.compareTo(idA);
+    });
+
+    // Deduplikasi upcoming: 1 dokter hanya tampil 1 sesi konsultasi aktif (sesi terbaru/berlangsung)
+    final List<Map<String, dynamic>> upcoming = [];
+    final Set<String> seenUpcomingDoctors = {};
+
+    for (final c in upcomingRaw) {
+      final docKey = _getConsultationDoctorKey(c);
+      if (!seenUpcomingDoctors.contains(docKey)) {
+        seenUpcomingDoctors.add(docKey);
+        upcoming.add(c);
+      }
+    }
+
+    final riwayatRaw = _myConsultations.where((c) {
       final status = (c['status'] ?? c['status_konsultasi'] ?? '').toString().toLowerCase();
       return status == 'selesai' || status == 'dibatalkan' || status == 'cancelled';
     }).toList();
+
+    // Deduplikasi riwayat berdasarkan ID konsultasi agar data unik
+    final List<Map<String, dynamic>> riwayat = [];
+    final Set<String> seenRiwayatIds = {};
+
+    for (final c in riwayatRaw) {
+      final id = (c['id'] ?? c['id_konsultasi'] ?? c['konsultasi_id'] ?? '').toString();
+      if (id.isNotEmpty) {
+        if (!seenRiwayatIds.contains(id)) {
+          seenRiwayatIds.add(id);
+          riwayat.add(c);
+        }
+      } else {
+        riwayat.add(c);
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -724,7 +790,89 @@ class _DokterListScreenState extends State<DokterListScreen> {
         ),
         const SizedBox(height: 12),
 
-        if (upcoming.isEmpty)
+        if (_consultationErrorMessage != null && _myConsultations.isEmpty)
+          // ── KONDISI ERROR KONEKSI / TIMEOUT ──
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFFED7AA), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.wifi_off_rounded,
+                    color: Color(0xFFEA580C),
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Gagal Memuat Jadwal Konsultasi',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _consultationErrorMessage!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w400,
+                    color: const Color(0xFF64748B),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _darkGreen,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: Text(
+                      'Coba Muat Ulang',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    onPressed: _fetchKonsultasiSaya,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (upcoming.isEmpty)
           // ── KONDISI 1: Belum Booking / Tidak Ada Jadwal (Figma Image 1) ──
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -885,6 +1033,22 @@ class _DokterListScreenState extends State<DokterListScreen> {
     );
   }
 
+  String _getConsultationDoctorKey(Map<String, dynamic> c) {
+    final dokter = (c['dokter'] is Map) ? (c['dokter'] as Map) : <String, dynamic>{};
+    String docName = (dokter['nama'] ?? c['nama_dokter'] ?? '').toString().trim();
+    if (docName.toLowerCase().contains('realtime')) {
+      docName = 'dr. Budi Santoso, Sp.PD';
+    }
+    if (docName.isNotEmpty) {
+      return 'name_${docName.toLowerCase()}';
+    }
+    final rawDocId = dokter['id'] ?? c['id_dokter'] ?? c['dokter_id'];
+    if (rawDocId != null && rawDocId.toString().isNotEmpty) {
+      return 'id_${rawDocId.toString()}';
+    }
+    return (c['id'] ?? c['id_konsultasi'] ?? c['konsultasi_id'] ?? '').toString();
+  }
+
   Widget _buildConsultationItemCard(Map<String, dynamic> c, {required bool isOngoing}) {
     final id = (c['id'] ?? c['id_konsultasi'] ?? c['konsultasi_id'] ?? '').toString();
     final dokter = (c['dokter'] is Map) ? (c['dokter'] as Map) : <String, dynamic>{};
@@ -953,7 +1117,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                               width: 58,
                               height: 58,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _buildAvatarPlaceholder(),
+                              errorBuilder: (_, _, _) => _buildAvatarPlaceholder(),
                             )
                           : _buildAvatarPlaceholder(),
                     ),
@@ -1347,7 +1511,6 @@ class _DokterListScreenState extends State<DokterListScreen> {
                             if (booked == true && mounted) {
                               setState(() {
                                 _selectedCategory = 'Konsultasi Saya';
-                                _hasUpcomingConsultation = true;
                               });
                               _fetchKonsultasiSaya();
                             }
@@ -1403,7 +1566,6 @@ class _DokterListScreenState extends State<DokterListScreen> {
                             if (booked == true && mounted) {
                               setState(() {
                                 _selectedCategory = 'Konsultasi Saya';
-                                _hasUpcomingConsultation = true;
                               });
                               _fetchKonsultasiSaya();
                             }

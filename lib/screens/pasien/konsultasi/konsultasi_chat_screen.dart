@@ -154,76 +154,6 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
     }
   }
 
-  void _switchConsultationId(String newId) {
-    if (newId.isEmpty || newId == _activeConsultationId) return;
-    _msgSub?.cancel();
-    _typingSub?.cancel();
-    _callSub?.cancel();
-
-    setState(() {
-      _activeConsultationId = newId;
-      _messages = [];
-      _isLoadingMessages = true;
-    });
-
-    _setupRealtimeListeners();
-    _loadMessagesFromFirebase();
-    _loadMessagesFromBackend();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Tersambung ke Konsultasi #$_activeConsultationId'),
-        backgroundColor: _darkGreen,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _showChangeConsultationIdDialog() {
-    final ctrl = TextEditingController(text: _activeConsultationId);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ganti ID Konsultasi'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Masukkan ID Konsultasi aktif untuk pengujian (misal ID dari Postman atau Server):',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'ID Konsultasi (UUID)',
-                hintText: 'Contoh: 2940f5ab-2a29-4860-983e-a0e7824c464e',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final newId = ctrl.text.trim();
-              Navigator.pop(ctx);
-              _switchConsultationId(newId);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: _darkGreen),
-            child: const Text('Terapkan', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _setupRealtimeListeners() {
     // 1. Mendengarkan pesan realtime dari Firebase (<100ms)
     _msgSub = _firebaseService.listenMessages(_activeConsultationId).listen((ChatMessage msg) {
@@ -354,11 +284,11 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
               final time = TimeUtils.formatChatTime(item['created_at']);
               final id = (item['id'] ?? item['id_pesan'] ?? '').toString();
 
-              final exists = _messages.any((m) =>
+              final idx = _messages.indexWhere((m) =>
                   (id.isNotEmpty && m['id'] == id) ||
                   (m['text'] == text && m['sender'] == senderKey));
 
-              if (!exists) {
+              if (idx == -1) {
                 _messages.add({
                   'id': id,
                   'sender': senderKey,
@@ -366,6 +296,14 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
                   'time': time,
                 });
                 hasNew = true;
+              } else {
+                if (id.isNotEmpty && _messages[idx]['id'] != id) {
+                  _messages[idx]['id'] = id;
+                }
+                if (time.isNotEmpty && _messages[idx]['time'] != time) {
+                  _messages[idx]['time'] = time;
+                  hasNew = true;
+                }
               }
             }
           }
@@ -416,8 +354,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
 
     final now = DateTime.now();
     final timeStr = TimeUtils.formatChatTime(now);
-    final formattedCreatedAt = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    final formattedCreatedAt = DateTime.now().toUtc().toIso8601String();
     final tempMsgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
 
     // Optimistic UI update
@@ -872,34 +809,6 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: const Color(0xFF16A34A),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          InkWell(
-                            onTap: _showChangeConsultationIdDialog,
-                            borderRadius: BorderRadius.circular(4),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '#$_activeConsultationId',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: _darkGreen,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  const Icon(Icons.edit_rounded, size: 9, color: _darkGreen),
-                                ],
-                              ),
                             ),
                           ),
                         ],

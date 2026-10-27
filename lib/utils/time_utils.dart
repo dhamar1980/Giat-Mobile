@@ -244,9 +244,27 @@ class TimeUtils {
       if (hasTimezoneOffset) {
         parsed = DateTime.tryParse(rawStr);
       } else {
-        // Jika tidak ada 'Z' atau offset, backend menyimpannya sebagai UTC
+        // String tidak memiliki 'Z' atau offset
+        // Bisa jadi UTC SQL string (misal: "2026-10-27 09:01:30")
+        // ATAU string yang aslinya sudah waktu lokal perangkat (misal: "2026-10-27 18:30:32")
+        final localParsed = DateTime.tryParse(rawStr);
         final iso = rawStr.replaceFirst(' ', 'T');
-        parsed = DateTime.tryParse('${iso}Z') ?? DateTime.tryParse(rawStr);
+        final utcParsed = DateTime.tryParse('${iso}Z');
+
+        if (utcParsed != null && localParsed != null) {
+          final converted = _convertToZone(utcParsed, targetZone);
+          final now = nowInUserZone;
+
+          // Jika setelah ditambah offset waktu melompat ke masa depan lebih dari 15 menit,
+          // artinya string input sebenarnya sudah merupakan waktu lokal (bukan UTC)
+          if (converted.isAfter(now.add(const Duration(minutes: 15)))) {
+            return localParsed;
+          } else {
+            parsed = utcParsed;
+          }
+        } else {
+          parsed = utcParsed ?? localParsed;
+        }
       }
     }
 

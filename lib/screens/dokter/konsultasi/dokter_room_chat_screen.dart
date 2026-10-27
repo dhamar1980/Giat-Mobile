@@ -254,8 +254,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
 
     final now = DateTime.now();
     final timeStr = TimeUtils.formatChatTime(now);
-    final formattedCreatedAt = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    final formattedCreatedAt = DateTime.now().toUtc().toIso8601String();
     final tempMsgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
 
     setState(() {
