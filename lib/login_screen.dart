@@ -10,6 +10,7 @@ import 'register_screen.dart';
 import 'screens/dokter/dokter_home_screen.dart';
 import 'screens/dokter/models/dokter_models.dart';
 import 'screens/apotek/apoteker_home_screen.dart';
+import 'screens/admin/admin_home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'services/auth_service.dart';
 import 'services/storage_service.dart';
@@ -57,6 +58,19 @@ const _demoUsers = [
   {'email': 'kf.dago@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek Kimia Farma Dago'},
   {'email': 'k24.buahbatu@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek K-24 Buah Batu'},
   {'email': 'mandiri.medika@gmail.com', 'password': 'password123', 'role': 'apotek', 'name': 'Apotek Mandiri Medika Pasteur'},
+
+  // 4. Admin
+  {'email': 'admin@gmail.com', 'password': 'password123', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin@gmail.com', 'password': 'admin', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin@gmail.com', 'password': '123456', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin', 'password': 'admin', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin', 'password': 'password123', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin', 'password': 'Admin@123', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin', 'password': '123456', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin@giat.id', 'password': 'admin', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin@giat.id', 'password': 'Admin@123', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin@giat.id', 'password': 'password123', 'role': 'admin', 'name': 'Admin GIAT'},
+  {'email': 'admin@giat.id', 'password': '123456', 'role': 'admin', 'name': 'Admin GIAT'},
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,6 +194,9 @@ class _LoginScreenState extends State<LoginScreen>
         targetEmail == 'aminah') {
       targetEmail = 'apotek.dago@kimiafarma.co.id';
       if (targetPass == 'apoteker') targetPass = 'password123';
+    } else if (targetEmail == 'admin') {
+      targetEmail = 'admin@gmail.com';
+      if (targetPass == 'admin') targetPass = 'password123';
     }
 
     try {
@@ -210,7 +227,12 @@ class _LoginScreenState extends State<LoginScreen>
         }
 
         Widget targetScreen;
-        if (role == 'dokter') {
+        if (role == 'admin') {
+          targetScreen = AdminHomeScreen(
+            adminName: name,
+            adminEmail: result.user?.email ?? targetEmail,
+          );
+        } else if (role == 'dokter') {
           targetScreen = DokterHomeScreen(doctorName: name);
         } else if (role == 'apotek' || role == 'apoteker') {
           targetScreen = ApotekerHomeScreen(apotekerName: name);
@@ -263,7 +285,12 @@ class _LoginScreenState extends State<LoginScreen>
         _showSnack('Server offline / fallback demo: $role');
 
         Widget targetScreen;
-        if (role == 'dokter') {
+        if (role == 'admin') {
+          targetScreen = AdminHomeScreen(
+            adminName: name,
+            adminEmail: demoUser.email,
+          );
+        } else if (role == 'dokter') {
           targetScreen = DokterHomeScreen(doctorName: name);
         } else if (role == 'apotek' || role == 'apoteker') {
           targetScreen = ApotekerHomeScreen(apotekerName: name);
@@ -308,7 +335,12 @@ class _LoginScreenState extends State<LoginScreen>
         }
 
         Widget targetScreen;
-        if (role == 'dokter') {
+        if (role == 'admin') {
+          targetScreen = AdminHomeScreen(
+            adminName: name,
+            adminEmail: result.user?.email,
+          );
+        } else if (role == 'dokter') {
           targetScreen = DokterHomeScreen(doctorName: name);
         } else if (role == 'apotek' || role == 'apoteker') {
           targetScreen = ApotekerHomeScreen(apotekerName: name);

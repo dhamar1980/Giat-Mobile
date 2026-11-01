@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'master_layout.dart';
 import 'models/user_model.dart';
 import 'onboarding_screen.dart';
+import 'screens/admin/admin_home_screen.dart';
 import 'screens/apotek/apoteker_home_screen.dart';
 import 'screens/dokter/dokter_home_screen.dart';
 import 'screens/dokter/models/dokter_models.dart';
@@ -84,7 +85,12 @@ class GiatApp extends StatelessWidget {
     // Auto-login jika sesi tersimpan masih valid
     if (initialUser != null) {
       final role = initialUser!.role.toLowerCase();
-      if (role == 'dokter') {
+      if (role == 'admin') {
+        initialScreen = AdminHomeScreen(
+          adminName: initialUser!.nama,
+          adminEmail: initialUser!.email,
+        );
+      } else if (role == 'dokter') {
         initialScreen = DokterHomeScreen(doctorName: initialUser!.nama);
       } else if (role == 'apotek' || role == 'apoteker') {
         initialScreen = ApotekerHomeScreen(apotekerName: initialUser!.nama);
