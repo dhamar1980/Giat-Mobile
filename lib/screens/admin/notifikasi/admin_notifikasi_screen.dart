@@ -24,6 +24,12 @@ class _AdminNotifikasiScreenState extends State<AdminNotifikasiScreen> {
 
   String _activeFilter = 'semua'; // 'semua' | 'unread'
 
+  @override
+  void initState() {
+    super.initState();
+    AdminStore.instance.fetchNotifications();
+  }
+
   IconData _getIconForType(String type) {
     switch (type) {
       case 'akun':
@@ -122,7 +128,7 @@ class _AdminNotifikasiScreenState extends State<AdminNotifikasiScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              adminTimeAgo(item.createdAt),
+                              item.waktuText ?? adminTimeAgo(item.createdAt),
                               style: GoogleFonts.poppins(
                                 fontSize: 12,
                                 color: _subtextColor,
@@ -363,20 +369,24 @@ class _AdminNotifikasiScreenState extends State<AdminNotifikasiScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: displayedList.isEmpty
                               ? _buildEmptyState()
-                              : ListView.builder(
-                                  itemCount: displayedList.length,
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(
-                                    parent: BouncingScrollPhysics(),
+                              : RefreshIndicator(
+                                  color: _primaryGreen,
+                                  onRefresh: store.fetchNotifications,
+                                  child: ListView.builder(
+                                    itemCount: displayedList.length,
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(
+                                      parent: BouncingScrollPhysics(),
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final item = displayedList[index];
+                                      return _buildNotificationCard(
+                                        context,
+                                        item,
+                                        store,
+                                      );
+                                    },
                                   ),
-                                  itemBuilder: (context, index) {
-                                    final item = displayedList[index];
-                                    return _buildNotificationCard(
-                                      context,
-                                      item,
-                                      store,
-                                    );
-                                  },
                                 ),
                         ),
                       ),
@@ -606,7 +616,7 @@ class _AdminNotifikasiScreenState extends State<AdminNotifikasiScreen> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        adminTimeAgo(item.createdAt),
+                        item.waktuText ?? adminTimeAgo(item.createdAt),
                         style: GoogleFonts.poppins(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,

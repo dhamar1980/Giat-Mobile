@@ -14,4 +14,19 @@ class ApiConstants {
 
   /// Default active Base URL
   static const String defaultBaseUrl = serverUrl;
+
+  /// Konfigurasi Database Real Supabase PostgreSQL (GIAT)
+  static const String supabaseDirectUrl =
+      'postgresql://postgres:KnWPC0g1ajTd2VJ8@db.auaejgogiyfrefsurahd.supabase.co:5432/postgres';
+  static const String supabaseProjectRef = 'auaejgogiyfrefsurahd';
+  static const String supabaseDirectHost =
+      'db.auaejgogiyfrefsurahd.supabase.co';
+  static const String supabasePoolerHost =
+      'aws-0-ap-northeast-1.pooler.supabase.com';
+  static const int supabaseDirectPort = 5432;
+  static const int supabasePoolerPort = 6543;
+  static const String supabaseDatabase = 'postgres';
+  static const String supabaseDirectUser = 'postgres';
+  static const String supabasePoolerUser = 'postgres.auaejgogiyfrefsurahd';
+  static const String supabasePassword = 'KnWPC0g1ajTd2VJ8';
 }

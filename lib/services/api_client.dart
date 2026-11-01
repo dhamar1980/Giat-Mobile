@@ -135,7 +135,10 @@ class ApiClient {
           // Handle 401 Unauthenticated: only redirect if user had an active real token
           if (error.response?.statusCode == 401) {
             final token = await StorageService().getToken();
-            final isDemo = token == null || token.isEmpty || token.startsWith('demo_');
+            final isDemo = token == null ||
+                token.isEmpty ||
+                token.startsWith('demo_') ||
+                token.startsWith('supabase_');
             final path = error.requestOptions.path.toLowerCase();
             final isAuthFlow = path.contains('/login') ||
                 path.contains('/register') ||

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'edukasi_detail_screen.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/supabase_admin_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUSAT EDUKASI KESEHATAN GINJAL (ARTIKEL & TIPS NUTRISI)
@@ -20,32 +21,7 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   static const _darkGreen = Color(0xFF065A37);
 
-  List<Map<String, dynamic>> _articles = [
-    {
-      'id': '1',
-      'title': 'Kenali Tanda-Tanda Penyakit Ginjal Sejak Dini',
-      'category': 'Info CKD',
-      'date': '15 Sept 2026',
-      'image': 'assets/images/kidneys.jpg',
-      'content': 'Penyakit ginjal kronis (CKD) sering kali berkembang tanpa menimbulkan gejala yang mencolok pada tahap awal (sering disebut "silent disease"). Beberapa tanda awal meliputi perubahan frekuensi buang air kecil, urine berbusa, pembengkakan pada kaki atau wajah, serta rasa lelah yang berkepanjangan akibat penumpukan racun dalam darah.\n\nPencegahan terbaik adalah melakukan pemeriksaan rutin fungsi ginjal (tes darah kreatinin & eGFR serta tes urine protein), menjaga tekanan darah di bawah 130/80 mmHg, dan mengontrol kadar gula darah.',
-    },
-    {
-      'id': '2',
-      'title': 'Makanan & Nutrisi Sehat untuk Menjaga Fungsi Ginjal',
-      'category': 'Nutrisi & Diet',
-      'date': '12 Sept 2026',
-      'image': 'assets/images/kidneys.jpg',
-      'content': 'Bagi pasien ginjal, pola makan yang tepat sangat krusial untuk memperlambat penurunan fungsi ginjal:\n\n1. Batasi Garam (Natrium): Maksimal 1 sendok teh garam dapur per hari untuk mencegah hipertensi dan penumpukan cairan.\n2. Pilih Protein Berkualitas: Konsumsi putih telur, ikan, atau ayam tanpa lemak dalam porsi terukur.\n3. Waspadai Kalium Berlebih: Jika kadar kalium tinggi, batasi pisang, alpukat, dan bayam, lalu gantilah dengan apel, pir, atau kembang kol.\n4. Cukupi Cairan Sesuai Anjuran: Jangan kurang dan jangan berlebih.',
-    },
-    {
-      'id': '3',
-      'title': 'Pentingnya Menjaga Tekanan Darah bagi Pasien Ginjal',
-      'category': 'Pola Hidup',
-      'date': '10 Sept 2026',
-      'image': 'assets/images/kidneys.jpg',
-      'content': 'Hipertensi dan kesehatan ginjal memiliki hubungan timbal balik yang sangat erat. Tekanan darah yang tinggi dapat merusak pembuluh darah kapiler halus (glomerulus) di dalam ginjal sehingga kemampuan menyaring racun menurun drastis.\n\nPastikan untuk meminum obat antihipertensi pelindung ginjal sesuai resep dokter, kurangi stres, tidur cukup 7-8 jam, dan lakukan olahraga ringan seperti jalan santai 30 menit setiap hari.',
-    },
-  ];
+  List<Map<String, dynamic>> _articles = [];
 
   @override
   void initState() {
@@ -54,6 +30,27 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
   }
 
   Future<void> _loadEdukasiFromApi() async {
+    try {
+      final pgRows = await SupabaseAdminService.instance.fetchEdukasi();
+      if (pgRows.isNotEmpty && mounted) {
+        setState(() {
+          _articles = pgRows.map((item) {
+            return {
+              'id': item['id']?.toString() ?? '',
+              'title': item['judul']?.toString() ?? 'Artikel Ginjal',
+              'category': item['kategori']?.toString() ?? 'Info CKD',
+              'date': item['penulis']?.toString() ?? 'Tim Medis GIAT',
+              'image': (item['gambar_url']?.toString().isNotEmpty ?? false)
+                  ? item['gambar_url'].toString()
+                  : 'assets/images/kidneys.jpg',
+              'content': item['konten']?.toString() ?? '',
+            };
+          }).toList();
+        });
+        return;
+      }
+    } catch (_) {}
+
     final res = await PasienApiService().getEdukasiList(kategori: _selectedCat);
     if (res.success && res.data != null && res.data!.isNotEmpty) {
       if (!mounted) return;
@@ -65,7 +62,7 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
               'title': item['judul']?.toString() ?? item['title']?.toString() ?? 'Artikel Ginjal',
               'category': item['kategori']?.toString() ?? item['category']?.toString() ?? 'Info CKD',
               'date': item['tanggal']?.toString() ?? item['date']?.toString() ?? 'Hari ini',
-              'image': item['gambar']?.toString() ?? item['image']?.toString() ?? 'assets/images/kidneys.jpg',
+              'image': item['gambar_url']?.toString() ?? item['gambar']?.toString() ?? item['image']?.toString() ?? 'assets/images/kidneys.jpg',
               'content': item['konten']?.toString() ?? item['content']?.toString() ?? '',
             };
           }
@@ -238,14 +235,23 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
                                 height: 140,
                                 width: double.infinity,
                                 color: const Color(0xFFE2E8F0),
-                                child: Image.asset(
-                                  art['image'],
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: const Color(0xFFDCFCE7),
-                                    child: const Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
-                                  ),
-                                ),
+                                child: art['image'].toString().startsWith('http')
+                                    ? Image.network(
+                                        art['image'].toString(),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Container(
+                                          color: const Color(0xFFDCFCE7),
+                                          child: const Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                                        ),
+                                      )
+                                    : Image.asset(
+                                        art['image'],
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Container(
+                                          color: const Color(0xFFDCFCE7),
+                                          child: const Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                                        ),
+                                      ),
                               ),
                               Positioned(
                                 top: 12,

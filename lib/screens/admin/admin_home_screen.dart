@@ -46,6 +46,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       nama: widget.adminName,
       email: widget.adminEmail,
     );
+    AdminStore.instance.fetchAllFromApi();
     _animCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 550),
@@ -65,6 +66,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   }
 
   Future<void> _handleLogout() async {
+    await AdminStore.instance.logoutAdmin();
     await AuthService().logout();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -231,174 +233,184 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
               trailingAction: _buildTopActionPill(store),
             ),
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
-                child: FadeTransition(
-                  opacity: _fadeAnim,
-                  child: SlideTransition(
-                    position: _slideAnim,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ── 3 Card Jumlah Akun (Dokter, Pasien, Apotek) ──
-                        Row(
-                          children: [
-                            _buildRoleCountCard(
-                              role: AdminUserRole.dokter,
-                              count: store.countRole(AdminUserRole.dokter),
-                            ),
-                            const SizedBox(width: 10),
-                            _buildRoleCountCard(
-                              role: AdminUserRole.pasien,
-                              count: store.countRole(AdminUserRole.pasien),
-                            ),
-                            const SizedBox(width: 10),
-                            _buildRoleCountCard(
-                              role: AdminUserRole.apotek,
-                              count: store.countRole(AdminUserRole.apotek),
-                            ),
-                          ],
-                        ),
-
-                        if (latestUpdate != null) ...[
-                          const SizedBox(height: 22),
+              child: RefreshIndicator(
+                color: _darkGreen,
+                onRefresh: store.fetchAllFromApi,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+                  child: FadeTransition(
+                    opacity: _fadeAnim,
+                    child: SlideTransition(
+                      position: _slideAnim,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── 3 Card Jumlah Akun (Dokter, Pasien, Apotek) ──
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Update Sistem Terkini',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF0F172A),
-                                ),
+                              _buildRoleCountCard(
+                                role: AdminUserRole.dokter,
+                                count: store.countRole(AdminUserRole.dokter),
                               ),
-                              GestureDetector(
-                                onTap: _openUpdateSistem,
-                                child: Text(
-                                  'Kirim Baru →',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: _darkGreen,
-                                  ),
-                                ),
+                              const SizedBox(width: 10),
+                              _buildRoleCountCard(
+                                role: AdminUserRole.pasien,
+                                count: store.countRole(AdminUserRole.pasien),
+                              ),
+                              const SizedBox(width: 10),
+                              _buildRoleCountCard(
+                                role: AdminUserRole.apotek,
+                                count: store.countRole(AdminUserRole.apotek),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
-                          GestureDetector(
-                            onTap: _openUpdateSistem,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(15),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: _border),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: latestUpdate.tipe.color
-                                              .withValues(alpha: 0.12),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          latestUpdate.tipe.label,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: latestUpdate.tipe.color,
-                                          ),
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Text(
-                                        adminTimeAgo(latestUpdate.publishedAt),
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11.5,
-                                          color: const Color(0xFF94A3B8),
-                                        ),
-                                      ),
-                                    ],
+
+                          if (latestUpdate != null) ...[
+                            const SizedBox(height: 22),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Update Sistem Terkini',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0F172A),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    latestUpdate.judul,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    latestUpdate.deskripsi,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
+                                ),
+                                GestureDetector(
+                                  onTap: _openUpdateSistem,
+                                  child: Text(
+                                    'Kirim Baru →',
                                     style: GoogleFonts.inter(
                                       fontSize: 12.5,
-                                      color: const Color(0xFF475569),
+                                      fontWeight: FontWeight.w700,
+                                      color: _darkGreen,
                                     ),
                                   ),
-                                ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            GestureDetector(
+                              onTap: _openUpdateSistem,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(15),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: _border),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: latestUpdate.tipe.color
+                                                .withValues(alpha: 0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            latestUpdate.tipe.label,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: latestUpdate.tipe.color,
+                                            ),
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          latestUpdate.waktuText ??
+                                              adminTimeAgo(
+                                                latestUpdate.publishedAt,
+                                              ),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.5,
+                                            color: const Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      latestUpdate.judul,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      latestUpdate.deskripsi,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        color: const Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          const SizedBox(height: 22),
+
+                          // ── Riwayat Perubahan Hak Akses ──
+                          Text(
+                            'Riwayat Perubahan Hak Akses',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 18,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: _border),
+                            ),
+                            child: Column(
+                              children: List.generate(
+                                store.logs.take(5).length,
+                                (i) {
+                                  final log = store.logs[i];
+                                  final isLast =
+                                      i == store.logs.take(5).length - 1;
+                                  return _buildTimelineItem(
+                                    title: '${log.namaUser} — ${log.aksi}',
+                                    time: log.waktuText ??
+                                        adminTimeAgo(log.waktu),
+                                    showLineBelow: !isLast,
+                                    onTap: () => _openAkun(),
+                                  );
+                                },
                               ),
                             ),
                           ),
                         ],
-
-                        const SizedBox(height: 22),
-
-                        // ── Riwayat Perubahan Hak Akses ──
-                        Text(
-                          'Riwayat Perubahan Hak Akses',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 18,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: _border),
-                          ),
-                          child: Column(
-                            children: List.generate(
-                              store.logs.take(5).length,
-                              (i) {
-                                final log = store.logs[i];
-                                final isLast =
-                                    i == store.logs.take(5).length - 1;
-                                return _buildTimelineItem(
-                                  title: '${log.namaUser} — ${log.aksi}',
-                                  time: adminTimeAgo(log.waktu),
-                                  showLineBelow: !isLast,
-                                  onTap: () => _openAkun(),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

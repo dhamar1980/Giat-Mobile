@@ -42,17 +42,21 @@ void main() async {
 
   // Validasi sesi ke backend via /me jika token ada
   if (token != null && token.isNotEmpty) {
-    try {
-      final user = await AuthService().getCurrentUser();
-      if (user != null) {
-        savedUser = user;
-      } else {
+    if (token.startsWith('supabase_') || token.startsWith('demo_')) {
+      // Sesi Supabase langsung / lokal tetap dipertahankan
+    } else {
+      try {
+        final user = await AuthService().getCurrentUser();
+        if (user != null) {
+          savedUser = user;
+        } else {
+          savedUser = null;
+          await StorageService().clearAuth();
+        }
+      } catch (_) {
         savedUser = null;
         await StorageService().clearAuth();
       }
-    } catch (_) {
-      savedUser = null;
-      await StorageService().clearAuth();
     }
   }
 

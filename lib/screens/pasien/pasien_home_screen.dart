@@ -12,6 +12,7 @@ import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/pasien_api_service.dart';
+import '../../services/supabase_admin_service.dart';
 import '../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
 
   Map<String, dynamic>? _homeData;
   int _unreadCount = 0;
+  List<Map<String, dynamic>> _edukasiArticles = [];
 
   @override
   void initState() {
@@ -81,6 +83,15 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
       if (countRes.success && mounted) {
         setState(() {
           _unreadCount = countRes.data ?? 0;
+        });
+      }
+    } catch (_) {}
+
+    try {
+      final pgEdukasi = await SupabaseAdminService.instance.fetchEdukasi();
+      if (pgEdukasi.isNotEmpty && mounted) {
+        setState(() {
+          _edukasiArticles = pgEdukasi;
         });
       }
     } catch (_) {}
@@ -693,28 +704,43 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            children: [
-              _buildEducationCard(
-                title: 'Kenali Tanda-Tanda Penyakit Ginjal Sejak Dini',
-                category: 'Artikel',
-                imagePath: 'assets/images/kidneys.jpg',
-                isAsset: true,
-              ),
-              const SizedBox(width: 14),
-              _buildEducationCard(
-                title: 'Makanan & Pola Hidup Sehat untuk Ginjal Kuat',
-                category: 'Nutrisi',
-                imagePath: 'assets/images/kidneys.jpg',
-                isAsset: true,
-              ),
-              const SizedBox(width: 14),
-              _buildEducationCard(
-                title: 'Pentingnya Cukup Minum Air Putih Setiap Hari',
-                category: 'Tips Sehat',
-                imagePath: 'assets/images/kidneys.jpg',
-                isAsset: true,
-              ),
-            ],
+            children: _edukasiArticles.isNotEmpty
+                ? [
+                    for (int i = 0; i < _edukasiArticles.take(5).length; i++) ...[
+                      if (i > 0) const SizedBox(width: 14),
+                      _buildEducationCard(
+                        title: _edukasiArticles[i]['judul']?.toString() ?? 'Artikel Ginjal',
+                        category: _edukasiArticles[i]['kategori']?.toString() ?? 'Info CKD',
+                        imagePath: (_edukasiArticles[i]['gambar_url']?.toString().isNotEmpty ?? false)
+                            ? _edukasiArticles[i]['gambar_url'].toString()
+                            : 'assets/images/kidneys.jpg',
+                        content: _edukasiArticles[i]['konten']?.toString(),
+                        date: _edukasiArticles[i]['penulis']?.toString(),
+                      ),
+                    ],
+                  ]
+                : [
+                    _buildEducationCard(
+                      title: 'Mengenal 5 Stadium Penyakit Ginjal Kronis (CKD) dan Deteksi Dini eGFR',
+                      category: 'Info CKD',
+                      imagePath: 'assets/images/kidneys.jpg',
+                      isAsset: true,
+                    ),
+                    const SizedBox(width: 14),
+                    _buildEducationCard(
+                      title: 'Panduan Diet Rendah Garam, Rendah Kalium & Rendah Fosfat untuk Pasien Ginjal',
+                      category: 'Nutrisi & Diet',
+                      imagePath: 'assets/images/kidneys.jpg',
+                      isAsset: true,
+                    ),
+                    const SizedBox(width: 14),
+                    _buildEducationCard(
+                      title: 'Manajemen Cairan Harian & Aktivitas Fisik Aman bagi Penyandang CKD',
+                      category: 'Pola Hidup',
+                      imagePath: 'assets/images/kidneys.jpg',
+                      isAsset: true,
+                    ),
+                  ],
           ),
         ),
       ],
@@ -725,6 +751,8 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
     required String title,
     required String category,
     required String imagePath,
+    String? content,
+    String? date,
     bool isAsset = false,
   }) {
     return GestureDetector(
@@ -736,9 +764,10 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
               article: {
                 'title': title,
                 'category': category,
-                'date': '15 Sept 2026',
+                'date': date ?? 'Tim Medis GIAT',
                 'image': imagePath,
-                'content': 'Menjaga kesehatan ginjal membutuhkan pemantauan rutin, pembatasan garam dapur, dan kontrol tekanan darah serta fungsi penyaringan ginjal.',
+                'content': content ??
+                    'Menjaga kesehatan ginjal membutuhkan pemantauan rutin, pembatasan garam dapur, dan kontrol tekanan darah serta fungsi penyaringan ginjal.',
               },
             ),
           ),
@@ -771,16 +800,27 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                   decoration: const BoxDecoration(
                     color: Color(0xFFE2E8F0),
                   ),
-                  child: Image.asset(
-                    imagePath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: const Color(0xFFD1FAE5),
-                      child: const Center(
-                        child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
-                      ),
-                    ),
-                  ),
+                  child: imagePath.startsWith('http')
+                      ? Image.network(
+                          imagePath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: const Color(0xFFD1FAE5),
+                            child: const Center(
+                              child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                            ),
+                          ),
+                        )
+                      : Image.asset(
+                          imagePath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: const Color(0xFFD1FAE5),
+                            child: const Center(
+                              child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                            ),
+                          ),
+                        ),
                 ),
                 Positioned(
                   bottom: 8,

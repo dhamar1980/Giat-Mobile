@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 import 'api_client.dart';
 import 'storage_service.dart';
+import 'supabase_admin_service.dart';
 
 /// Authentication Service integrating Firebase Auth, Google Sign-In, and GIAT Laravel Backend.
 class AuthService {
@@ -188,7 +189,33 @@ class AuthService {
         );
       }
     } catch (e) {
-      debugPrint('Email/Password Login Error: $e');
+      debugPrint('Email/Password Login HTTP Error (trying direct Supabase): $e');
+      if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+        try {
+          final pgRow = await SupabaseAdminService.instance.authenticateUser(
+            email: email.trim().toLowerCase(),
+            password: password,
+          );
+          if (pgRow != null) {
+            final resolvedRole =
+                (pgRow['role']?.toString() ?? role ?? 'pasien').toLowerCase();
+            final user = UserModel.fromJson(pgRow, defaultRole: resolvedRole);
+            final token = 'supabase_${user.id}';
+            await _storage.saveToken(token);
+            await _storage.saveUser(user);
+            await _storage.saveRole(user.role);
+            return AuthResult(
+              success: true,
+              message: 'Login berhasil (Supabase).',
+              user: user,
+              token: token,
+              role: user.role,
+            );
+          }
+        } catch (pgErr) {
+          debugPrint('Supabase direct auth notice: $pgErr');
+        }
+      }
       return AuthResult(
         success: false,
         message: ApiClient.getErrorMessage(e),

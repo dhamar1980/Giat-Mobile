@@ -24,6 +24,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   static const _bgColor = Color(0xFFF7FAF8);
   static const _border = Color(0xFFE2E8F0);
 
+  @override
+  void initState() {
+    super.initState();
+    AdminStore.instance.fetchProfile();
+  }
+
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -122,23 +128,31 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          store.adminNama = namaCtrl.text.trim().isEmpty
-                              ? store.adminNama
-                              : namaCtrl.text.trim();
-                          store.adminJabatan = jabatanCtrl.text.trim().isEmpty
-                              ? store.adminJabatan
-                              : jabatanCtrl.text.trim();
-                          store.adminEmail = emailCtrl.text.trim().isEmpty
-                              ? store.adminEmail
-                              : emailCtrl.text.trim();
-                          store.adminNoHp = noHpCtrl.text.trim().isEmpty
-                              ? store.adminNoHp
-                              : noHpCtrl.text.trim();
-                        });
+                      onPressed: () async {
+                        final nama = namaCtrl.text.trim().isEmpty
+                            ? store.adminNama
+                            : namaCtrl.text.trim();
+                        final jabatan = jabatanCtrl.text.trim().isEmpty
+                            ? store.adminJabatan
+                            : jabatanCtrl.text.trim();
+                        final email = emailCtrl.text.trim().isEmpty
+                            ? store.adminEmail
+                            : emailCtrl.text.trim();
+                        final noHp = noHpCtrl.text.trim().isEmpty
+                            ? store.adminNoHp
+                            : noHpCtrl.text.trim();
+
                         Navigator.pop(ctx);
-                        _showSnack('Profil Admin berhasil diperbarui!');
+                        await store.updateAdminProfile(
+                          nama: nama,
+                          email: email,
+                          noHp: noHp,
+                          jabatan: jabatan,
+                        );
+                        if (mounted) {
+                          setState(() {});
+                          _showSnack('Profil Admin berhasil diperbarui!');
+                        }
                       },
                       child: Text(
                         'Simpan Perubahan',
@@ -231,7 +245,14 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
+                      if (oldPassCtrl.text.trim().isEmpty) {
+                        _showSnack(
+                          'Kata sandi saat ini wajib diisi',
+                          isError: true,
+                        );
+                        return;
+                      }
                       if (newPassCtrl.text.length < 6) {
                         _showSnack(
                           'Kata sandi baru minimal 6 karakter',
@@ -247,7 +268,17 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                         return;
                       }
                       Navigator.pop(ctx);
-                      _showSnack('Kata sandi Admin berhasil diperbarui!');
+                      final err = await AdminStore.instance.updateAdminPassword(
+                        currentPassword: oldPassCtrl.text,
+                        newPassword: newPassCtrl.text,
+                        newPasswordConfirmation: confirmPassCtrl.text,
+                      );
+                      if (!mounted) return;
+                      if (err == null) {
+                        _showSnack('Kata sandi Admin berhasil diperbarui!');
+                      } else {
+                        _showSnack(err, isError: true);
+                      }
                     },
                     child: Text(
                       'Perbarui Kata Sandi',
@@ -303,6 +334,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
               if (widget.onLogout != null) {
                 widget.onLogout!();
               } else {
+                await AdminStore.instance.logoutAdmin();
                 await AuthService().logout();
                 if (mounted) {
                   Navigator.of(context).pushAndRemoveUntil(

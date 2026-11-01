@@ -320,12 +320,11 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
               const SizedBox(height: 16),
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.asset(
+                child: _buildArticleImage(
                   item.gambar,
                   height: 170,
                   width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
+                  fallback: Container(
                     height: 170,
                     color: const Color(0xFFDCFCE7),
                     child: const Center(
@@ -629,17 +628,21 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
                             Expanded(
                               child: filtered.isEmpty
                                   ? _buildEmptyState()
-                                  : ListView.builder(
-                                      padding: EdgeInsets.zero,
-                                      itemCount: filtered.length,
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(
-                                        parent: BouncingScrollPhysics(),
+                                  : RefreshIndicator(
+                                      color: _darkGreen,
+                                      onRefresh: store.fetchEdukasi,
+                                      child: ListView.builder(
+                                        padding: EdgeInsets.zero,
+                                        itemCount: filtered.length,
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(
+                                          parent: BouncingScrollPhysics(),
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final item = filtered[index];
+                                          return _buildEdukasiCard(item);
+                                        },
                                       ),
-                                      itemBuilder: (context, index) {
-                                        final item = filtered[index];
-                                        return _buildEdukasiCard(item);
-                                      },
                                     ),
                             ),
 
@@ -761,6 +764,30 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
     );
   }
 
+  Widget _buildArticleImage(
+    String path, {
+    double? width,
+    double? height,
+    required Widget fallback,
+  }) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    return Image.asset(
+      path,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+
   Widget _buildEdukasiCard(AdminEdukasi item) {
     Color iconBgColor = const Color(0xFFD5E8F0);
     if (item.kategori.contains('Nutrisi')) {
@@ -819,12 +846,11 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.asset(
+                      child: _buildArticleImage(
                         item.gambar,
                         width: 58,
                         height: 58,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const Center(
+                        fallback: const Center(
                           child: Icon(
                             Icons.menu_book_outlined,
                             color: _textColor,

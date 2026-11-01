@@ -55,6 +55,7 @@ class _AdminAkunScreenState extends State<AdminAkunScreen> {
 
   List<AdminAccount> _getFilteredAccounts(AdminStore store) {
     final byFilter = store.accounts.where((a) {
+      if (a.role == AdminUserRole.admin) return false;
       if (_selectedFilter != 'Semua') return a.role.key == _selectedFilter;
       return true;
     }).toList();
@@ -158,7 +159,7 @@ class _AdminAkunScreenState extends State<AdminAkunScreen> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: AdminUserRole.values.map((r) {
+                      children: AdminStore.managedRoles.map((r) {
                         final isSelected = selectedRole == r;
                         return GestureDetector(
                           onTap: () => setModalState(() => selectedRole = r),
@@ -293,7 +294,10 @@ class _AdminAkunScreenState extends State<AdminAkunScreen> {
                             keterangan:
                                 ketCtrl.text.trim().isEmpty ? null : ketCtrl.text.trim(),
                           );
-                          store.addAccount(newAcc);
+                          store.addAccount(
+                            newAcc,
+                            password: passCtrl.text.trim(),
+                          );
                           Navigator.pop(ctx);
                           _showSnack(
                             'Akun ${newAcc.nama} (${newAcc.role.label}) berhasil dibuat!',
@@ -365,7 +369,7 @@ class _AdminAkunScreenState extends State<AdminAkunScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              ...AdminUserRole.values.map((r) {
+              ...AdminStore.managedRoles.map((r) {
                 final isSelected = chosen == r;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -546,7 +550,7 @@ class _AdminAkunScreenState extends State<AdminAkunScreen> {
                     AdminCurvedHeader(
                       title: 'Kelola Akun Pengguna 👥',
                       subtitle:
-                          'Tambah akun baru dan atur hak akses role (Pasien, Dokter, Apotek, Admin) pengguna GIAT. ✨',
+                          'Tambah akun baru dan atur hak akses role (Pasien, Dokter, Apotek) pengguna GIAT. ✨',
                       trailingAction: widget.trailingAction,
                     ),
 
@@ -615,7 +619,7 @@ class _AdminAkunScreenState extends State<AdminAkunScreen> {
 
                             const SizedBox(height: 10),
 
-                            // Filter Chips
+                            // Filter Chips (Pasien, Dokter, Apotek saja — tanpa Admin)
                             SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               physics: const BouncingScrollPhysics(),
@@ -640,11 +644,6 @@ class _AdminAkunScreenState extends State<AdminAkunScreen> {
                                     'apotek',
                                     'Apotek (${store.countRole(AdminUserRole.apotek)})',
                                   ),
-                                  const SizedBox(width: 8),
-                                  _buildFilterChip(
-                                    'admin',
-                                    'Admin (${store.countRole(AdminUserRole.admin)})',
-                                  ),
                                 ],
                               ),
                             ),
@@ -655,17 +654,21 @@ class _AdminAkunScreenState extends State<AdminAkunScreen> {
                             Expanded(
                               child: filtered.isEmpty
                                   ? _buildEmptyState()
-                                  : ListView.builder(
-                                      padding: EdgeInsets.zero,
-                                      itemCount: filtered.length,
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(
-                                        parent: BouncingScrollPhysics(),
+                                  : RefreshIndicator(
+                                      color: _darkGreen,
+                                      onRefresh: store.fetchAccounts,
+                                      child: ListView.builder(
+                                        padding: EdgeInsets.zero,
+                                        itemCount: filtered.length,
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(
+                                          parent: BouncingScrollPhysics(),
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final acc = filtered[index];
+                                          return _buildAccountCard(acc);
+                                        },
                                       ),
-                                      itemBuilder: (context, index) {
-                                        final acc = filtered[index];
-                                        return _buildAccountCard(acc);
-                                      },
                                     ),
                             ),
 

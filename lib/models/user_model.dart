@@ -41,7 +41,8 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, {String defaultRole = 'pasien'}) {
-    final dynamic parsedId = json['id_pasien'] ??
+    final dynamic parsedId = json['id_admin'] ??
+        json['id_pasien'] ??
         json['id_dokter'] ??
         json['id_apotek'] ??
         (json['user'] is Map ? (json['user'] as Map)['id'] : null) ??
@@ -53,7 +54,9 @@ class UserModel {
       resolvedRole = ((json['user'] as Map)['role'] as String?)?.toLowerCase() ?? '';
     }
     if (resolvedRole.isEmpty || resolvedRole == 'pasien') {
-      if (json['id_apotek'] != null || json.containsKey('lokasi_apotek') || json.containsKey('jam_operasional')) {
+      if (json['id_admin'] != null || json.containsKey('jabatan')) {
+        resolvedRole = 'admin';
+      } else if (json['id_apotek'] != null || json.containsKey('lokasi_apotek') || json.containsKey('jam_operasional')) {
         resolvedRole = 'apotek';
       } else if (json['id_dokter'] != null || json.containsKey('no_str') || json.containsKey('spesialisasi')) {
         resolvedRole = 'dokter';

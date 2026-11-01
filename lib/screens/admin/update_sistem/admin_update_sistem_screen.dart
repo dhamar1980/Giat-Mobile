@@ -428,17 +428,21 @@ class _AdminUpdateSistemScreenState extends State<AdminUpdateSistemScreen> {
                             Expanded(
                               child: filtered.isEmpty
                                   ? _buildEmptyState()
-                                  : ListView.builder(
-                                      padding: EdgeInsets.zero,
-                                      itemCount: filtered.length,
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(
-                                        parent: BouncingScrollPhysics(),
+                                  : RefreshIndicator(
+                                      color: _darkGreen,
+                                      onRefresh: store.fetchSystemUpdates,
+                                      child: ListView.builder(
+                                        padding: EdgeInsets.zero,
+                                        itemCount: filtered.length,
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(
+                                          parent: BouncingScrollPhysics(),
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final u = filtered[index];
+                                          return _buildUpdateCard(u);
+                                        },
                                       ),
-                                      itemBuilder: (context, index) {
-                                        final u = filtered[index];
-                                        return _buildUpdateCard(u);
-                                      },
                                     ),
                             ),
 
@@ -665,7 +669,7 @@ class _AdminUpdateSistemScreenState extends State<AdminUpdateSistemScreen> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
-                                adminTimeAgo(u.publishedAt),
+                                u.waktuText ?? adminTimeAgo(u.publishedAt),
                                 style: GoogleFonts.poppins(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w500,

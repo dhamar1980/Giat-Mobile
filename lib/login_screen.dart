@@ -204,6 +204,7 @@ class _LoginScreenState extends State<LoginScreen>
       final result = await AuthService().loginWithEmailPassword(
         email: targetEmail,
         password: targetPass,
+        role: targetEmail == 'admin@gmail.com' ? 'admin' : null,
       );
 
       if (!mounted) return;
