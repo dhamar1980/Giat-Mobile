@@ -1215,6 +1215,36 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                 ),
               ),
 
+              if (_weightRecords.length == 1) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF065A37)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Catat minimal 2 kali untuk melihat garis tren perkembangan berat badan.',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF475569),
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 12),
 
               // ── IMT Saat Ini Container ──
@@ -1359,8 +1389,6 @@ class _WeightLineChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (records.isEmpty) return;
-
     const leftPadding = 24.0;
     const rightPadding = 24.0;
     const topPadding = 28.0;
@@ -1368,10 +1396,6 @@ class _WeightLineChartPainter extends CustomPainter {
 
     final chartWidth = size.width - leftPadding - rightPadding;
     final chartHeight = size.height - topPadding - bottomPadding;
-
-    // Find min and max weight
-    double minWeight = 64.4;
-    double maxWeight = 65.8;
 
     // Draw horizontal dashed grid lines
     final gridPaint = Paint()
@@ -1384,10 +1408,114 @@ class _WeightLineChartPainter extends CustomPainter {
       _drawDashedLine(canvas, Offset(leftPadding - 8, y), Offset(size.width - rightPadding + 8, y), gridPaint);
     }
 
-    // Calculate point coordinates
+    if (records.isEmpty) {
+      final textSpan = TextSpan(
+        text: 'Belum ada data perkembangan berat badan',
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: const Color(0xFF94A3B8),
+        ),
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(
+        canvas,
+        Offset((size.width - textPainter.width) / 2, topPadding + (chartHeight - textPainter.height) / 2),
+      );
+      return;
+    }
+
+    // ── Single Record State ──
+    if (records.length == 1) {
+      final ptX = size.width / 2;
+      final ptY = topPadding + (chartHeight / 2);
+      final pt = Offset(ptX, ptY);
+
+      // Vertical guide line to date axis
+      final guidePaint = Paint()
+        ..color = const Color(0xFF10B981).withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      _drawVerticalDashedLine(canvas, Offset(ptX, ptY + 8), Offset(ptX, size.height - 24), guidePaint);
+
+      // Glowing outer halo
+      final haloPaint = Paint()
+        ..color = const Color(0xFF10B981).withValues(alpha: 0.18)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(pt, 12.0, haloPaint);
+
+      // Solid emerald dot
+      final dotPaint = Paint()..color = const Color(0xFF10B981);
+      canvas.drawCircle(pt, 5.5, dotPaint);
+
+      // Inner white center
+      final innerPaint = Paint()..color = Colors.white;
+      canvas.drawCircle(pt, 2.2, innerPaint);
+
+      // Weight label above point
+      final valStr = '${records[0].weight.toStringAsFixed(1).replaceAll('.', ',')} kg';
+      final textSpan = TextSpan(
+        text: valStr,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: const Color(0xFF044E2F),
+        ),
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(
+        canvas,
+        Offset(ptX - (textPainter.width / 2), ptY - 22),
+      );
+
+      // Date label below on X-axis
+      final dateSpan = TextSpan(
+        text: _formatIndonesianDate(records[0].date),
+        style: GoogleFonts.inter(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFF044E2F),
+        ),
+      );
+      final datePainter = TextPainter(
+        text: dateSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      datePainter.paint(
+        canvas,
+        Offset(ptX - (datePainter.width / 2), size.height - 18),
+      );
+      return;
+    }
+
+    // ── Multiple Records State (>= 2) ──
+    // Dynamic Min and Max Weight calculation
+    final weights = records.map((e) => e.weight).toList();
+    final actualMin = weights.reduce((a, b) => a < b ? a : b);
+    final actualMax = weights.reduce((a, b) => a > b ? a : b);
+
+    double minWeight;
+    double maxWeight;
+    if ((actualMax - actualMin).abs() < 0.1) {
+      minWeight = actualMin - 2.0;
+      maxWeight = actualMax + 2.0;
+    } else {
+      final diff = actualMax - actualMin;
+      minWeight = actualMin - (diff * 0.25);
+      maxWeight = actualMax + (diff * 0.25);
+    }
+
+    // Calculate point coordinates (records.length >= 2, no division by zero)
     final points = <Offset>[];
+    final stepX = chartWidth / (records.length - 1);
     for (int i = 0; i < records.length; i++) {
-      final x = leftPadding + (i * (chartWidth / (records.length - 1)));
+      final x = leftPadding + (i * stepX);
       final weight = records[i].weight;
       final normalized = (weight - minWeight) / (maxWeight - minWeight);
       final y = topPadding + (1 - normalized.clamp(0.0, 1.0)) * chartHeight;
@@ -1440,9 +1568,13 @@ class _WeightLineChartPainter extends CustomPainter {
 
       // Draw node circle
       if (isLatest) {
+        // Glowing halo
+        canvas.drawCircle(pt, 9.0, Paint()..color = const Color(0xFF10B981).withValues(alpha: 0.2));
         // Solid green circle for current point
         final dotPaint = Paint()..color = const Color(0xFF10B981);
         canvas.drawCircle(pt, 5.5, dotPaint);
+        // Inner white dot
+        canvas.drawCircle(pt, 2.2, Paint()..color = Colors.white);
       } else {
         // Hollow circle with white center and green ring
         final outerPaint = Paint()
@@ -1456,10 +1588,10 @@ class _WeightLineChartPainter extends CustomPainter {
         canvas.drawCircle(pt, 3.2, innerPaint);
       }
 
-      // Draw weight value label (for point 2 '64.8', put it below the point as shown in the design)
-      final valStr = rec.weight.toStringAsFixed(1);
-      final isBelow = (i == 2); // 64.8 is lowest point, label placed below
-      final labelY = isBelow ? (pt.dy + 7) : (pt.dy - 19);
+      // Draw weight value label
+      final valStr = rec.weight.toStringAsFixed(1).replaceAll('.', ',');
+      final isNearTop = pt.dy - 19 < (topPadding - 8);
+      final labelY = isNearTop ? (pt.dy + 7) : (pt.dy - 19);
 
       final textSpan = TextSpan(
         text: valStr,
@@ -1511,6 +1643,20 @@ class _WeightLineChartPainter extends CustomPainter {
         paint,
       );
       startX += dashWidth + dashSpace;
+    }
+  }
+
+  void _drawVerticalDashedLine(Canvas canvas, Offset p1, Offset p2, Paint paint) {
+    const dashHeight = 4.0;
+    const dashSpace = 4.0;
+    double startY = p1.dy;
+    while (startY < p2.dy) {
+      canvas.drawLine(
+        Offset(p1.dx, startY),
+        Offset(p1.dx, startY + dashHeight),
+        paint,
+      );
+      startY += dashHeight + dashSpace;
     }
   }
 

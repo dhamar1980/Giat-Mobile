@@ -221,4 +221,17 @@ class ApiClient {
 
     return error?.toString() ?? 'Terjadi kesalahan yang tidak diketahui.';
   }
+
+  /// Safely extracts a List from standard API responses or paginated API responses
+  static List<dynamic> extractList(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is List) return raw;
+    if (raw is Map) {
+      final d = raw['data'];
+      if (d is List) return d;
+      if (d is Map && d['data'] is List) return d['data'] as List;
+      if (raw['items'] is List) return raw['items'] as List;
+    }
+    return [];
+  }
 }

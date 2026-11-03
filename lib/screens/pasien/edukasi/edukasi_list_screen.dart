@@ -43,7 +43,9 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
               'date': item['penulis']?.toString() ?? 'Tim Medis GIAT',
               'image': (item['gambar_url']?.toString().isNotEmpty ?? false)
                   ? item['gambar_url'].toString()
-                  : 'assets/images/kidneys.jpg',
+                  : (item['gambar']?.toString().isNotEmpty ?? false)
+                      ? item['gambar'].toString()
+                      : 'assets/images/kidneys.jpg',
               'content': item['konten']?.toString() ?? '',
             };
           }).toList();
@@ -90,7 +92,7 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
     if (img.startsWith('data:image/')) {
       try {
         final commaIdx = img.indexOf(',');
-        final b64 = commaIdx >= 0 ? img.substring(commaIdx + 1) : img;
+        final b64 = (commaIdx >= 0 ? img.substring(commaIdx + 1) : img).replaceAll(RegExp(r'\s+'), '');
         return Image.memory(
           base64Decode(b64),
           fit: BoxFit.cover,

@@ -23,7 +23,7 @@ class EdukasiDetailScreen extends StatelessWidget {
     if (img.startsWith('data:image/')) {
       try {
         final commaIdx = img.indexOf(',');
-        final b64 = commaIdx >= 0 ? img.substring(commaIdx + 1) : img;
+        final b64 = (commaIdx >= 0 ? img.substring(commaIdx + 1) : img).replaceAll(RegExp(r'\s+'), '');
         return Image.memory(
           base64Decode(b64),
           fit: BoxFit.cover,

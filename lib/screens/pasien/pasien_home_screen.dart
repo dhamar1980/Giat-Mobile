@@ -718,7 +718,9 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                         category: _edukasiArticles[i]['kategori']?.toString() ?? 'Info CKD',
                         imagePath: (_edukasiArticles[i]['gambar_url']?.toString().isNotEmpty ?? false)
                             ? _edukasiArticles[i]['gambar_url'].toString()
-                            : 'assets/images/kidneys.jpg',
+                            : (_edukasiArticles[i]['gambar']?.toString().isNotEmpty ?? false)
+                                ? _edukasiArticles[i]['gambar'].toString()
+                                : 'assets/images/kidneys.jpg',
                         content: _edukasiArticles[i]['konten']?.toString(),
                         date: _edukasiArticles[i]['penulis']?.toString(),
                       ),
@@ -810,9 +812,9 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                           builder: (_) {
                             try {
                               final commaIdx = imagePath.indexOf(',');
-                              final b64 = commaIdx >= 0
+                              final b64 = (commaIdx >= 0
                                   ? imagePath.substring(commaIdx + 1)
-                                  : imagePath;
+                                  : imagePath).replaceAll(RegExp(r'\s+'), '');
                               return Image.memory(
                                 base64Decode(b64),
                                 fit: BoxFit.cover,

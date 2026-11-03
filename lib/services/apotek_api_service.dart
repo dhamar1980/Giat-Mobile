@@ -32,12 +32,7 @@ class ApotekApiService {
     try {
       final response = await _client.dio.get('/apotek/notifikasi');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat notifikasi apotek.',
         data: list,
@@ -57,12 +52,7 @@ class ApotekApiService {
     try {
       final response = await _client.dio.get('/apotek/reminder');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat jadwal pengingat pasien.',
         data: list,
@@ -84,12 +74,7 @@ class ApotekApiService {
       if (status != null && status.isNotEmpty) qParams['status'] = status;
       final response = await _client.dio.get('/apotek/pesanan', queryParameters: qParams);
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat antrean pesanan obat.',
         data: list,
@@ -182,12 +167,7 @@ class ApotekApiService {
     try {
       final response = await _client.dio.get('/apotek/resep');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat daftar resep dokter masuk.',
         data: list,
@@ -223,12 +203,7 @@ class ApotekApiService {
       if (query != null && query.isNotEmpty) qParams['q'] = query;
       final response = await _client.dio.get('/apotek/obat', queryParameters: qParams);
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat inventaris obat.',
         data: list,
@@ -244,12 +219,7 @@ class ApotekApiService {
     try {
       final response = await _client.dio.get('/apotek/obat/stock');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat laporan stok obat.',
         data: list,
@@ -339,12 +309,7 @@ class ApotekApiService {
     try {
       final response = await _client.dio.get('/apotek/jam-operasional');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat jadwal jam operasional.',
         data: list,
@@ -374,12 +339,7 @@ class ApotekApiService {
     try {
       final response = await _client.dio.get('/apotek/area-layanan');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat daftar area layanan.',
         data: list,
@@ -423,12 +383,7 @@ class ApotekApiService {
     try {
       final response = await _client.dio.get('/apotek/aktivitas');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat riwayat aktivitas.',
         data: list,

@@ -1,4 +1,4 @@
-/// Models for Notifikasi Pengguna
+// Models for Notifikasi Pengguna
 
 class NotifikasiModel {
   final dynamic id;
@@ -7,6 +7,7 @@ class NotifikasiModel {
   final String? tipe;
   final bool isRead;
   final String createdAt;
+  final String? waktu;
   final Map<String, dynamic>? data;
 
   NotifikasiModel({
@@ -16,6 +17,7 @@ class NotifikasiModel {
     this.tipe,
     required this.isRead,
     required this.createdAt,
+    this.waktu,
     this.data,
   });
 
@@ -27,6 +29,7 @@ class NotifikasiModel {
       tipe: json['tipe']?.toString() ?? json['type']?.toString(),
       isRead: json['is_read'] == true || json['is_read'] == 1 || json['read_at'] != null,
       createdAt: json['created_at']?.toString() ?? json['tanggal']?.toString() ?? '',
+      waktu: json['waktu']?.toString(),
       data: json['data'] is Map<String, dynamic> ? json['data'] as Map<String, dynamic> : null,
     );
   }

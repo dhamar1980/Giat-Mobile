@@ -589,9 +589,18 @@ class SupabaseAdminService {
     required String gambar,
     required bool isUpdate,
   }) async {
-    final gambarUrl = gambar.startsWith('http')
-        ? gambar
-        : 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=600&q=80';
+    final trimmed = gambar.trim();
+    final String gambarUrl;
+    if (trimmed.startsWith('data:image/') ||
+        trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('assets/')) {
+      gambarUrl = trimmed;
+    } else if (trimmed.isNotEmpty) {
+      gambarUrl = trimmed;
+    } else {
+      gambarUrl = 'assets/images/kidneys.jpg';
+    }
 
     if (isUpdate && id != null && id.isNotEmpty) {
       await _exec(
@@ -627,7 +636,7 @@ class SupabaseAdminService {
         'konten': konten,
         'penulis': penulis,
         'durasi_baca': durasiBaca,
-        'gambar_url': gambar,
+        'gambar_url': gambarUrl,
         'updated_at': DateTime.now().toIso8601String(),
       };
     } else {

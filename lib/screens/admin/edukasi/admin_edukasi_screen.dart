@@ -1332,7 +1332,7 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
     if (path.startsWith('data:image/')) {
       try {
         final commaIdx = path.indexOf(',');
-        final b64 = commaIdx >= 0 ? path.substring(commaIdx + 1) : path;
+        final b64 = (commaIdx >= 0 ? path.substring(commaIdx + 1) : path).replaceAll(RegExp(r'\s+'), '');
         return Image.memory(
           base64Decode(b64),
           width: width,

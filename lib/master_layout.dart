@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'screens/pasien/pasien_home_screen.dart';
 import 'screens/pasien/konsultasi/dokter_list_screen.dart';
@@ -8,7 +7,6 @@ import 'screens/pasien/pragi/pragi_home_view.dart';
 import 'screens/pasien/pantau/pantau_dashboard_screen.dart';
 import 'screens/pasien/obat/daftar_obat_screen.dart';
 import 'screens/pasien/profile/profile_pasien_screen.dart';
-import 'screens/pasien/reminder/reminder_list_screen.dart';
 import 'screens/pasien/widgets/pasien_bottom_navbar.dart';
 import 'widgets/giat_background.dart';
 import 'widgets/app_brand_title.dart';
@@ -38,7 +36,6 @@ class MasterLayout extends StatefulWidget {
 class _MasterLayoutState extends State<MasterLayout> {
   late int _currentIndex;
 
-  static const _darkGreen = Color(0xFF065A37);
   static const _bgColor = Color(0xFFF6FAF7);
 
   // Notification data
@@ -70,12 +67,13 @@ class _MasterLayoutState extends State<MasterLayout> {
   ];
 
   int _unreadCount = 0;
-  bool _isTopBarVisible = true;
+  late final Set<int> _activatedTabs;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _activatedTabs = {_currentIndex};
     _unreadCount = StorageService().getUnreadNotificationCount();
     _fetchNotificationState();
   }
@@ -126,7 +124,7 @@ class _MasterLayoutState extends State<MasterLayout> {
     if (_currentIndex != index) {
       setState(() {
         _currentIndex = index;
-        _isTopBarVisible = true;
+        _activatedTabs.add(index);
       });
       _fetchNotificationState();
     }
@@ -155,33 +153,43 @@ class _MasterLayoutState extends State<MasterLayout> {
               index: _currentIndex,
               children: [
                 // Tab 0: Home Pasien
-                PasienHomeScreen(
-                  userName: widget.userName,
-                  isEmbedded: true,
-                  onNavigateTab: _onTabSelected,
-                ),
+                _activatedTabs.contains(0)
+                    ? PasienHomeScreen(
+                        userName: widget.userName,
+                        isEmbedded: true,
+                        onNavigateTab: _onTabSelected,
+                      )
+                    : const SizedBox.shrink(),
 
                 // Tab 1: Konsultasi Dokter
-                DokterListScreen(
-                  userName: widget.userName,
-                  isEmbedded: true,
-                ),
+                _activatedTabs.contains(1)
+                    ? DokterListScreen(
+                        userName: widget.userName,
+                        isEmbedded: true,
+                      )
+                    : const SizedBox.shrink(),
 
                 // Tab 2: PRAGI AI Assistant & Screening
-                const PragiHomeView(
-                  isEmbedded: true,
-                ),
+                _activatedTabs.contains(2)
+                    ? const PragiHomeView(
+                        isEmbedded: true,
+                      )
+                    : const SizedBox.shrink(),
 
                 // Tab 3: Pantau Kesehatan Ginjal
-                PantauDashboardScreen(
-                  userName: widget.userName,
-                  isEmbedded: true,
-                ),
+                _activatedTabs.contains(3)
+                    ? PantauDashboardScreen(
+                        userName: widget.userName,
+                        isEmbedded: true,
+                      )
+                    : const SizedBox.shrink(),
 
                 // Tab 4: Jadwal & Stok Obat
-                const DaftarObatScreen(
-                  isEmbedded: true,
-                ),
+                _activatedTabs.contains(4)
+                    ? const DaftarObatScreen(
+                        isEmbedded: true,
+                      )
+                    : const SizedBox.shrink(),
               ],
             ),
           ),

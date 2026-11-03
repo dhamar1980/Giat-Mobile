@@ -57,12 +57,7 @@ class PasienApiService {
       }
 
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat artikel edukasi.',
         data: list,
@@ -78,12 +73,7 @@ class PasienApiService {
     try {
       final response = await _client.dio.get('/edukasi/kategori');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat kategori edukasi.',
         data: list,
@@ -126,12 +116,7 @@ class PasienApiService {
     try {
       final response = await _client.dio.get('/pasien/reminder');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat jadwal pengingat.',
         data: list,
@@ -147,12 +132,7 @@ class PasienApiService {
     try {
       final response = await _client.dio.get('/pasien/reminder/hari-ini');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat pengingat hari ini.',
         data: list,
@@ -368,12 +348,7 @@ class PasienApiService {
     try {
       final response = await _client.dio.get('/pasien/pantau');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
 
       // Simpan ke local cache
       if (list.isNotEmpty) {
@@ -584,7 +559,6 @@ class PasienApiService {
   Future<ApiResponse<PragiHasilSkrining>> submitPragiSkrining(Map<String, dynamic> answers) async {
     try {
       dynamic response;
-      DioException? lastDioError;
 
       // Ensure answers map is flattened to 16 features if inadvertently passed with 'jawaban' key
       final Map<String, dynamic> directPayload = answers.containsKey('jawaban') && answers['jawaban'] is Map
@@ -594,31 +568,26 @@ class PasienApiService {
       // 1. Try POST /pasien/pragi/predict with direct 16 features
       try {
         response = await _client.dio.post('/pasien/pragi/predict', data: directPayload);
-      } on DioException catch (e1) {
-        lastDioError = e1;
+      } on DioException {
         // 2. Try POST /pasien/pragi/skrining with direct features
         try {
           response = await _client.dio.post('/pasien/pragi/skrining', data: directPayload);
-        } on DioException catch (e2) {
-          lastDioError = e2;
+        } on DioException {
           // 3. Try with wrapped {"jawaban": ...} on /pasien/pragi/skrining if 422 or 400
           try {
             response = await _client.dio.post(
               '/pasien/pragi/skrining',
               data: {'jawaban': directPayload},
             );
-          } on DioException catch (e3) {
-            lastDioError = e3;
+          } on DioException {
             // 4. Try public fallback /pragi/predict
             try {
               response = await _client.dio.post('/pragi/predict', data: directPayload);
-            } on DioException catch (e4) {
-              lastDioError = e4;
+            } on DioException {
               // 5. Try public fallback /pragi/skrining
               try {
                 response = await _client.dio.post('/pragi/skrining', data: directPayload);
-              } on DioException catch (e5) {
-                lastDioError = e5;
+              } on DioException {
                 rethrow;
               }
             }
@@ -675,12 +644,7 @@ class PasienApiService {
     try {
       final response = await _client.dio.get('/pasien/pragi/riwayat');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat riwayat skrining PRAGI.',
         data: list,
@@ -710,12 +674,7 @@ class PasienApiService {
     try {
       final response = await _client.dio.get('/pasien/pragi/chat/history');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat riwayat obrolan PRAGI.',
         data: list,
@@ -778,12 +737,7 @@ class PasienApiService {
       }
       final response = await _client.dio.get('/pasien/obat/katalog', queryParameters: qParams);
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat katalog obat.',
         data: list,
@@ -842,12 +796,7 @@ class PasienApiService {
     try {
       final response = await _client.dio.get('/pasien/obat/resep-saya');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat resep dokter Anda.',
         data: list,
@@ -878,12 +827,7 @@ class PasienApiService {
     try {
       final response = await _client.dio.get('/pasien/obat/riwayat-pembelian');
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat riwayat pembelian obat.',
         data: list,
@@ -971,12 +915,7 @@ class PasienApiService {
         }
       }
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat notifikasi.',
         data: list,
@@ -1080,12 +1019,7 @@ class PasienApiService {
         }
       }
       final raw = response.data;
-      List<dynamic> list = [];
-      if (raw?['data'] is List) {
-        list = raw['data'] as List;
-      } else if (raw is List) {
-        list = raw;
-      }
+      final List<dynamic> list = ApiClient.extractList(raw);
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat riwayat konsultasi pasien.',
         data: list,

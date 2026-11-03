@@ -111,8 +111,8 @@ class _PasienNotifikasiScreenState extends State<PasienNotifikasiScreen> {
     ),
   ];
 
-  List<PasienNotificationItem> _notifications = List.from(_defaultNotifications);
-  bool _isLoading = false;
+  List<PasienNotificationItem> _notifications = [];
+  bool _isLoading = true;
   String _activeFilter = 'semua'; // 'semua' | 'unread'
 
   @override
@@ -139,7 +139,7 @@ class _PasienNotifikasiScreenState extends State<PasienNotifikasiScreen> {
 
         if (mounted) {
           setState(() {
-            _notifications = items.isNotEmpty ? items : List.from(_defaultNotifications);
+            _notifications = items;
             _isLoading = false;
           });
         }
