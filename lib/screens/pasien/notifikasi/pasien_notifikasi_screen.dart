@@ -111,8 +111,8 @@ class _PasienNotifikasiScreenState extends State<PasienNotifikasiScreen> {
     ),
   ];
 
-  List<PasienNotificationItem> _notifications = [];
-  bool _isLoading = true;
+  List<PasienNotificationItem> _notifications = List.from(_defaultNotifications);
+  bool _isLoading = false;
   String _activeFilter = 'semua'; // 'semua' | 'unread'
 
   @override

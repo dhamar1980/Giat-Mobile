@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/admin_models.dart';
 import '../widgets/admin_header.dart';
 
@@ -68,6 +71,33 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
     );
   }
 
+  static const List<Map<String, String>> _presetArticleImages = [
+    {
+      'label': 'Pemeriksaan Ginjal',
+      'url': 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      'label': 'Nutrisi & Diet',
+      'url': 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      'label': 'Pola Hidup Sehat',
+      'url': 'https://images.unsplash.com/photo-1505576399279-565b52d4ac71?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      'label': 'Konsultasi Medis',
+      'url': 'https://images.unsplash.com/photo-1631815588090-d4bfec5b1ccb?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      'label': 'Obat & Suplemen',
+      'url': 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      'label': 'Ilustrasi Ginjal',
+      'url': 'assets/images/kidneys.jpg',
+    },
+  ];
+
   void _showEdukasiFormSheet({AdminEdukasi? existing}) {
     final store = AdminStore.instance;
     final judulCtrl = TextEditingController(text: existing?.judul ?? '');
@@ -75,10 +105,230 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
     final kontenCtrl = TextEditingController(text: existing?.konten ?? '');
     final penulisCtrl =
         TextEditingController(text: existing?.penulis ?? 'Tim Medis GIAT');
-    final durasiCtrl =
-        TextEditingController(text: '${existing?.durasiBaca ?? 4}');
+    String selectedGambar =
+        existing?.gambar ?? _presetArticleImages.first['url']!;
+    final gambarUrlCtrl = TextEditingController(
+      text: selectedGambar.startsWith('http') ? selectedGambar : '',
+    );
     String kategori = existing?.kategori ?? AdminStore.edukasiKategori.first;
+    bool isSaving = false;
     final formKey = GlobalKey<FormState>();
+    final picker = ImagePicker();
+
+    Future<void> showFallbackGalleryDialog(
+      BuildContext modalCtx,
+      void Function(void Function()) setModalState, {
+      String? infoMessage,
+    }) async {
+      await showDialog<void>(
+        context: modalCtx,
+        builder: (dCtx) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: Text(
+            'Pilih Gambar Artikel Edukasi',
+            style: GoogleFonts.inter(
+              fontSize: 15.5,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (infoMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: Color(0xFFD97706),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            infoMessage,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: const Color(0xFF92400E),
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  'Pilih salah satu gambar sampul di bawah ini:',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF334155),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _presetArticleImages.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1.35,
+                  ),
+                  itemBuilder: (_, idx) {
+                    final preset = _presetArticleImages[idx];
+                    final url = preset['url']!;
+                    final label = preset['label']!;
+                    final isSelected = selectedGambar == url;
+                    return GestureDetector(
+                      onTap: () {
+                        setModalState(() {
+                          selectedGambar = url;
+                          gambarUrlCtrl.text =
+                              url.startsWith('http') ? url : '';
+                        });
+                        Navigator.pop(dCtx);
+                      },
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: _buildArticleImage(
+                              url,
+                              fallback: Container(
+                                color: const Color(0xFFDCFCE7),
+                                child: const Icon(
+                                  Icons.image_outlined,
+                                  color: _darkGreen,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected
+                                    ? _darkGreen
+                                    : Colors.transparent,
+                                width: 2.5,
+                              ),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.65),
+                                ],
+                              ),
+                            ),
+                            alignment: Alignment.bottomLeft,
+                            padding: const EdgeInsets.all(6),
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx),
+              child: Text(
+                'Tutup',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  color: _darkGreen,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Future<void> pickImageFromDevice(
+      BuildContext modalCtx,
+      ImageSource source,
+      void Function(void Function()) setModalState,
+    ) async {
+      try {
+        if (source == ImageSource.camera) {
+          final status = await Permission.camera.request();
+          if (!status.isGranted) {
+            if (!modalCtx.mounted) return;
+            await showFallbackGalleryDialog(
+              modalCtx,
+              setModalState,
+              infoMessage:
+                  'Izin kamera belum diberikan. Berikan izin Kamera di Pengaturan HP atau pilih gambar sampul di bawah ini.',
+            );
+            return;
+          }
+        }
+
+        final XFile? picked = await picker.pickImage(
+          source: source,
+          maxWidth: 640,
+          maxHeight: 640,
+          imageQuality: 65,
+        );
+        if (picked == null) return;
+        final bytes = await picked.readAsBytes();
+        final ext = picked.path.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+        final dataUri = 'data:image/$ext;base64,${base64Encode(bytes)}';
+        setModalState(() {
+          selectedGambar = dataUri;
+          gambarUrlCtrl.clear();
+        });
+      } on MissingPluginException {
+        if (!modalCtx.mounted) return;
+        await showFallbackGalleryDialog(
+          modalCtx,
+          setModalState,
+          infoMessage:
+              'Plugin Galeri/Kamera baru saja ditambahkan. Lakukan Stop lalu jalankan ulang "flutter run" (bukan sekadar Hot Reload) agar Galeri & Kamera HP aktif. Sementara itu Anda bisa memilih gambar di bawah:',
+        );
+      } catch (e) {
+        if (!modalCtx.mounted) return;
+        await showFallbackGalleryDialog(
+          modalCtx,
+          setModalState,
+          infoMessage:
+              'Tidak dapat membuka Galeri/Kamera perangkat saat ini. Silakan pilih gambar sampul di bawah atau lakukan Stop & "flutter run" ulang:',
+        );
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -176,6 +426,320 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
                       }).toList(),
                     ),
 
+                    const SizedBox(height: 16),
+
+                    // ── Gambar Artikel Edukasi ──
+                    Text(
+                      'Gambar Artikel Edukasi',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Kotak Pratinjau Gambar
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Stack(
+                              children: [
+                                SizedBox(
+                                  height: 140,
+                                  width: double.infinity,
+                                  child: _buildArticleImage(
+                                    selectedGambar,
+                                    height: 140,
+                                    width: double.infinity,
+                                    fallback: Container(
+                                      height: 140,
+                                      color: const Color(0xFFDCFCE7),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.add_photo_alternate_outlined,
+                                            size: 38,
+                                            color: _darkGreen,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Pratinjau Gambar Artikel',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: _darkGreen,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 8,
+                                  left: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.6),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.image_outlined,
+                                          size: 13,
+                                          color: Colors.white,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          selectedGambar.startsWith('data:image/')
+                                              ? 'Gambar Perangkat'
+                                              : 'Sampul Artikel',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Tombol Pilih dari Galeri / Kamera
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: _darkGreen,
+                                    side: const BorderSide(
+                                      color: Color(0xFFBBF7D0),
+                                    ),
+                                    backgroundColor: const Color(0xFFF0FDF4),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: () => pickImageFromDevice(
+                                    ctx,
+                                    ImageSource.gallery,
+                                    setModalState,
+                                  ),
+                                  icon: const Icon(
+                                    Icons.photo_library_outlined,
+                                    size: 17,
+                                  ),
+                                  label: Text(
+                                    'Pilih Galeri',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: _darkGreen,
+                                    side: const BorderSide(
+                                      color: Color(0xFFBBF7D0),
+                                    ),
+                                    backgroundColor: const Color(0xFFF0FDF4),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: () => pickImageFromDevice(
+                                    ctx,
+                                    ImageSource.camera,
+                                    setModalState,
+                                  ),
+                                  icon: const Icon(
+                                    Icons.camera_alt_outlined,
+                                    size: 17,
+                                  ),
+                                  label: Text(
+                                    'Kamera',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 10),
+                          Text(
+                            'Atau pilih gambar sampul cepat:',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 62,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _presetArticleImages.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (_, idx) {
+                                final preset = _presetArticleImages[idx];
+                                final presetUrl = preset['url']!;
+                                final isPicked = selectedGambar == presetUrl;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setModalState(() {
+                                      selectedGambar = presetUrl;
+                                      gambarUrlCtrl.text =
+                                          presetUrl.startsWith('http')
+                                              ? presetUrl
+                                              : '';
+                                    });
+                                  },
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        width: 78,
+                                        height: 62,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: isPicked
+                                                ? _darkGreen
+                                                : const Color(0xFFCBD5E1),
+                                            width: isPicked ? 2.2 : 1,
+                                          ),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: _buildArticleImage(
+                                            presetUrl,
+                                            width: 78,
+                                            height: 62,
+                                            fallback: Container(
+                                              color: const Color(0xFFDCFCE7),
+                                              child: const Icon(
+                                                Icons.image_outlined,
+                                                color: _darkGreen,
+                                                size: 20,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (isPicked)
+                                        Positioned(
+                                          top: 4,
+                                          right: 4,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(2),
+                                            decoration: const BoxDecoration(
+                                              color: _darkGreen,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.check_rounded,
+                                              size: 11,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: gambarUrlCtrl,
+                            onChanged: (v) {
+                              final trimmed = v.trim();
+                              if (trimmed.isNotEmpty) {
+                                setModalState(() => selectedGambar = trimmed);
+                              }
+                            },
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              color: const Color(0xFF0F172A),
+                            ),
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Atau tempel tautan URL gambar (https://...)',
+                              hintStyle: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.link_rounded,
+                                size: 18,
+                                color: Color(0xFF64748B),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: _border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: _border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: _darkGreen,
+                                  width: 1.3,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                     const SizedBox(height: 14),
                     _buildTextField(
                       controller: judulCtrl,
@@ -209,26 +773,10 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
                     ),
 
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: _buildTextField(
-                            controller: penulisCtrl,
-                            label: 'Penulis / Narasumber',
-                            hint: 'Tim Medis GIAT',
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: durasiCtrl,
-                            label: 'Baca (Menit)',
-                            hint: '4',
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
+                    _buildTextField(
+                      controller: penulisCtrl,
+                      label: 'Penulis / Narasumber',
+                      hint: 'Tim Medis GIAT',
                     ),
 
                     const SizedBox(height: 18),
@@ -243,40 +791,59 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () {
-                          if (!formKey.currentState!.validate()) return;
-                          final durasi =
-                              int.tryParse(durasiCtrl.text.trim()) ?? 4;
-                          final item = AdminEdukasi(
-                            id: existing?.id ?? store.newId(),
-                            judul: judulCtrl.text.trim(),
-                            kategori: kategori,
-                            ringkasan: ringkasanCtrl.text.trim(),
-                            konten: kontenCtrl.text.trim(),
-                            gambar: existing?.gambar ?? 'assets/images/kidneys.jpg',
-                            penulis: penulisCtrl.text.trim().isEmpty
-                                ? 'Tim Medis GIAT'
-                                : penulisCtrl.text.trim(),
-                            durasiBaca: durasi,
-                            status: EdukasiStatus.published,
-                            createdAt: existing?.createdAt ?? DateTime.now(),
-                            updatedAt: DateTime.now(),
-                          );
-                          store.saveEdukasi(item);
-                          Navigator.pop(ctx);
-                          _showSnack(
-                            existing == null
-                                ? 'Artikel edukasi berhasil ditambahkan!'
-                                : 'Artikel edukasi berhasil diperbarui!',
-                          );
-                        },
-                        child: Text(
-                          existing == null ? 'Simpan Artikel' : 'Simpan Perubahan',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                if (!formKey.currentState!.validate()) return;
+                                setModalState(() => isSaving = true);
+                                final finalGambar =
+                                    selectedGambar.trim().isNotEmpty
+                                        ? selectedGambar.trim()
+                                        : 'assets/images/kidneys.jpg';
+                                final item = AdminEdukasi(
+                                  id: existing?.id ?? store.newId(),
+                                  judul: judulCtrl.text.trim(),
+                                  kategori: kategori,
+                                  ringkasan: ringkasanCtrl.text.trim(),
+                                  konten: kontenCtrl.text.trim(),
+                                  gambar: finalGambar,
+                                  penulis: penulisCtrl.text.trim().isEmpty
+                                      ? 'Tim Medis GIAT'
+                                      : penulisCtrl.text.trim(),
+                                  durasiBaca: existing?.durasiBaca ?? 4,
+                                  status: EdukasiStatus.published,
+                                  createdAt:
+                                      existing?.createdAt ?? DateTime.now(),
+                                  updatedAt: DateTime.now(),
+                                );
+                                await store.saveEdukasi(item);
+                                if (ctx.mounted) {
+                                  Navigator.pop(ctx);
+                                }
+                                _showSnack(
+                                  existing == null
+                                      ? 'Artikel edukasi berhasil ditambahkan!'
+                                      : 'Artikel edukasi berhasil diperbarui!',
+                                );
+                              },
+                        child: isSaving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                existing == null
+                                    ? 'Simpan Artikel'
+                                    : 'Simpan Perubahan',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -356,14 +923,6 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
                         fontWeight: FontWeight.w700,
                         color: _darkGreen,
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '• ${item.durasiBaca} menit baca',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -770,6 +1329,21 @@ class _AdminEdukasiScreenState extends State<AdminEdukasiScreen> {
     double? height,
     required Widget fallback,
   }) {
+    if (path.startsWith('data:image/')) {
+      try {
+        final commaIdx = path.indexOf(',');
+        final b64 = commaIdx >= 0 ? path.substring(commaIdx + 1) : path;
+        return Image.memory(
+          base64Decode(b64),
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      } catch (_) {
+        return fallback;
+      }
+    }
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return Image.network(
         path,

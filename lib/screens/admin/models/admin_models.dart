@@ -1093,30 +1093,10 @@ class AdminStore extends ChangeNotifier {
   }
 
   // ── Update sistem ──
-  /// Mengirim & mempublikasikan notifikasi update sistem baru ke tabel `system_updates` di Supabase
+  /// Mengirim & mempublikasikan notifikasi update sistem baru via API Backend (otomatis disebar ke seluruh akun)
   Future<void> addUpdate(AdminSystemUpdate u) async {
     updates.insert(0, u);
     notifyListeners();
-
-    try {
-      final createdMap = await _supabase.createSystemUpdate(
-        tipe: u.tipe.name,
-        targetRole: u.targetRole,
-        judul: u.judul,
-        deskripsi: u.deskripsi,
-      );
-      if (createdMap != null) {
-        final created = AdminSystemUpdate.fromJson(createdMap);
-        final idx = updates.indexWhere((x) => x.id == u.id);
-        if (idx >= 0) {
-          updates[idx] = created;
-          notifyListeners();
-        }
-      }
-      return;
-    } catch (pgErr) {
-      debugPrint('AdminStore.addUpdate Supabase fallback to HTTP: $pgErr');
-    }
 
     try {
       final response = await _api.dio.post(
@@ -1140,6 +1120,26 @@ class AdminStore extends ChangeNotifier {
         }
       }
       await fetchDashboard();
+      return;
+    } catch (apiErr) {
+      debugPrint('AdminStore.addUpdate API fallback to Supabase: $apiErr');
+    }
+
+    try {
+      final createdMap = await _supabase.createSystemUpdate(
+        tipe: u.tipe.name,
+        targetRole: u.targetRole,
+        judul: u.judul,
+        deskripsi: u.deskripsi,
+      );
+      if (createdMap != null) {
+        final created = AdminSystemUpdate.fromJson(createdMap);
+        final idx = updates.indexWhere((x) => x.id == u.id);
+        if (idx >= 0) {
+          updates[idx] = created;
+          notifyListeners();
+        }
+      }
     } catch (e) {
       debugPrint('AdminStore.addUpdate error: $e');
     }

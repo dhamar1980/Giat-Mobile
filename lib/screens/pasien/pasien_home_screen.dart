@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,7 +13,6 @@ import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/pasien_api_service.dart';
-import '../../services/supabase_admin_service.dart';
 import '../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,26 +72,29 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
     try {
       final res = await PasienApiService().getHome();
       if (res.success && res.data != null && mounted) {
+        final edukasiList = res.data!['edukasi_kesehatan'];
+        final List<Map<String, dynamic>> articles = [];
+        if (edukasiList is List) {
+          for (var item in edukasiList) {
+            if (item is Map) {
+              articles.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
         setState(() {
           _homeData = res.data;
+          if (articles.isNotEmpty) {
+            _edukasiArticles = articles;
+          }
         });
       }
     } catch (_) {}
 
     try {
       final countRes = await PasienApiService().getNotifikasiUnreadCount();
-      if (countRes.success && mounted) {
+      if (countRes.success && countRes.data != null && mounted) {
         setState(() {
-          _unreadCount = countRes.data ?? 0;
-        });
-      }
-    } catch (_) {}
-
-    try {
-      final pgEdukasi = await SupabaseAdminService.instance.fetchEdukasi();
-      if (pgEdukasi.isNotEmpty && mounted) {
-        setState(() {
-          _edukasiArticles = pgEdukasi;
+          _unreadCount = countRes.data!;
         });
       }
     } catch (_) {}
@@ -677,7 +680,9 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                     MaterialPageRoute(
                       builder: (_) => const EdukasiListScreen(),
                     ),
-                  );
+                  ).then((_) {
+                    if (mounted) _fetchLiveHome();
+                  });
                 },
                 child: Row(
                   children: [
@@ -800,27 +805,55 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                   decoration: const BoxDecoration(
                     color: Color(0xFFE2E8F0),
                   ),
-                  child: imagePath.startsWith('http')
-                      ? Image.network(
-                          imagePath,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: const Color(0xFFD1FAE5),
-                            child: const Center(
-                              child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
-                            ),
-                          ),
+                  child: imagePath.startsWith('data:image/')
+                      ? Builder(
+                          builder: (_) {
+                            try {
+                              final commaIdx = imagePath.indexOf(',');
+                              final b64 = commaIdx >= 0
+                                  ? imagePath.substring(commaIdx + 1)
+                                  : imagePath;
+                              return Image.memory(
+                                base64Decode(b64),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: const Color(0xFFD1FAE5),
+                                  child: const Center(
+                                    child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                                  ),
+                                ),
+                              );
+                            } catch (_) {
+                              return Container(
+                                color: const Color(0xFFD1FAE5),
+                                child: const Center(
+                                  child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                                ),
+                              );
+                            }
+                          },
                         )
-                      : Image.asset(
-                          imagePath,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: const Color(0xFFD1FAE5),
-                            child: const Center(
-                              child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                      : imagePath.startsWith('http')
+                          ? Image.network(
+                              imagePath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: const Color(0xFFD1FAE5),
+                                child: const Center(
+                                  child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                                ),
+                              ),
+                            )
+                          : Image.asset(
+                              imagePath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: const Color(0xFFD1FAE5),
+                                child: const Center(
+                                  child: Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
                 ),
                 Positioned(
                   bottom: 8,

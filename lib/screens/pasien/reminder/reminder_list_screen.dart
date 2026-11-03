@@ -48,8 +48,8 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
     ];
   }
 
-  List<Map<String, dynamic>> _reminders = [];
-  bool _isLoading = true;
+  List<Map<String, dynamic>> _reminders = List.from(_defaultReminders);
+  bool _isLoading = false;
   bool _isNavigating = false;
 
   @override

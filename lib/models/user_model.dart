@@ -49,20 +49,20 @@ class UserModel {
         json['id'] ??
         0;
 
-    String resolvedRole = (json['role'] as String?)?.toLowerCase() ?? '';
+    String resolvedRole = (json['role'] as String?)?.toLowerCase().trim() ?? '';
     if (resolvedRole.isEmpty && json['user'] is Map) {
-      resolvedRole = ((json['user'] as Map)['role'] as String?)?.toLowerCase() ?? '';
+      resolvedRole = ((json['user'] as Map)['role'] as String?)?.toLowerCase().trim() ?? '';
     }
-    if (resolvedRole.isEmpty || resolvedRole == 'pasien') {
-      if (json['id_admin'] != null || json.containsKey('jabatan')) {
+    if (resolvedRole.isEmpty) {
+      if (json['id_admin'] != null || (json['jabatan'] != null && json['jabatan'].toString().trim().isNotEmpty)) {
         resolvedRole = 'admin';
-      } else if (json['id_apotek'] != null || json.containsKey('lokasi_apotek') || json.containsKey('jam_operasional')) {
+      } else if (json['id_apotek'] != null || (json['lokasi_apotek'] != null && json['lokasi_apotek'].toString().trim().isNotEmpty)) {
         resolvedRole = 'apotek';
-      } else if (json['id_dokter'] != null || json.containsKey('no_str') || json.containsKey('spesialisasi')) {
+      } else if (json['id_dokter'] != null || (json['no_str'] != null && json['no_str'].toString().trim().isNotEmpty) || (json['spesialisasi'] != null && json['spesialisasi'].toString().trim().isNotEmpty)) {
         resolvedRole = 'dokter';
       } else if (json['id_pasien'] != null) {
         resolvedRole = 'pasien';
-      } else if (resolvedRole.isEmpty) {
+      } else {
         resolvedRole = defaultRole.toLowerCase();
       }
     }

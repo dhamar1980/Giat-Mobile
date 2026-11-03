@@ -712,6 +712,9 @@ class SupabaseAdminService {
     final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
     final newId = uuidRes.first.toColumnMap()['id'].toString().trim();
     final targetLabel = _targetLabel(targetRole);
+    final normalizedTarget = targetRole.trim().toLowerCase();
+    final tipeLabel = _tipeLabel(tipe);
+    final notifTitle = '[$tipeLabel] $judul';
 
     await _exec(
       '''
@@ -727,10 +730,44 @@ class SupabaseAdminService {
         'judul': judul,
         'deskripsi': deskripsi,
         'tipe': tipe,
-        'targetRole': targetRole,
+        'targetRole': normalizedTarget,
         'targetLabel': targetLabel,
       },
     );
+
+    // Distribusikan juga ke tabel notifikasi pengguna agar terbaca oleh Pasien/Dokter/Apotek
+    try {
+      if (normalizedTarget == 'semua') {
+        await _exec(
+          '''
+          INSERT INTO notifikasi (id, id_user, judul, pesan, kategori, is_read, created_at)
+          SELECT gen_random_uuid()::text, TRIM(u.id), @judul, @pesan, 'sistem', false, NOW()
+          FROM "user" u
+          WHERE LOWER(TRIM(u.role)) IN ('pasien', 'dokter', 'apotek')
+          ''',
+          parameters: {
+            'judul': notifTitle,
+            'pesan': deskripsi,
+          },
+        );
+      } else {
+        await _exec(
+          '''
+          INSERT INTO notifikasi (id, id_user, judul, pesan, kategori, is_read, created_at)
+          SELECT gen_random_uuid()::text, TRIM(u.id), @judul, @pesan, 'sistem', false, NOW()
+          FROM "user" u
+          WHERE LOWER(TRIM(u.role)) = @role
+          ''',
+          parameters: {
+            'judul': notifTitle,
+            'pesan': deskripsi,
+            'role': normalizedTarget,
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('createSystemUpdate fan-out warning: $e');
+    }
 
     return {
       'id': newId,
@@ -854,6 +891,18 @@ class SupabaseAdminService {
         return 'Apotek';
       default:
         return 'Semua Pengguna';
+    }
+  }
+
+  String _tipeLabel(String tipe) {
+    switch (tipe.toLowerCase()) {
+      case 'perbaikan':
+        return 'Perbaikan';
+      case 'pemeliharaan':
+        return 'Pemeliharaan';
+      case 'fitur':
+      default:
+        return 'Fitur Baru';
     }
   }
 }

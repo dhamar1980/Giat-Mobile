@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -11,6 +12,40 @@ class EdukasiDetailScreen extends StatelessWidget {
   const EdukasiDetailScreen({super.key, required this.article});
 
   static const _darkGreen = Color(0xFF065A37);
+
+  Widget _buildBannerImage(String img) {
+    final fallback = Container(
+      color: const Color(0xFFDCFCE7),
+      child: const Center(
+        child: Icon(Icons.health_and_safety_rounded, size: 64, color: _darkGreen),
+      ),
+    );
+    if (img.startsWith('data:image/')) {
+      try {
+        final commaIdx = img.indexOf(',');
+        final b64 = commaIdx >= 0 ? img.substring(commaIdx + 1) : img;
+        return Image.memory(
+          base64Decode(b64),
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      } catch (_) {
+        return fallback;
+      }
+    }
+    if (img.startsWith('http')) {
+      return Image.network(
+        img,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    return Image.asset(
+      img,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,27 +86,9 @@ class EdukasiDetailScreen extends StatelessWidget {
               height: 220,
               width: double.infinity,
               color: const Color(0xFFE2E8F0),
-              child: article['image'] != null && article['image'].toString().startsWith('http')
-                  ? Image.network(
-                      article['image'].toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: const Color(0xFFDCFCE7),
-                        child: const Center(
-                          child: Icon(Icons.health_and_safety_rounded, size: 64, color: _darkGreen),
-                        ),
-                      ),
-                    )
-                  : Image.asset(
-                      article['image']?.toString() ?? 'assets/images/kidneys.jpg',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: const Color(0xFFDCFCE7),
-                        child: const Center(
-                          child: Icon(Icons.health_and_safety_rounded, size: 64, color: _darkGreen),
-                        ),
-                      ),
-                    ),
+              child: _buildBannerImage(
+                article['image']?.toString() ?? 'assets/images/kidneys.jpg',
+              ),
             ),
 
             Padding(

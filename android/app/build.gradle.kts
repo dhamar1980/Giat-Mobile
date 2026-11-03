@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.giat"
-    compileSdk = flutter.compileSdkVersion.coerceAtLeast(35)
+    compileSdk = flutter.compileSdkVersion.coerceAtLeast(36)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

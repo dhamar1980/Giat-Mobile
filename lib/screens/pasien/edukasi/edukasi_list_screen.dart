@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'edukasi_detail_screen.dart';
@@ -79,6 +80,38 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Widget _buildCardImage(String img) {
+    final fallback = Container(
+      color: const Color(0xFFDCFCE7),
+      child: const Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
+    );
+    if (img.startsWith('data:image/')) {
+      try {
+        final commaIdx = img.indexOf(',');
+        final b64 = commaIdx >= 0 ? img.substring(commaIdx + 1) : img;
+        return Image.memory(
+          base64Decode(b64),
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      } catch (_) {
+        return fallback;
+      }
+    }
+    if (img.startsWith('http')) {
+      return Image.network(
+        img,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    return Image.asset(
+      img,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
   }
 
   @override
@@ -235,23 +268,7 @@ class _EdukasiListScreenState extends State<EdukasiListScreen> {
                                 height: 140,
                                 width: double.infinity,
                                 color: const Color(0xFFE2E8F0),
-                                child: art['image'].toString().startsWith('http')
-                                    ? Image.network(
-                                        art['image'].toString(),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Container(
-                                          color: const Color(0xFFDCFCE7),
-                                          child: const Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
-                                        ),
-                                      )
-                                    : Image.asset(
-                                        art['image'],
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Container(
-                                          color: const Color(0xFFDCFCE7),
-                                          child: const Icon(Icons.health_and_safety_rounded, size: 48, color: _darkGreen),
-                                        ),
-                                      ),
+                                child: _buildCardImage(art['image']?.toString() ?? 'assets/images/kidneys.jpg'),
                               ),
                               Positioned(
                                 top: 12,

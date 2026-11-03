@@ -207,8 +207,11 @@ class _DokterListScreenState extends State<DokterListScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchLiveDoctors();
     _fetchKonsultasiSaya();
+    // Muat daftar dokter setelah jeda singkat agar request tidak bertumpuk di server
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _fetchLiveDoctors();
+    });
   }
 
   Future<void> _fetchKonsultasiSaya() async {
@@ -244,23 +247,6 @@ class _DokterListScreenState extends State<DokterListScreen> {
   }
 
   Future<void> _fetchLiveDoctors({String? search, String? spesialisasi}) async {
-    try {
-      final catRes = await KonsultasiApiService().getKategoriDokter();
-      if (catRes.success && catRes.data != null && catRes.data!.isNotEmpty && mounted) {
-        final List<String> cats = ['Konsultasi Saya', 'Semua Dokter'];
-        for (var c in catRes.data!) {
-          final name = c is Map ? (c['nama'] ?? c['name'] ?? c['kategori']) : c.toString();
-          if (name != null && !cats.contains(name.toString())) {
-            cats.add(name.toString());
-          }
-        }
-        setState(() {
-          _categories.clear();
-          _categories.addAll(cats);
-        });
-      }
-    } catch (_) {}
-
     try {
       final res = await KonsultasiApiService().getDokterList(
         search: search,
