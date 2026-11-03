@@ -6,6 +6,7 @@ import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../profile/dokter_profile_screen.dart';
 import 'dokter_room_chat_screen.dart';
 import '../../../utils/time_utils.dart';
+import '../../../services/konsultasi_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DAFTAR KONSULTASI DOKTER (Sesuai Desain Figma / Image 1, 2, 3)
@@ -36,8 +37,145 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   bool _isTopBarVisible = true;
+  List<DokterConsultation> _liveConsultations = [];
+  final Map<String, DokterPatient> _livePatientMap = {};
 
   bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiveConsultations();
+  }
+
+  Future<void> _fetchLiveConsultations() async {
+    try {
+      final res = await KonsultasiApiService().getRiwayatDokter();
+      if (res.success && res.data != null && res.data!.isNotEmpty) {
+        final List<DokterConsultation> parsedList = [];
+        for (var item in res.data!) {
+          if (item is! Map) continue;
+          final map = Map<String, dynamic>.from(item);
+
+          final id = (map['id'] ?? map['id_konsultasi'] ?? '').toString();
+          final pasienData = map['pasien'] is Map ? Map<String, dynamic>.from(map['pasien'] as Map) : null;
+          final patientId = (map['id_pasien'] ?? pasienData?['id_pasien'] ?? pasienData?['id'] ?? id).toString();
+          final patientName = (pasienData?['nama'] ?? map['nama_pasien'] ?? 'Pasien').toString();
+
+          // Initials
+          String initials = 'P';
+          final parts = patientName.trim().split(RegExp(r'\s+'));
+          if (parts.isNotEmpty && parts[0].isNotEmpty) {
+            if (parts.length == 1) {
+              initials = parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+            } else {
+              initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+            }
+          }
+
+          // Status
+          final statusStr = (map['status'] ?? map['status_konsultasi'] ?? '').toString().toLowerCase();
+          KonsultasiStatus status;
+          if (statusStr == 'selesai' || statusStr == 'completed') {
+            status = KonsultasiStatus.selesai;
+          } else if (statusStr == 'terjadwal' || statusStr == 'scheduled' || statusStr == 'menunggu' || statusStr == 'pending') {
+            status = KonsultasiStatus.terjadwal;
+          } else {
+            status = KonsultasiStatus.berlangsung;
+          }
+
+          // Scheduled time text
+          String timeText = 'Hari ini';
+          final tgl = map['tanggal_konsultasi'];
+          final jmMulai = map['jam_mulai']?.toString();
+          if (jmMulai != null && jmMulai.isNotEmpty) {
+            final timeOnly = jmMulai.length >= 5 ? jmMulai.substring(0, 5) : jmMulai;
+            timeText = '$timeOnly WIB';
+          } else if (tgl != null) {
+            timeText = TimeUtils.formatDate(tgl, useIndonesianMonth: true);
+          }
+
+          // Message count & last message
+          final msgCount = int.tryParse((map['pesan_count'] ?? map['unread_count'] ?? 0).toString()) ?? 0;
+          final lastMsg = (map['last_message'] ?? map['keluhan_awal'] ?? map['isi_konsultasi'] ?? 'Konsultasi GIAT').toString();
+          final lastTime = TimeUtils.formatChatTime(map['updated_at'] ?? map['created_at']);
+
+          // Calculate Age
+          int age = 26;
+          if (pasienData?['tanggal_lahir'] != null) {
+            final dt = DateTime.tryParse(pasienData!['tanggal_lahir'].toString());
+            if (dt != null) {
+              final now = DateTime.now();
+              age = now.year - dt.year;
+              if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
+                age--;
+              }
+            }
+          }
+
+          final rawGender = (pasienData?['jenis_kelamin'] ?? '').toString();
+          final gender = (rawGender == 'L' || rawGender.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
+
+          final avatarUrl = (pasienData?['foto_profile'] ?? pasienData?['foto_profil'])?.toString();
+
+          final patientObj = DokterPatient(
+            id: patientId,
+            name: patientName,
+            initials: initials,
+            age: age,
+            gender: gender,
+            address: (pasienData?['alamat'] ?? 'Kota Bandung').toString(),
+            weightKg: 55.0,
+            heightM: 1.65,
+            condition: 'Pasien Ginjal',
+            complaint: (map['keluhan_awal'] ?? map['isi_konsultasi'] ?? 'Konsultasi Ginjal').toString(),
+            complaintDetail: (map['keluhan_awal'] ?? map['isi_konsultasi'] ?? '').toString(),
+            currentMedicines: const [],
+            avatarUrl: avatarUrl,
+            avatarBgColor: const Color(0xFFCFE8F3),
+            avatarTextColor: const Color(0xFF0F172A),
+          );
+          _livePatientMap[patientId] = patientObj;
+
+          parsedList.add(
+            DokterConsultation(
+              id: id,
+              patientName: patientName,
+              initials: initials,
+              status: status,
+              scheduledTimeText: timeText,
+              messageCount: msgCount,
+              lastMessage: lastMsg,
+              lastTime: lastTime,
+              patientId: patientId,
+              avatarUrl: avatarUrl,
+              patient: patientObj,
+            ),
+          );
+        }
+
+        if (mounted) {
+          setState(() {
+            _liveConsultations = parsedList;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error fetching live consultations: $e');
+    }
+  }
+
+  List<DokterConsultation> get _allConsultations {
+    if (_liveConsultations.isNotEmpty) {
+      final existingIds = _liveConsultations.map((c) => c.id).toSet();
+      final existingNames = _liveConsultations.map((c) => c.patientName.toLowerCase()).toSet();
+      final extraMocks = DokterMockData.consultations.where((m) =>
+          !existingIds.contains(m.id) && !existingNames.contains(m.patientName.toLowerCase())
+      ).toList();
+      return [..._liveConsultations, ...extraMocks];
+    }
+    return DokterMockData.consultations;
+  }
 
   @override
   void dispose() {
@@ -46,23 +184,22 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
   }
 
   List<DokterConsultation> _getFilteredConsultations() {
+    final all = _allConsultations;
     List<DokterConsultation> list;
 
     if (_selectedFilterIndex == 1) {
-      // Terjadwal tab (Matches Image 2: Lestari Putri, Lesti Purnama)
-      list = DokterMockData.consultations
-          .where((item) => item.status == KonsultasiStatus.terjadwal)
-          .toList();
+      // Terjadwal tab
+      list = all.where((item) => item.status == KonsultasiStatus.terjadwal).toList();
     } else if (_selectedFilterIndex == 2) {
-      // Selesai tab (Matches Image 3: Hendra Kurniawan)
-      list = DokterMockData.consultations
-          .where((item) => item.status == KonsultasiStatus.selesai)
-          .toList();
+      // Selesai tab
+      list = all.where((item) => item.status == KonsultasiStatus.selesai).toList();
     } else {
-      // Semua tab (Matches Image 1: Budi Santoso, Lestari Putri, Hendra Kurniawan)
-      list = DokterMockData.consultations.where((item) {
-        return item.id != 'c-3'; // c-3 is Lesti Purnama shown in Terjadwal
-      }).toList();
+      // Semua tab: Matches all items except purely mock c-3 if mock-only
+      if (_liveConsultations.isEmpty) {
+        list = all.where((item) => item.id != 'c-3').toList();
+      } else {
+        list = all;
+      }
     }
 
     if (_searchQuery.trim().isEmpty) return list;
@@ -73,6 +210,9 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
   }
 
   DokterPatient _findPatient(String patientId) {
+    if (_livePatientMap.containsKey(patientId)) {
+      return _livePatientMap[patientId]!;
+    }
     return DokterMockData.patients.firstWhere(
       (p) => p.id == patientId,
       orElse: () => DokterMockData.patients.first,
@@ -80,7 +220,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
   }
 
   void _openChat(DokterConsultation item) {
-    final patient = _findPatient(item.patientId);
+    final patient = item.patient ?? _findPatient(item.patientId);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => DokterRoomChatScreen(
@@ -88,7 +228,9 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
           consultationId: item.id,
         ),
       ),
-    );
+    ).then((_) {
+      if (mounted) _fetchLiveConsultations();
+    });
   }
 
   @override
@@ -207,32 +349,44 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
 
                 // ── Consultation Cards List ──
                 Expanded(
-                  child: filtered.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                  child: RefreshIndicator(
+                    onRefresh: _fetchLiveConsultations,
+                    color: _darkGreen,
+                    child: filtered.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
                             children: [
-                              const Icon(Icons.people_outline_rounded, size: 48, color: Color(0xFF94A3B8)),
-                              const SizedBox(height: 10),
-                              Text(
-                                'Tidak ada konsultasi ditemukan.',
-                                style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+                              SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+                              Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.people_outline_rounded, size: 48, color: Color(0xFF94A3B8)),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Tidak ada konsultasi ditemukan.',
+                                      style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                            itemCount: filtered.length,
+                            separatorBuilder: (context, _) => const SizedBox(height: 14),
+                            itemBuilder: (context, index) {
+                              final item = filtered[index];
+                              return _buildConsultationCard(item);
+                            },
                           ),
-                        )
-                      : ListView.separated(
-                          physics: const AlwaysScrollableScrollPhysics(
-                            parent: BouncingScrollPhysics(),
-                          ),
-                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                          itemCount: filtered.length,
-                          separatorBuilder: (context, _) => const SizedBox(height: 14),
-                          itemBuilder: (context, index) {
-                            final item = filtered[index];
-                            return _buildConsultationCard(item);
-                          },
-                        ),
+                  ),
                 ),
               ],
             ),
@@ -306,7 +460,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar box with initials and soft light blue background
+              // Avatar box with initials and soft light blue background (or network photo)
               Container(
                 width: 48,
                 height: 48,
@@ -314,15 +468,33 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
                   color: const Color(0xFFCFE8F3),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Center(
-                  child: Text(
-                    item.initials,
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
-                      fontSize: 16,
-                    ),
-                  ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: item.avatarUrl != null && item.avatarUrl!.isNotEmpty
+                      ? Image.network(
+                          item.avatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Text(
+                              item.initials,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF0F172A),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            item.initials,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 12),

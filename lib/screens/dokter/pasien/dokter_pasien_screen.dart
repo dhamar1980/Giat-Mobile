@@ -33,6 +33,7 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   bool _isTopBarVisible = true;
+  List<DokterPatient> _livePatients = [];
 
   bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
 
@@ -44,7 +45,69 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
 
   Future<void> _fetchLivePatients() async {
     try {
-      await DokterApiService().getPasienList();
+      final res = await DokterApiService().getPasienList();
+      if (res.success && res.data != null && res.data!.isNotEmpty) {
+        final List<DokterPatient> parsed = [];
+        for (var item in res.data!) {
+          if (item is! Map) continue;
+          final map = Map<String, dynamic>.from(item);
+          final id = (map['id_pasien'] ?? map['id'] ?? '').toString();
+          final name = (map['nama'] ?? map['name'] ?? 'Pasien').toString();
+
+          String initials = 'P';
+          final parts = name.trim().split(RegExp(r'\s+'));
+          if (parts.isNotEmpty && parts[0].isNotEmpty) {
+            if (parts.length == 1) {
+              initials = parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+            } else {
+              initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+            }
+          }
+
+          int age = 26;
+          if (map['tanggal_lahir'] != null) {
+            final dt = DateTime.tryParse(map['tanggal_lahir'].toString());
+            if (dt != null) {
+              final now = DateTime.now();
+              age = now.year - dt.year;
+              if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
+                age--;
+              }
+            }
+          }
+
+          final rawGender = (map['jenis_kelamin'] ?? '').toString();
+          final gender = (rawGender == 'L' || rawGender.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
+
+          final avatarUrl = (map['foto_profile'] ?? map['foto_profil'])?.toString();
+
+          parsed.add(
+            DokterPatient(
+              id: id,
+              name: name,
+              initials: initials,
+              age: age,
+              gender: gender,
+              address: (map['alamat'] ?? 'Kota Bandung').toString(),
+              weightKg: 55.0,
+              heightM: 1.65,
+              condition: 'Pasien Ginjal',
+              complaint: (map['keluhan_awal'] ?? 'Pemeriksaan rutin ginjal').toString(),
+              complaintDetail: (map['keluhan_awal'] ?? '').toString(),
+              currentMedicines: const [],
+              avatarUrl: avatarUrl,
+              avatarBgColor: const Color(0xFFCFE8F3),
+              avatarTextColor: const Color(0xFF0F172A),
+            ),
+          );
+        }
+
+        if (mounted) {
+          setState(() {
+            _livePatients = parsed;
+          });
+        }
+      }
     } catch (_) {}
   }
 
@@ -55,9 +118,20 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
   }
 
   List<DokterPatient> _getFilteredPatients() {
-    final list = DokterMockData.patients;
-    if (_searchQuery.trim().isEmpty) return list;
-    return list.where((p) {
+    final List<DokterPatient> all;
+    if (_livePatients.isNotEmpty) {
+      final existingIds = _livePatients.map((p) => p.id).toSet();
+      final existingNames = _livePatients.map((p) => p.name.toLowerCase()).toSet();
+      final extraMocks = DokterMockData.patients.where((m) =>
+          !existingIds.contains(m.id) && !existingNames.contains(m.name.toLowerCase())
+      ).toList();
+      all = [..._livePatients, ...extraMocks];
+    } else {
+      all = DokterMockData.patients;
+    }
+
+    if (_searchQuery.trim().isEmpty) return all;
+    return all.where((p) {
       return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           p.gender.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
@@ -294,15 +368,33 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
                 color: avatarBg,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Center(
-                child: Text(
-                  p.initials,
-                  style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: avatarTextColor,
-                  ),
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: p.avatarUrl != null && p.avatarUrl!.isNotEmpty
+                    ? Image.network(
+                        p.avatarUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            p.initials,
+                            style: GoogleFonts.inter(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: avatarTextColor,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          p.initials,
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: avatarTextColor,
+                          ),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 14),

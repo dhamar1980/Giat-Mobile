@@ -610,15 +610,33 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                     color: const Color(0xFFDCFCE7),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Center(
-                    child: Text(
-                      p.initials,
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w800,
-                        color: _darkGreen,
-                        fontSize: 15,
-                      ),
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: p.avatarUrl != null && p.avatarUrl!.isNotEmpty
+                        ? Image.network(
+                            p.avatarUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                p.initials,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w800,
+                                  color: _darkGreen,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              p.initials,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w800,
+                                color: _darkGreen,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 10),

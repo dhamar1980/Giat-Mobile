@@ -22,6 +22,7 @@ class DokterPatient {
   final List<DokterPrescriptionItem> currentMedicines;
   final Color? avatarBgColor;
   final Color? avatarTextColor;
+  final String? avatarUrl;
 
   const DokterPatient({
     required this.id,
@@ -38,6 +39,7 @@ class DokterPatient {
     required this.currentMedicines,
     this.avatarBgColor,
     this.avatarTextColor,
+    this.avatarUrl,
   });
 }
 
@@ -101,6 +103,8 @@ class DokterConsultation {
   final String lastMessage;
   final String lastTime;
   final String patientId;
+  final String? avatarUrl;
+  final DokterPatient? patient;
 
   const DokterConsultation({
     required this.id,
@@ -112,6 +116,8 @@ class DokterConsultation {
     required this.lastMessage,
     required this.lastTime,
     required this.patientId,
+    this.avatarUrl,
+    this.patient,
   });
 }
 
