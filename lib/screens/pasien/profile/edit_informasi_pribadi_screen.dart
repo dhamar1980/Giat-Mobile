@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EDIT INFORMASI PRIBADI & KESEHATAN SCREEN
@@ -54,16 +55,24 @@ class _EditInformasiPribadiScreenState
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.currentName);
-    _birthDateCtrl = TextEditingController(text: widget.currentBirthDate);
+    final initialBirthStr = TimeUtils.formatBirthDate(widget.currentBirthDate);
+    _birthDateCtrl = TextEditingController(
+      text: initialBirthStr != '-' ? initialBirthStr : widget.currentBirthDate,
+    );
     _addressCtrl = TextEditingController(text: widget.currentAddress.replaceAll('\n', ', '));
 
-    _selectedGender = _genderOptions.contains(widget.currentGender)
-        ? widget.currentGender
+    final normalizedGender = (widget.currentGender == 'P')
+        ? 'Perempuan'
+        : ((widget.currentGender == 'L') ? 'Laki-laki' : widget.currentGender);
+    _selectedGender = _genderOptions.contains(normalizedGender)
+        ? normalizedGender
         : _genderOptions.first;
 
-    _selectedBloodType = _bloodTypeOptions.contains(widget.currentBloodType)
-        ? widget.currentBloodType
-        : _bloodTypeOptions.first;
+    final matchingBlood = _bloodTypeOptions.firstWhere(
+      (opt) => opt == widget.currentBloodType || opt.startsWith('${widget.currentBloodType} ') || opt.startsWith(widget.currentBloodType),
+      orElse: () => _bloodTypeOptions.first,
+    );
+    _selectedBloodType = matchingBlood;
   }
 
   @override
@@ -76,7 +85,13 @@ class _EditInformasiPribadiScreenState
 
   Future<void> _pickBirthDate() async {
     final now = DateTime.now();
-    final initialDate = DateTime(1985, 5, 12);
+    final parsed = TimeUtils.parseBirthDate(
+      _birthDateCtrl.text.isNotEmpty ? _birthDateCtrl.text : widget.currentBirthDate,
+    );
+    final initialDate = (parsed != null && parsed.isBefore(now))
+        ? parsed
+        : DateTime(1998, 4, 12);
+
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -97,11 +112,7 @@ class _EditInformasiPribadiScreenState
     );
 
     if (picked != null) {
-      const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-        'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'
-      ];
-      final formatted = '${picked.day} ${months[picked.month - 1]} ${picked.year}';
+      final formatted = TimeUtils.formatBirthDate(picked);
       setState(() {
         _birthDateCtrl.text = formatted;
       });

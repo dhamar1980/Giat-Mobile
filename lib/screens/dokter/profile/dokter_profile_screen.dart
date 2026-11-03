@@ -1,7 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../models/user_model.dart';
 import '../../../onboarding_screen.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/dokter_api_service.dart';
+import '../../../services/storage_service.dart';
 import '../models/dokter_models.dart';
 import 'dokter_informasi_profile_screen.dart';
 import 'dokter_pengaturan_notifikasi_screen.dart';
@@ -381,6 +386,76 @@ class _DokterProfileScreenState extends State<DokterProfileScreen> {
 );
 }
 
+  Future<void> _pickImage(BuildContext context, ImageSource source, DokterProfileState profileState) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+      final file = File(picked.path);
+      profileState.updateAvatar(type: 'file', path: file.path);
+
+      // Update local user cache
+      final user = await StorageService().getUser();
+      if (user != null) {
+        final updated = UserModel(
+          id: user.id,
+          nama: user.nama,
+          email: user.email,
+          noHp: user.noHp,
+          alamat: user.alamat,
+          jenisKelamin: user.jenisKelamin,
+          nik: user.nik,
+          fotoProfile: file.path,
+          firebaseUid: user.firebaseUid,
+          authProvider: user.authProvider,
+          role: user.role,
+          spesialisasi: user.spesialisasi,
+          instansi: user.instansi,
+          noStr: user.noStr,
+          noSip: user.noSip,
+          tanggalLahir: user.tanggalLahir,
+          golonganDarah: user.golonganDarah,
+        );
+        await StorageService().saveUser(updated);
+      }
+
+      final res = await DokterApiService().updateFotoProfil(file);
+      final newUrl = res.data?['foto_profile'] ?? res.data?['foto'] ?? res.data?['url'];
+      if (newUrl != null && newUrl.toString().startsWith('http')) {
+        profileState.updateAvatar(type: 'network', path: newUrl.toString());
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Foto profil dokter berhasil diperbarui!',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: _darkGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memilih atau mengunggah foto: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   void _showChangeProfilePhotoModal(BuildContext context, DokterProfileState profileState) {
     showModalBottomSheet(
       context: context,
@@ -419,7 +494,7 @@ class _DokterProfileScreenState extends State<DokterProfileScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Pilih foto profil yang jelas dan profesional',
+              'Pilih foto profil yang jelas dan profesional dari kamera atau galeri HP Anda.',
               style: GoogleFonts.inter(
                 fontSize: 13,
                 color: const Color(0xFF64748B),
@@ -450,21 +525,7 @@ class _DokterProfileScreenState extends State<DokterProfileScreen> {
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
               onTap: () {
                 Navigator.pop(ctx);
-                profileState.updateAvatar(
-                  type: 'asset',
-                  path: 'assets/images/dokter_apoteker.jpg',
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil dokter berhasil diperbarui dari kamera!',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: _darkGreen,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                _pickImage(context, ImageSource.camera, profileState);
               },
             ),
 
@@ -493,21 +554,7 @@ class _DokterProfileScreenState extends State<DokterProfileScreen> {
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
               onTap: () {
                 Navigator.pop(ctx);
-                profileState.updateAvatar(
-                  type: 'network',
-                  path: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil dokter berhasil dipilih dari galeri!',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: _darkGreen,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                _pickImage(context, ImageSource.gallery, profileState);
               },
             ),
 
@@ -629,8 +676,6 @@ class _DokterProfileScreenState extends State<DokterProfileScreen> {
   }
 
   Widget _buildHeader(BuildContext context, String name, String specialty, DokterProfileState profileState) {
-    final topPadding = MediaQuery.of(context).padding.top;
-
     return ClipPath(
       clipper: _ProfileHeaderOrganicClipper(),
       child: Container(
@@ -662,44 +707,7 @@ class _DokterProfileScreenState extends State<DokterProfileScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Top Navigation Row: "✏️ Edit" pill button
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        GestureDetector(
-                          onTap: () => _showChangeProfilePhotoModal(context, profileState),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFBBF24), // Vibrant golden amber
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.edit, size: 13, color: Color(0xFF0F172A)),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Edit',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    const SizedBox(height: 8),
 
                     const SizedBox(height: 12),
 

@@ -1,7 +1,10 @@
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../models/user_model.dart';
 import '../../../onboarding_screen.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/storage_service.dart';
@@ -39,7 +42,8 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   static const _border = Color(0xFFE2E8F0);
 
   late String _nama;
-  String _avatarType = 'asset'; // 'asset', 'network', 'default'
+  File? _avatarFile;
+  String _avatarType = 'asset'; // 'asset', 'network', 'file', 'default'
   String _avatarPath = 'assets/images/dokter_apoteker.jpg';
 
   @override
@@ -112,14 +116,20 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   ];
 
   Widget _buildAvatarImage() {
-    if (_avatarType == 'default') {
+    if (_avatarFile != null && _avatarFile!.existsSync()) {
+      return Image.file(_avatarFile!, width: 104, height: 104, fit: BoxFit.cover);
+    }
+    if (_avatarPath.isNotEmpty && File(_avatarPath).existsSync()) {
+      return Image.file(File(_avatarPath), width: 104, height: 104, fit: BoxFit.cover);
+    }
+    if (_avatarType == 'default' || _avatarPath.isEmpty) {
       return Container(
         color: const Color(0xFFDCFCE7),
         child: const Center(
           child: Icon(Icons.local_pharmacy_rounded, size: 52, color: _darkGreen),
         ),
       );
-    } else if (_avatarType == 'network') {
+    } else if (_avatarType == 'network' || _avatarPath.startsWith('http')) {
       return Image.network(
         _avatarPath,
         width: 104,
@@ -145,6 +155,74 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
           ),
         ),
       );
+    }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+      final file = File(picked.path);
+      setState(() {
+        _avatarFile = file;
+        _avatarType = 'file';
+        _avatarPath = file.path;
+      });
+
+      // Update local storage
+      final user = await StorageService().getUser();
+      if (user != null) {
+        final updated = UserModel(
+          id: user.id,
+          nama: user.nama,
+          email: user.email,
+          noHp: user.noHp,
+          alamat: user.alamat,
+          jenisKelamin: user.jenisKelamin,
+          nik: user.nik,
+          fotoProfile: file.path,
+          firebaseUid: user.firebaseUid,
+          authProvider: user.authProvider,
+          role: user.role,
+          spesialisasi: user.spesialisasi,
+          instansi: user.instansi,
+          noStr: user.noStr,
+          noSip: user.noSip,
+          tanggalLahir: user.tanggalLahir,
+          golonganDarah: user.golonganDarah,
+        );
+        await StorageService().saveUser(updated);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Foto profil apoteker berhasil diperbarui!',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: _darkGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memilih foto: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -183,7 +261,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Pilih foto profil apoteker yang jelas dan profesional',
+              'Pilih foto profil apoteker yang jelas dan profesional dari kamera atau galeri HP Anda.',
               style: GoogleFonts.inter(
                 fontSize: 13,
                 color: const Color(0xFF64748B),
@@ -214,21 +292,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
               onTap: () {
                 Navigator.pop(ctx);
-                setState(() {
-                  _avatarType = 'asset';
-                  _avatarPath = 'assets/images/dokter_apoteker.jpg';
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil berhasil diperbarui dari kamera!',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: _darkGreen,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                _pickImage(ImageSource.camera);
               },
             ),
 
@@ -257,21 +321,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
               onTap: () {
                 Navigator.pop(ctx);
-                setState(() {
-                  _avatarType = 'network';
-                  _avatarPath = 'https://images.unsplash.com/photo-1594824813629-87a70197d19a?auto=format&fit=crop&q=80&w=300';
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil berhasil dipilih dari galeri!',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: _darkGreen,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                _pickImage(ImageSource.gallery);
               },
             ),
 
@@ -508,8 +558,6 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   // HEADER SECTION (Mockup: Green gradient, curved edge & circular avatar)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
-
     return ClipPath(
       clipper: _ProfileHeaderOrganicClipper(),
       child: Container(
@@ -581,39 +629,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                         else
                           const SizedBox.shrink(),
 
-                        // Tombol "✏️ Edit"
-                        GestureDetector(
-                          onTap: () => _showChangeProfilePhotoModal(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFBBF24), // Vibrant golden amber
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.edit, size: 13, color: Color(0xFF0F172A)),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Edit',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        const SizedBox.shrink(),
                       ],
                     ),
 

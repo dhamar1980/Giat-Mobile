@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/dokter_api_service.dart';
@@ -667,14 +668,27 @@ class DokterProfileState extends ChangeNotifier {
   }
 
   Widget buildAvatarWidget({double size = 96, double iconSize = 48}) {
-    if (avatarType == 'default') {
+    if (avatarType == 'default' || avatarPath.isEmpty) {
       return Container(
         width: size,
         height: size,
         color: const Color(0xFFDCFCE7),
         child: Icon(Icons.person_rounded, size: iconSize, color: const Color(0xFF065A37)),
       );
-    } else if (avatarType == 'network') {
+    } else if (avatarType == 'file' || File(avatarPath).existsSync()) {
+      return Image.file(
+        File(avatarPath),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => Container(
+          width: size,
+          height: size,
+          color: const Color(0xFFDCFCE7),
+          child: Icon(Icons.person_rounded, size: iconSize, color: const Color(0xFF065A37)),
+        ),
+      );
+    } else if (avatarType == 'network' || avatarPath.startsWith('http')) {
       return Image.network(
         avatarPath,
         width: size,

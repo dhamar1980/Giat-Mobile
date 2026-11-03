@@ -338,7 +338,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Kembali'), findsOneWidget);
-    expect(find.text('Edit'), findsOneWidget);
     expect(find.text('Informasi Profesional'), findsOneWidget);
     expect(find.text('Spesialisasi'), findsOneWidget);
     expect(find.text('No. STR'), findsOneWidget);
@@ -350,8 +349,8 @@ void main() {
     expect(find.text('Jl. Sehat No. 12, Jember'), findsOneWidget);
     expect(find.text('Jadwal Praktik'), findsOneWidget);
 
-    // Tap Tombol Edit Kuning untuk memicu modal ganti foto profil
-    await tester.tap(find.text('Edit'));
+    // Tap Avatar / Foto Profil untuk memicu modal ganti foto profil
+    await tester.tap(find.byType(ClipOval).first);
     await tester.pumpAndSettle();
 
     expect(find.text('Ganti Foto Profil'), findsOneWidget);

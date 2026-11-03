@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../login_screen.dart';
+import '../../../models/user_model.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/pasien_api_service.dart';
@@ -37,8 +40,16 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
   late String _golonganDarah;
   late String _alamat;
 
-  String _avatarType = 'asset'; // 'asset', 'network', 'default'
-  String _avatarPath = 'assets/images/sarah_amelia.jpg';
+  File? _avatarFile;
+  String _avatarType = 'default'; // 'asset', 'network', 'file', 'default'
+  String _avatarPath = '';
+  bool _isUploadingPhoto = false;
+
+  // Real data untuk Ringkasan Kesehatan
+  String _statusGinjal = 'Stabil';
+  Color _statusGinjalColor = const Color(0xFF10B981);
+  String _konsultasiTerakhir = 'Memuat...';
+  String _pengingatBerikutnya = 'Memuat...';
 
   final List<Map<String, String>> _presetAvatars = [
     {
@@ -73,16 +84,44 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
     super.initState();
     _nama = widget.userName.isNotEmpty && widget.userName != 'Pasien'
         ? widget.userName
-        : 'Sarah Amelia';
-    _email = 'sarah.amelia@Gmail.com';
-    _tanggalLahir = '12 Mei 1985';
-    _jenisKelamin = 'Perempuan';
-    _golonganDarah = 'O Positif (O+)';
-    _alamat = 'Jl. Merdeka No. 123, Jakarta\nSelatan';
+        : '';
+    _email = '';
+    _tanggalLahir = '';
+    _jenisKelamin = '';
+    _golonganDarah = '';
+    _alamat = '';
     _loadProfile();
   }
 
+  void _setAvatarFromPath(String path) {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) {
+      _avatarType = 'default';
+      _avatarPath = '';
+      _avatarFile = null;
+      return;
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      _avatarType = 'network';
+      _avatarPath = trimmed;
+      _avatarFile = null;
+    } else if (File(trimmed).existsSync()) {
+      _avatarType = 'file';
+      _avatarPath = trimmed;
+      _avatarFile = File(trimmed);
+    } else if (trimmed.startsWith('assets/')) {
+      _avatarType = 'asset';
+      _avatarPath = trimmed;
+      _avatarFile = null;
+    } else {
+      _avatarType = 'default';
+      _avatarPath = trimmed;
+      _avatarFile = null;
+    }
+  }
+
   Future<void> _loadProfile() async {
+    // 1. Muat dari cache lokal UserModel agar data instan muncul
     try {
       final user = await StorageService().getUser();
       if (user != null && mounted) {
@@ -91,16 +130,18 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           if (user.email.isNotEmpty) _email = user.email;
           if (user.alamat != null && user.alamat!.isNotEmpty) _alamat = user.alamat!;
           if (user.jenisKelamin != null && user.jenisKelamin!.isNotEmpty) _jenisKelamin = user.jenisKelamin!;
-          if (user.tanggalLahir != null && user.tanggalLahir!.isNotEmpty) _tanggalLahir = user.tanggalLahir!;
+          if (user.tanggalLahir != null && user.tanggalLahir!.isNotEmpty) {
+            _tanggalLahir = TimeUtils.formatBirthDate(user.tanggalLahir!);
+          }
           if (user.golonganDarah != null && user.golonganDarah!.isNotEmpty) _golonganDarah = user.golonganDarah!;
           if (user.fotoProfile != null && user.fotoProfile!.isNotEmpty) {
-            _avatarType = user.fotoProfile!.startsWith('http') ? 'network' : 'asset';
-            _avatarPath = user.fotoProfile!;
+            _setAvatarFromPath(user.fotoProfile!);
           }
         });
       }
     } catch (_) {}
 
+    // 2. Muat profil real dari API backend Pasien
     try {
       final res = await PasienApiService().getProfile();
       if (res.success && res.data != null && mounted) {
@@ -110,16 +151,120 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           if (d['email'] != null && d['email'].toString().isNotEmpty) _email = d['email'].toString();
           if (d['alamat'] != null && d['alamat'].toString().isNotEmpty) _alamat = d['alamat'].toString();
           if (d['jenis_kelamin'] != null && d['jenis_kelamin'].toString().isNotEmpty) _jenisKelamin = d['jenis_kelamin'].toString();
-          if (d['tanggal_lahir'] != null && d['tanggal_lahir'].toString().isNotEmpty) _tanggalLahir = d['tanggal_lahir'].toString();
+          if (d['tanggal_lahir'] != null && d['tanggal_lahir'].toString().isNotEmpty) {
+            _tanggalLahir = TimeUtils.formatBirthDate(d['tanggal_lahir'].toString());
+          }
           if (d['golongan_darah'] != null && d['golongan_darah'].toString().isNotEmpty) _golonganDarah = d['golongan_darah'].toString();
           if (d['foto_profile'] != null && d['foto_profile'].toString().isNotEmpty) {
-            final f = d['foto_profile'].toString();
-            _avatarType = f.startsWith('http') ? 'network' : 'asset';
-            _avatarPath = f;
+            _setAvatarFromPath(d['foto_profile'].toString());
           }
         });
       }
     } catch (_) {}
+
+    // 3. Muat ringkasan kesehatan real
+    await _loadRingkasanKesehatan();
+  }
+
+  Future<void> _loadRingkasanKesehatan() async {
+    // A. Status Kesehatan Ginjal (dari ringkasan pemantauan real)
+    try {
+      final cachedSummary = StorageService().getPantauSummaryCache();
+      if (cachedSummary != null) {
+        _applyPantauSummary(cachedSummary);
+      }
+      final pantauRes = await PasienApiService().getPantauSummary();
+      if (pantauRes.success && pantauRes.data != null && mounted) {
+        _applyPantauSummary(pantauRes.data!);
+      }
+    } catch (_) {}
+
+    // B. Konsultasi Terakhir (dari riwayat konsultasi real)
+    try {
+      final konsultasiRes = await PasienApiService().getRiwayatKonsultasi();
+      if (konsultasiRes.success && konsultasiRes.data != null && mounted) {
+        final list = konsultasiRes.data!;
+        if (list.isNotEmpty) {
+          final first = list.first;
+          final rawDate = first['tanggal'] ?? first['created_at'] ?? first['waktu_mulai'] ?? first['jadwal'] ?? first['waktu'];
+          if (rawDate != null) {
+            setState(() {
+              _konsultasiTerakhir = TimeUtils.formatDate(rawDate, useIndonesianMonth: true);
+            });
+          } else {
+            setState(() {
+              _konsultasiTerakhir = 'Belum ada riwayat';
+            });
+          }
+        } else {
+          setState(() {
+            _konsultasiTerakhir = 'Belum ada riwayat';
+          });
+        }
+      } else if (mounted) {
+        setState(() {
+          _konsultasiTerakhir = 'Belum ada riwayat';
+        });
+      }
+    } catch (_) {
+      if (mounted && _konsultasiTerakhir == 'Memuat...') {
+        setState(() {
+          _konsultasiTerakhir = 'Belum ada riwayat';
+        });
+      }
+    }
+
+    // C. Pengingat Berikutnya (dari jadwal pengingat real hari ini / aktif)
+    try {
+      final remRes = await PasienApiService().getRemindersHariIni();
+      List<dynamic> remList = [];
+      if (remRes.success && remRes.data != null && remRes.data!.isNotEmpty) {
+        remList = remRes.data!;
+      } else {
+        final allRemRes = await PasienApiService().getReminders();
+        if (allRemRes.success && allRemRes.data != null) {
+          remList = allRemRes.data!;
+        }
+      }
+
+      if (remList.isNotEmpty && mounted) {
+        final firstRem = remList.first;
+        final name = firstRem['nama']?.toString() ?? firstRem['judul']?.toString() ?? firstRem['title']?.toString() ?? 'Obat';
+        final timeRaw = firstRem['waktu']?.toString() ?? firstRem['time']?.toString() ?? '08:00';
+        final timeStr = TimeUtils.formatChatTime(timeRaw, separator: ':');
+        setState(() {
+          _pengingatBerikutnya = '$name - $timeStr';
+        });
+      } else if (mounted) {
+        setState(() {
+          _pengingatBerikutnya = 'Tidak ada jadwal aktif';
+        });
+      }
+    } catch (_) {
+      if (mounted && _pengingatBerikutnya == 'Memuat...') {
+        setState(() {
+          _pengingatBerikutnya = 'Tidak ada jadwal aktif';
+        });
+      }
+    }
+  }
+
+  void _applyPantauSummary(Map<String, dynamic> data) {
+    final rawKondisi = data['kondisi_tubuh'] ?? data['kondisi'] ?? data['status'] ?? data['status_ginjal'];
+    if (rawKondisi != null && rawKondisi.toString().trim().isNotEmpty && mounted) {
+      final str = rawKondisi.toString().trim();
+      final lower = str.toLowerCase();
+      Color col = const Color(0xFF10B981);
+      if (lower.contains('buruk') || lower.contains('kritis') || lower.contains('bahaya')) {
+        col = const Color(0xFFEF4444);
+      } else if (lower.contains('waspada') || lower.contains('perhatian') || lower.contains('sedang') || lower.contains('kurang')) {
+        col = const Color(0xFFF59E0B);
+      }
+      setState(() {
+        _statusGinjal = str;
+        _statusGinjalColor = col;
+      });
+    }
   }
 
   Future<void> _navigateToEditInformasiPribadi() async {
@@ -142,7 +287,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           _nama = result['name']!;
         }
         if (result['birthDate'] != null && result['birthDate']!.isNotEmpty) {
-          _tanggalLahir = result['birthDate']!;
+          _tanggalLahir = TimeUtils.formatBirthDate(result['birthDate']!);
         }
         if (result['gender'] != null && result['gender']!.isNotEmpty) {
           _jenisKelamin = result['gender']!;
@@ -158,13 +303,45 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
       });
 
       // Synchronize changes to backend API: PUT /pasien/profile
+      final dbBirthDate = TimeUtils.toDbDate(_tanggalLahir);
+      final dbGender = _jenisKelamin == 'Perempuan' ? 'P' : (_jenisKelamin == 'Laki-laki' ? 'L' : _jenisKelamin);
       PasienApiService().updateProfile({
         'nama': _nama,
         'alamat': _alamat,
-        'jenis_kelamin': _jenisKelamin == 'Perempuan' ? 'P' : 'L',
-        'tanggal_lahir': _tanggalLahir,
+        'jenis_kelamin': dbGender,
+        'tanggal_lahir': dbBirthDate,
         'gol_darah': _golonganDarah,
+        'golongan_darah': _golonganDarah,
       });
+
+      // Simpan juga ke local user cache
+      try {
+        final currentUser = await StorageService().getUser();
+        if (currentUser != null) {
+          final updated = UserModel(
+            id: currentUser.id,
+            nama: _nama,
+            email: currentUser.email,
+            noHp: currentUser.noHp,
+            alamat: _alamat,
+            jenisKelamin: dbGender,
+            nik: currentUser.nik,
+            fotoProfile: currentUser.fotoProfile,
+            firebaseUid: currentUser.firebaseUid,
+            authProvider: currentUser.authProvider,
+            role: currentUser.role,
+            spesialisasi: currentUser.spesialisasi,
+            instansi: currentUser.instansi,
+            noStr: currentUser.noStr,
+            noSip: currentUser.noSip,
+            tanggalLahir: dbBirthDate,
+            golonganDarah: _golonganDarah,
+          );
+          await StorageService().saveUser(updated);
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -179,6 +356,116 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           ),
         ),
       );
+    }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      final file = File(picked.path);
+      setState(() {
+        _avatarFile = file;
+        _avatarType = 'file';
+        _avatarPath = file.path;
+        _isUploadingPhoto = true;
+      });
+
+      // Update local storage langsung agar foto langsung persisten
+      final currentUser = await StorageService().getUser();
+      if (currentUser != null) {
+        final updatedUser = UserModel(
+          id: currentUser.id,
+          nama: currentUser.nama,
+          email: currentUser.email,
+          noHp: currentUser.noHp,
+          alamat: currentUser.alamat,
+          jenisKelamin: currentUser.jenisKelamin,
+          nik: currentUser.nik,
+          fotoProfile: file.path,
+          firebaseUid: currentUser.firebaseUid,
+          authProvider: currentUser.authProvider,
+          role: currentUser.role,
+          spesialisasi: currentUser.spesialisasi,
+          instansi: currentUser.instansi,
+          noStr: currentUser.noStr,
+          noSip: currentUser.noSip,
+          tanggalLahir: currentUser.tanggalLahir,
+          golonganDarah: currentUser.golonganDarah,
+        );
+        await StorageService().saveUser(updatedUser);
+      }
+
+      // Unggah ke backend server GIAT
+      final res = await PasienApiService().updateFotoProfile(file);
+      if (!mounted) return;
+      setState(() {
+        _isUploadingPhoto = false;
+      });
+
+      final newUrl = res.data?['foto_profile'] ?? res.data?['foto'] ?? res.data?['image_url'] ?? res.data?['url'];
+      if (newUrl != null && newUrl.toString().startsWith('http')) {
+        setState(() {
+          _avatarType = 'network';
+          _avatarPath = newUrl.toString();
+        });
+        if (currentUser != null) {
+          final netUser = UserModel(
+            id: currentUser.id,
+            nama: currentUser.nama,
+            email: currentUser.email,
+            noHp: currentUser.noHp,
+            alamat: currentUser.alamat,
+            jenisKelamin: currentUser.jenisKelamin,
+            nik: currentUser.nik,
+            fotoProfile: newUrl.toString(),
+            firebaseUid: currentUser.firebaseUid,
+            authProvider: currentUser.authProvider,
+            role: currentUser.role,
+            spesialisasi: currentUser.spesialisasi,
+            instansi: currentUser.instansi,
+            noStr: currentUser.noStr,
+            noSip: currentUser.noSip,
+            tanggalLahir: currentUser.tanggalLahir,
+            golonganDarah: currentUser.golonganDarah,
+          );
+          await StorageService().saveUser(netUser);
+        }
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Foto profil berhasil diperbarui!',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: _darkGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memilih atau mengunggah foto: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -218,7 +505,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Pilih sumber foto atau pilih karakter avatar profil Anda.',
+              'Pilih sumber foto dari kamera atau galeri handphone Anda.',
               style: GoogleFonts.inter(
                 fontSize: 13,
                 color: const Color(0xFF64748B),
@@ -249,21 +536,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
               onTap: () {
                 Navigator.pop(ctx);
-                setState(() {
-                  _avatarType = 'asset';
-                  _avatarPath = 'assets/images/sarah_amelia.jpg';
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil berhasil diperbarui dari kamera!',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: _darkGreen,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                _pickImage(ImageSource.camera);
               },
             ),
 
@@ -292,21 +565,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
               onTap: () {
                 Navigator.pop(ctx);
-                setState(() {
-                  _avatarType = 'asset';
-                  _avatarPath = 'assets/images/sarah_amelia.jpg';
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil berhasil dipilih dari galeri!',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: _darkGreen,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                _pickImage(ImageSource.gallery);
               },
             ),
 
@@ -341,6 +600,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                       setState(() {
                         _avatarType = item['type']!;
                         _avatarPath = item['path']!;
+                        _avatarFile = null;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -409,6 +669,8 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                 Navigator.pop(ctx);
                 setState(() {
                   _avatarType = 'default';
+                  _avatarFile = null;
+                  _avatarPath = '';
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -430,16 +692,25 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
   }
 
   Widget _buildAvatarImage() {
-    if (_avatarType == 'default') {
+    if (_isUploadingPhoto) {
       return Container(
         color: const Color(0xFFDCFCE7),
-        child: const Icon(
-          Icons.person_rounded,
-          size: 56,
-          color: _darkGreen,
+        child: const Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.5, color: _darkGreen),
+          ),
         ),
       );
-    } else if (_avatarType == 'network') {
+    }
+    if (_avatarFile != null && _avatarFile!.existsSync()) {
+      return Image.file(_avatarFile!, fit: BoxFit.cover);
+    }
+    if (_avatarPath.isNotEmpty && File(_avatarPath).existsSync()) {
+      return Image.file(File(_avatarPath), fit: BoxFit.cover);
+    }
+    if (_avatarType == 'network' || _avatarPath.startsWith('http://') || _avatarPath.startsWith('https://')) {
       return Image.network(
         _avatarPath,
         fit: BoxFit.cover,
@@ -448,22 +719,25 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           child: const Icon(Icons.person_rounded, size: 56, color: _darkGreen),
         ),
       );
-    } else {
+    }
+    if (_avatarType == 'asset' && _avatarPath.startsWith('assets/')) {
       return Image.asset(
         _avatarPath,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Image.network(
-            'https://images.unsplash.com/photo-1594824813629-87a70197d19a?auto=format&fit=crop&q=80&w=300',
-            fit: BoxFit.cover,
-            errorBuilder: (c, e, s) => Container(
-              color: const Color(0xFFDCFCE7),
-              child: const Icon(Icons.person_rounded, size: 56, color: _darkGreen),
-            ),
-          );
-        },
+        errorBuilder: (c, e, s) => Container(
+          color: const Color(0xFFDCFCE7),
+          child: const Icon(Icons.person_rounded, size: 56, color: _darkGreen),
+        ),
       );
     }
+    return Container(
+      color: const Color(0xFFDCFCE7),
+      child: const Icon(
+        Icons.person_rounded,
+        size: 56,
+        color: _darkGreen,
+      ),
+    );
   }
 
   void _handleLogout() {
@@ -791,7 +1065,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
                 child: Column(
                   children: [
-                    // Top Navigation Row: "Kembali" pill & "Edit" pill
+                    // Top Navigation Row: Tombol Kembali saja (Tombol Edit kuning dihapus sesuai permintaan)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -835,47 +1109,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                             ),
                           ),
                         ),
-
-                        // Tombol "✏️ Edit"
-                        GestureDetector(
-                          onTap: _showChangeProfilePhotoModal,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 7.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFBBF24), // Vibrant golden amber
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.edit,
-                                  size: 13,
-                                  color: Color(0xFF0F172A),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Edit',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        const SizedBox.shrink(),
                       ],
                     ),
 
@@ -984,6 +1218,17 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
     );
   }
 
+  String _displayJenisKelamin(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.toUpperCase() == 'P' || trimmed.toLowerCase() == 'perempuan') {
+      return 'Perempuan';
+    }
+    if (trimmed.toUpperCase() == 'L' || trimmed.toLowerCase() == 'laki-laki') {
+      return 'Laki-laki';
+    }
+    return trimmed.isNotEmpty ? trimmed : '-';
+  }
+
   Widget _buildRingkasanKesehatanCard() {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -1003,7 +1248,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Status Kesehatan Ginjal
+          // 1. Status Kesehatan Ginjal (Real Data)
           Text(
             'Status Kesehatan Ginjal',
             style: GoogleFonts.inter(
@@ -1018,14 +1263,14 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
               Container(
                 width: 9,
                 height: 9,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF10B981),
+                decoration: BoxDecoration(
+                  color: _statusGinjalColor,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                'Stabil',
+                _statusGinjal,
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -1037,7 +1282,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
 
           const SizedBox(height: 18),
 
-          // 2. Konsultasi Terakhir
+          // 2. Konsultasi Terakhir (Real Data)
           Text(
             'Konsultasi Terakhir',
             style: GoogleFonts.inter(
@@ -1048,7 +1293,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '12 Okt 2023',
+            _konsultasiTerakhir,
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -1058,7 +1303,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
 
           const SizedBox(height: 18),
 
-          // 3. Pengingat Berikutnya
+          // 3. Pengingat Berikutnya (Real Data)
           Text(
             'Pengingat Berikutnya',
             style: GoogleFonts.inter(
@@ -1069,7 +1314,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Obat - 20:00',
+            _pengingatBerikutnya,
             style: GoogleFonts.inter(
               fontSize: 15.5,
               fontWeight: FontWeight.w700,
@@ -1108,25 +1353,25 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                 _buildPersonalItem(
                   icon: Icons.cake_outlined,
                   label: 'Tanggal Lahir',
-                  value: _tanggalLahir,
+                  value: TimeUtils.formatBirthDate(_tanggalLahir),
                 ),
                 const SizedBox(height: 16),
                 _buildPersonalItem(
                   icon: Icons.wc_rounded,
                   label: 'Jenis Kelamin',
-                  value: _jenisKelamin,
+                  value: _displayJenisKelamin(_jenisKelamin),
                 ),
                 const SizedBox(height: 16),
                 _buildPersonalItem(
                   icon: Icons.water_drop_outlined,
                   label: 'Golongan Darah',
-                  value: _golonganDarah,
+                  value: _golonganDarah.isNotEmpty ? _golonganDarah : '-',
                 ),
                 const SizedBox(height: 16),
                 _buildPersonalItem(
                   icon: Icons.home_rounded,
                   label: 'Alamat',
-                  value: _alamat,
+                  value: _alamat.isNotEmpty ? _alamat : '-',
                 ),
                 const SizedBox(height: 16),
                 InkWell(

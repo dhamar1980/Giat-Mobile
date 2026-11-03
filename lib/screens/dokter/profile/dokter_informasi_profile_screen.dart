@@ -1,6 +1,11 @@
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import '../../../models/user_model.dart';
+import '../../../services/dokter_api_service.dart';
+import '../../../services/storage_service.dart';
 import '../models/dokter_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +40,76 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
       );
     }
     DokterProfileState.instance.loadProfile(fallbackName: widget.doctorName);
+  }
+
+  Future<void> _pickImage(BuildContext context, ImageSource source, DokterProfileState profileState) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+      final file = File(picked.path);
+      profileState.updateAvatar(type: 'file', path: file.path);
+
+      // Update local storage
+      final user = await StorageService().getUser();
+      if (user != null) {
+        final updated = UserModel(
+          id: user.id,
+          nama: user.nama,
+          email: user.email,
+          noHp: user.noHp,
+          alamat: user.alamat,
+          jenisKelamin: user.jenisKelamin,
+          nik: user.nik,
+          fotoProfile: file.path,
+          firebaseUid: user.firebaseUid,
+          authProvider: user.authProvider,
+          role: user.role,
+          spesialisasi: user.spesialisasi,
+          instansi: user.instansi,
+          noStr: user.noStr,
+          noSip: user.noSip,
+          tanggalLahir: user.tanggalLahir,
+          golonganDarah: user.golonganDarah,
+        );
+        await StorageService().saveUser(updated);
+      }
+
+      final res = await DokterApiService().updateFotoProfil(file);
+      final newUrl = res.data?['foto_profile'] ?? res.data?['foto'] ?? res.data?['url'];
+      if (newUrl != null && newUrl.toString().startsWith('http')) {
+        profileState.updateAvatar(type: 'network', path: newUrl.toString());
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Foto profil dokter berhasil diperbarui!',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: _darkGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memilih atau mengunggah foto: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _showChangeProfilePhotoModal(BuildContext context) {
@@ -105,21 +180,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
               onTap: () {
                 Navigator.pop(ctx);
-                profileState.updateAvatar(
-                  type: 'asset',
-                  path: 'assets/images/dokter_apoteker.jpg',
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil dokter berhasil diperbarui dari kamera!',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: _darkGreen,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                _pickImage(context, ImageSource.camera, profileState);
               },
             ),
 
@@ -148,21 +209,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
               onTap: () {
                 Navigator.pop(ctx);
-                profileState.updateAvatar(
-                  type: 'network',
-                  path: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil dokter berhasil dipilih dari galeri!',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: _darkGreen,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                _pickImage(context, ImageSource.gallery, profileState);
               },
             ),
 
@@ -632,7 +679,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
                 child: Column(
                   children: [
-                    // Top Navigation Row: "Kembali" pill & Yellow "Edit" pill
+                    // Top Navigation Row: "Kembali" pill
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -669,40 +716,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                             ),
                           ),
                         ),
-
-                        // Tombol "✏️ Edit" (Amber Yellow - Ganti Foto Profil)
-                        GestureDetector(
-                          onTap: () => _showChangeProfilePhotoModal(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFBBF24), // Vibrant golden amber
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.edit, size: 13, color: Color(0xFF0F172A)),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Edit',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        const SizedBox.shrink(),
                       ],
                     ),
 

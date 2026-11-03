@@ -367,6 +367,138 @@ class TimeUtils {
     return result;
   }
 
+  /// Format tanggal lahir secara akurat tanpa pergeseran zona waktu
+  /// Menghilangkan masalah tampilan ISO string seperti "1998-04-12T00:00:00.000000Z"
+  /// Contoh output: "12 April 1998"
+  static String formatBirthDate(dynamic input, {bool shortMonth = false}) {
+    if (input == null) return '-';
+    final str = input.toString().trim();
+    if (str.isEmpty || str == '-' || str == 'null') return '-';
+
+    // 1. Cek format ISO8601 seperti "1998-04-12T00:00:00.000000Z" atau "1998-04-12"
+    final isoMatch = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})').firstMatch(str);
+    if (isoMatch != null) {
+      final y = int.tryParse(isoMatch.group(1)!);
+      final m = int.tryParse(isoMatch.group(2)!);
+      final d = int.tryParse(isoMatch.group(3)!);
+      if (y != null && m != null && d != null && m >= 1 && m <= 12) {
+        final monthName = shortMonth
+            ? indonesianMonthsShort[m - 1]
+            : indonesianMonths[m - 1];
+        return '$d $monthName $y';
+      }
+    }
+
+    // 2. Cek format DD-MM-YYYY atau DD/MM/YYYY
+    final dmyMatch = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(str);
+    if (dmyMatch != null) {
+      final d = int.tryParse(dmyMatch.group(1)!);
+      final m = int.tryParse(dmyMatch.group(2)!);
+      final y = int.tryParse(dmyMatch.group(3)!);
+      if (y != null && m != null && d != null && m >= 1 && m <= 12) {
+        final monthName = shortMonth
+            ? indonesianMonthsShort[m - 1]
+            : indonesianMonths[m - 1];
+        return '$d $monthName $y';
+      }
+    }
+
+    // 3. Cek format "12 Mei 1985" atau "12 April 1998"
+    final textMatch = RegExp(r'^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})').firstMatch(str);
+    if (textMatch != null) {
+      final d = int.tryParse(textMatch.group(1)!);
+      final monthStr = textMatch.group(2)!.toLowerCase();
+      final y = int.tryParse(textMatch.group(3)!);
+      if (d != null && y != null) {
+        int? monthIndex;
+        for (int i = 0; i < 12; i++) {
+          if (indonesianMonths[i].toLowerCase() == monthStr ||
+              indonesianMonthsShort[i].toLowerCase() == monthStr ||
+              indonesianMonths[i].toLowerCase().startsWith(monthStr)) {
+            monthIndex = i;
+            break;
+          }
+        }
+        if (monthIndex != null) {
+          final monthName = shortMonth
+              ? indonesianMonthsShort[monthIndex]
+              : indonesianMonths[monthIndex];
+          return '$d $monthName $y';
+        }
+      }
+    }
+
+    // 4. Fallback jika DateTime.tryParse mengenali
+    try {
+      final parsed = DateTime.tryParse(str);
+      if (parsed != null) {
+        final monthName = shortMonth
+            ? indonesianMonthsShort[parsed.month - 1]
+            : indonesianMonths[parsed.month - 1];
+        return '${parsed.day} $monthName ${parsed.year}';
+      }
+    } catch (_) {}
+
+    return str;
+  }
+
+  /// Parse string tanggal ke DateTime (berguna untuk DatePicker)
+  static DateTime? parseBirthDate(dynamic input) {
+    if (input == null) return null;
+    final str = input.toString().trim();
+    if (str.isEmpty || str == '-' || str == 'null') return null;
+
+    final isoMatch = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})').firstMatch(str);
+    if (isoMatch != null) {
+      final y = int.tryParse(isoMatch.group(1)!);
+      final m = int.tryParse(isoMatch.group(2)!);
+      final d = int.tryParse(isoMatch.group(3)!);
+      if (y != null && m != null && d != null && m >= 1 && m <= 12) {
+        return DateTime(y, m, d);
+      }
+    }
+
+    final dmyMatch = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(str);
+    if (dmyMatch != null) {
+      final d = int.tryParse(dmyMatch.group(1)!);
+      final m = int.tryParse(dmyMatch.group(2)!);
+      final y = int.tryParse(dmyMatch.group(3)!);
+      if (y != null && m != null && d != null && m >= 1 && m <= 12) {
+        return DateTime(y, m, d);
+      }
+    }
+
+    final textMatch = RegExp(r'^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})').firstMatch(str);
+    if (textMatch != null) {
+      final d = int.tryParse(textMatch.group(1)!);
+      final monthStr = textMatch.group(2)!.toLowerCase();
+      final y = int.tryParse(textMatch.group(3)!);
+      if (d != null && y != null) {
+        for (int i = 0; i < 12; i++) {
+          if (indonesianMonths[i].toLowerCase() == monthStr ||
+              indonesianMonthsShort[i].toLowerCase() == monthStr ||
+              indonesianMonths[i].toLowerCase().startsWith(monthStr)) {
+            return DateTime(y, i + 1, d);
+          }
+        }
+      }
+    }
+
+    return DateTime.tryParse(str);
+  }
+
+  /// Konversi tanggal lahir ke format DB (YYYY-MM-DD)
+  static String toDbDate(dynamic input) {
+    final parsed = parseBirthDate(input);
+    if (parsed != null) {
+      final y = parsed.year.toString().padLeft(4, '0');
+      final m = parsed.month.toString().padLeft(2, '0');
+      final d = parsed.day.toString().padLeft(2, '0');
+      return '$y-$m-$d';
+    }
+    return input?.toString() ?? '';
+  }
+
   /// Format waktu relatif untuk notifikasi atau riwayat ("Baru saja", "5 menit lalu", dsb.)
   static String formatRelativeTime(dynamic input) {
     if (input == null) return 'Baru saja';

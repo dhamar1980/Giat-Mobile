@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/time_utils.dart';
 
 /// Model representing a GIAT user (Pasien, Dokter, Apotek, etc.)
 class UserModel {
@@ -19,6 +20,8 @@ class UserModel {
   final String? noSip;
   final String? tanggalLahir;
   final String? golonganDarah;
+
+  String get formattedTanggalLahir => TimeUtils.formatBirthDate(tanggalLahir);
 
   UserModel({
     required this.id,
