@@ -1,4 +1,4 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'checkout_resep_screen.dart';
@@ -202,12 +202,23 @@ class _KeranjangScreenState extends State<KeranjangScreen> {
       return;
     }
 
+    final selectedCartItems = _items
+        .where((i) => i.isSelected)
+        .map((i) => <String, dynamic>{
+              'id_obat': i.id,
+              'nama': i.name,
+              'jumlah': i.quantity,
+              'harga': i.unitPrice,
+            })
+        .toList();
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => CheckoutResepScreen(
           userName: widget.userName,
           resepData: widget.resepData,
+          cartItems: selectedCartItems,
         ),
       ),
     );

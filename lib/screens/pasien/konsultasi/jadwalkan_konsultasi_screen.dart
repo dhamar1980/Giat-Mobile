@@ -32,24 +32,120 @@ class _JadwalkanKonsultasiScreenState extends State<JadwalkanKonsultasiScreen> {
   int _selectedDateIndex = 0;
   String _selectedTime = '14.00';
 
-  final List<Map<String, dynamic>> _dateList = [
-    {'day': 'Senin', 'date': '01 Agu', 'fullDate': 'Senin, 01 Agustus 2026', 'isFull': false},
-    {'day': 'Selasa', 'date': '02 Agu', 'fullDate': 'Selasa, 02 Agustus 2026', 'isFull': true},
-    {'day': 'Rabu', 'date': '03 Agu', 'fullDate': 'Rabu, 03 Agustus 2026', 'isFull': false},
-    {'day': 'Kamis', 'date': '04 Agu', 'fullDate': 'Kamis, 04 Agustus 2026', 'isFull': false},
-    {'day': 'Jumat', 'date': '05 Agu', 'fullDate': 'Jumat, 05 Agustus 2026', 'isFull': false},
-    {'day': 'Sabtu', 'date': '06 Agu', 'fullDate': 'Sabtu, 06 Agustus 2026', 'isFull': false},
+  late final List<Map<String, dynamic>> _dateList = _generateUpcomingDates();
+
+  static const List<String> _dayNamesId = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
+  ];
+
+  static const List<String> _monthShortId = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+
+  static const List<String> _monthFullId = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
   ];
 
   final List<Map<String, dynamic>> _timeSlots = [
-    {'time': '09.00', 'isAvailable': false, 'status': 'Penuh'},
-    {'time': '10.00', 'isAvailable': true, 'status': 'Tersedia'},
-    {'time': '11.00', 'isAvailable': false, 'status': 'Penuh'},
-    {'time': '13.00', 'isAvailable': true, 'status': 'Tersedia'},
-    {'time': '14.00', 'isAvailable': true, 'status': 'Dipilih'},
-    {'time': '15.00', 'isAvailable': true, 'status': 'Tersedia'},
-    {'time': '16.00', 'isAvailable': true, 'status': 'Tersedia'},
+    {'time': '09.00', 'hour': 9, 'isAvailable': false, 'status': 'Penuh'},
+    {'time': '10.00', 'hour': 10, 'isAvailable': true, 'status': 'Tersedia'},
+    {'time': '11.00', 'hour': 11, 'isAvailable': false, 'status': 'Penuh'},
+    {'time': '13.00', 'hour': 13, 'isAvailable': true, 'status': 'Tersedia'},
+    {'time': '14.00', 'hour': 14, 'isAvailable': true, 'status': 'Dipilih'},
+    {'time': '15.00', 'hour': 15, 'isAvailable': true, 'status': 'Tersedia'},
+    {'time': '16.00', 'hour': 16, 'isAvailable': true, 'status': 'Tersedia'},
   ];
+
+  List<Map<String, dynamic>> _generateUpcomingDates() {
+    final now = DateTime.now();
+    // Jika waktu saat ini sudah lewat pukul 15:30, mulai jadwal dari besok
+    // agar semua pilihan tanggal & jam selalu berada di masa depan.
+    final startOffset =
+        (now.hour > 15 || (now.hour == 15 && now.minute >= 30)) ? 1 : 0;
+
+    return List.generate(6, (idx) {
+      final dt = DateTime(now.year, now.month, now.day)
+          .add(Duration(days: startOffset + idx));
+      final dayName = _dayNamesId[dt.weekday - 1];
+      final dayNum = dt.day.toString().padLeft(2, '0');
+      final shortMonth = _monthShortId[dt.month - 1];
+      final fullMonth = _monthFullId[dt.month - 1];
+      final isoDate =
+          '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-$dayNum';
+      final isToday =
+          dt.year == now.year && dt.month == now.month && dt.day == now.day;
+
+      return {
+        'day': dayName,
+        'date': '$dayNum $shortMonth',
+        'fullDate': '$dayName, $dayNum $fullMonth ${dt.year}',
+        'isoDate': isoDate,
+        'isToday': isToday,
+        'isFull': idx == 2, // salah satu hari ditandai penuh sebagai variasi jadwal
+      };
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureValidSelectedTimeForDate(_selectedDateIndex);
+  }
+
+  bool _isSlotInPastForDate(int dateIndex, int slotHour) {
+    final dateItem = _dateList[dateIndex];
+    if (dateItem['isToday'] != true) return false;
+    final now = DateTime.now();
+    final slotDt = DateTime(now.year, now.month, now.day, slotHour, 0);
+    return !slotDt.isAfter(now.add(const Duration(minutes: 30)));
+  }
+
+  void _ensureValidSelectedTimeForDate(int dateIndex) {
+    final currentSlot = _timeSlots.firstWhere(
+      (s) => s['time'] == _selectedTime,
+      orElse: () => _timeSlots[4],
+    );
+    final currentHour = (currentSlot['hour'] as int?) ?? 14;
+    final currentAvail = (currentSlot['isAvailable'] as bool?) ?? true;
+    if (!currentAvail || _isSlotInPastForDate(dateIndex, currentHour)) {
+      for (final s in _timeSlots) {
+        final h = (s['hour'] as int?) ?? 10;
+        final avail = (s['isAvailable'] as bool?) ?? false;
+        if (avail && !_isSlotInPastForDate(dateIndex, h)) {
+          _selectedTime = s['time'] as String;
+          break;
+        }
+      }
+    }
+  }
 
   String _formatTimeRange(String startTime) {
     return TimeUtils.formatScheduleRange(startTime, durationMinutes: 30);
@@ -138,6 +234,7 @@ class _JadwalkanKonsultasiScreenState extends State<JadwalkanKonsultasiScreen> {
                     'rating': docRating,
                     'price': docPrice,
                     'avatarUrl': docAvatar,
+                    'selected_iso_date': selectedDateObj['isoDate'],
                   },
                   selectedDate: formattedDate,
                   selectedTime: formattedTime,
@@ -532,6 +629,7 @@ class _JadwalkanKonsultasiScreenState extends State<JadwalkanKonsultasiScreen> {
                 }
                 setState(() {
                   _selectedDateIndex = index;
+                  _ensureValidSelectedTimeForDate(index);
                 });
               },
               child: Container(
@@ -602,8 +700,11 @@ class _JadwalkanKonsultasiScreenState extends State<JadwalkanKonsultasiScreen> {
           runSpacing: 10,
           children: _timeSlots.map((slot) {
             final timeStr = slot['time'] as String;
-            final isAvailable = slot['isAvailable'] as bool;
-            final isSelected = _selectedTime == timeStr;
+            final slotHour = (slot['hour'] as int?) ?? 10;
+            final isPastToday =
+                _isSlotInPastForDate(_selectedDateIndex, slotHour);
+            final isAvailable = (slot['isAvailable'] as bool) && !isPastToday;
+            final isSelected = _selectedTime == timeStr && isAvailable;
 
             Color bgColor;
             Color borderColor;
@@ -621,8 +722,10 @@ class _JadwalkanKonsultasiScreenState extends State<JadwalkanKonsultasiScreen> {
               bgColor = const Color(0xFFEEF3FA);
               borderColor = Colors.transparent;
               timeColor = const Color(0xFF94A3B8);
-              statusColor = const Color(0xFFDC2626);
-              statusText = 'Penuh';
+              statusColor = isPastToday
+                  ? const Color(0xFF64748B)
+                  : const Color(0xFFDC2626);
+              statusText = isPastToday ? 'Sudah Lewat' : 'Penuh';
             } else {
               bgColor = Colors.white;
               borderColor = const Color(0xFFE2E8F0);
@@ -638,7 +741,11 @@ class _JadwalkanKonsultasiScreenState extends State<JadwalkanKonsultasiScreen> {
                   if (!isAvailable) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Slot waktu pukul $timeStr sudah penuh.'),
+                        content: Text(
+                          isPastToday
+                              ? 'Waktu pukul $timeStr hari ini sudah lewat. Pilih jam berikutnya atau hari lain.'
+                              : 'Slot waktu pukul $timeStr sudah penuh.',
+                        ),
                         duration: const Duration(seconds: 2),
                       ),
                     );

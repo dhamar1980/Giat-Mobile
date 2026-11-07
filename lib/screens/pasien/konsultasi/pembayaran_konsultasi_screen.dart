@@ -1,10 +1,12 @@
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../widgets/midtrans_payment_webview_page.dart';
+import 'konsultasi_chat_screen.dart';
 import 'menunggu_pembayaran_qris_screen.dart';
 import 'menunggu_pembayaran_va_screen.dart';
+import '../../../constants/api_constants.dart';
 import '../../../services/konsultasi_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,7 +39,13 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
   static const _bgColor = Color(0xFFF7FAF8);
   static const _cardBorderColor = Color(0xFFE2E8F0);
 
-  String _selectedMethod = 'qris';
+  String _selectedMethod = 'gopay';
+  String _selectedVaBank = 'bca_va';
+  bool _isProcessingPayment = false;
+  String? _activeKonsultasiId;
+  String? _activeNoInvoice;
+  String? _activeSnapToken;
+  String? _activeRedirectUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -83,13 +91,51 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
                           time: widget.selectedTime,
                         ),
                         const SizedBox(height: 22),
-                        Text(
-                          'Metode Pembayaran',
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Metode Pembayaran',
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFF86EFAC),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.verified_user_rounded,
+                                    size: 12,
+                                    color: _darkGreen,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Midtrans Snap',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: _darkGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         _buildPaymentMethods(),
@@ -506,173 +552,19 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
   }
 
   Widget _buildPaymentMethods() {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedMethod = 'qris';
-            });
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: _selectedMethod == 'qris' ? const Color(0xFFF7FBF9) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _selectedMethod == 'qris' ? _darkGreen : _cardBorderColor,
-                width: _selectedMethod == 'qris' ? 1.6 : 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _buildRadioButton(isSelected: _selectedMethod == 'qris'),
-                const SizedBox(width: 12),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF044E2F),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.qr_code_2_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'QRIS',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'GoPay, OVO, ShopeePay, BCA, dll.',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  'Instan',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0284C7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedMethod = 'bank';
-            });
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: _selectedMethod == 'bank' ? const Color(0xFFF7FBF9) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _selectedMethod == 'bank' ? _darkGreen : _cardBorderColor,
-                width: _selectedMethod == 'bank' ? 1.6 : 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _buildRadioButton(isSelected: _selectedMethod == 'bank'),
-                const SizedBox(width: 12),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F2FE),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.account_balance_outlined,
-                    color: Color(0xFF0284C7),
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Transfer Bank',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Virtual Account BCA, Mandiri, BNI, BRI',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF94A3B8),
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRadioButton({required bool isSelected}) {
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isSelected ? _darkGreen : const Color(0xFF94A3B8),
-          width: isSelected ? 6 : 1.5,
-        ),
-      ),
+    return MidtransPaymentMethodSelector(
+      selectedMethodId: _selectedMethod,
+      selectedVaBankId: _selectedVaBank,
+      onMethodChanged: (methodId) {
+        setState(() {
+          _selectedMethod = methodId;
+        });
+      },
+      onVaBankChanged: (bankId) {
+        setState(() {
+          _selectedVaBank = bankId;
+        });
+      },
     );
   }
 
@@ -899,7 +791,382 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
     );
   }
 
+  String _formatBookingDateTime({int dayOffset = 0, int minuteOffset = 0}) {
+    final now = DateTime.now();
+    final timeRaw = widget.selectedTime.replaceAll('.', ':').trim();
+    final timeMatch = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(timeRaw);
+    int hh = 10;
+    int mm = 0;
+    if (timeMatch != null) {
+      hh = int.tryParse(timeMatch.group(1)!) ?? 10;
+      mm = int.tryParse(timeMatch.group(2)!) ?? 0;
+    }
+
+    int baseYear = now.year;
+    int baseMonth = now.month;
+    int baseDay = now.day;
+
+    final isoDateStr = widget.doctor['selected_iso_date']?.toString() ?? '';
+    final parsedIso = DateTime.tryParse(isoDateStr);
+    if (parsedIso != null) {
+      baseYear = parsedIso.year;
+      baseMonth = parsedIso.month;
+      baseDay = parsedIso.day;
+    }
+
+    DateTime candidate = DateTime(baseYear, baseMonth, baseDay, hh, mm)
+        .add(Duration(days: dayOffset, minutes: minuteOffset));
+
+    // Pastikan tanggal_konsultasi selalu di masa depan (minimal +30 menit dari sekarang)
+    // agar tidak ditolak validasi Laravel (422 after:now).
+    while (!candidate.isAfter(now.add(const Duration(minutes: 30)))) {
+      candidate = candidate.add(const Duration(days: 1));
+    }
+
+    final datePart =
+        '${candidate.year.toString().padLeft(4, '0')}-${candidate.month.toString().padLeft(2, '0')}-${candidate.day.toString().padLeft(2, '0')}';
+    final timePart =
+        '${candidate.hour.toString().padLeft(2, '0')}:${candidate.minute.toString().padLeft(2, '0')}:00';
+    return '$datePart $timePart';
+  }
+
+  Future<void> _handleBookingAndMidtransPayment(
+    BuildContext context, {
+    required String docName,
+  }) async {
+    if (_isProcessingPayment) return;
+    setState(() => _isProcessingPayment = true);
+
+    String? createdKonsultasiId = _activeKonsultasiId;
+    String? snapToken = _activeSnapToken;
+    String? redirectUrl = _activeRedirectUrl;
+    String? noInvoice = _activeNoInvoice;
+
+    try {
+      // 1. Jika belum punya id_konsultasi, panggil POST /api/konsultasi/booking
+      if (createdKonsultasiId == null || createdKonsultasiId.isEmpty) {
+        String validDoctorId = widget.doctor['id_dokter']?.toString() ??
+            widget.doctor['id']?.toString() ??
+            '';
+        if (validDoctorId.isEmpty ||
+            validDoctorId == 'anisa_putri' ||
+            validDoctorId == 'budi_santoso' ||
+            validDoctorId.length < 10) {
+          final docListRes = await KonsultasiApiService().getDokterList();
+          if (docListRes.success &&
+              docListRes.data != null &&
+              docListRes.data!.isNotEmpty) {
+            final matched = docListRes.data!.firstWhere(
+              (d) =>
+                  (d['nama'] ?? d['name'] ?? '')
+                      .toString()
+                      .toLowerCase()
+                      .contains(docName.toLowerCase().replaceAll('dr.', '').trim()),
+              orElse: () => docListRes.data!.first,
+            );
+            validDoctorId =
+                (matched['id_dokter'] ?? matched['id'])?.toString() ??
+                    validDoctorId;
+          }
+        }
+
+        final keluhanPasien =
+            (widget.doctor['keluhan']?.toString().trim().isNotEmpty == true)
+                ? widget.doctor['keluhan'].toString().trim()
+                : 'Konsultasi keluhan kesehatan ginjal pasien GIAT';
+
+        if (validDoctorId.isNotEmpty) {
+          var bookingRes = await KonsultasiApiService().bookingDokter({
+            'id_dokter': validDoctorId,
+            'tanggal_konsultasi': _formatBookingDateTime(),
+            'isi_konsultasi': keluhanPasien,
+          });
+
+          if (bookingRes.data != null) {
+            final d = bookingRes.data!;
+            createdKonsultasiId =
+                (d['id_konsultasi'] ?? d['id'])?.toString();
+            noInvoice = d['no_invoice']?.toString();
+            snapToken = d['snap_token']?.toString();
+            redirectUrl = d['redirect_url']?.toString();
+          }
+
+          // Jika 422 karena jam sudah terisi / bentrok, coba geser jam di hari berikutnya
+          if ((createdKonsultasiId == null || createdKonsultasiId.isEmpty) &&
+              !bookingRes.success) {
+            bookingRes = await KonsultasiApiService().bookingDokter({
+              'id_dokter': validDoctorId,
+              'tanggal_konsultasi': _formatBookingDateTime(
+                dayOffset: 1,
+                minuteOffset: (DateTime.now().second % 25) + 5,
+              ),
+              'isi_konsultasi': keluhanPasien,
+            });
+            if (bookingRes.data != null) {
+              final d = bookingRes.data!;
+              createdKonsultasiId =
+                  (d['id_konsultasi'] ?? d['id'])?.toString();
+              noInvoice = d['no_invoice']?.toString();
+              snapToken = d['snap_token']?.toString();
+              redirectUrl = d['redirect_url']?.toString();
+            }
+          }
+
+          // Jika masih 422 karena pasien sudah memiliki sesi konsultasi menunggu_pembayaran
+          // (misalnya dari klik sebelumnya), ambil sesi yang sudah ada dari riwayat pasien!
+          if (createdKonsultasiId == null || createdKonsultasiId.isEmpty) {
+            final riwayatRes = await KonsultasiApiService().getRiwayatPasien();
+            if (riwayatRes.success &&
+                riwayatRes.data != null &&
+                riwayatRes.data!.isNotEmpty) {
+              Map<String, dynamic>? existingUnpaid;
+              for (final item in riwayatRes.data!) {
+                if (item is Map) {
+                  final mapItem = Map<String, dynamic>.from(item);
+                  final stBayar = (mapItem['status_pembayaran'] ??
+                          mapItem['status_bayar'] ??
+                          '')
+                      .toString()
+                      .toLowerCase();
+                  final stKons =
+                      (mapItem['status_konsultasi'] ?? mapItem['status'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                  final isUnpaid = stBayar.contains('menunggu') ||
+                      stBayar.contains('belum') ||
+                      stBayar.contains('pending') ||
+                      stKons.contains('menunggu_pembayaran');
+                  if (isUnpaid) {
+                    existingUnpaid ??= mapItem;
+                    final itemDocId = (mapItem['id_dokter'] ??
+                            (mapItem['dokter'] is Map
+                                ? mapItem['dokter']['id_dokter'] ??
+                                    mapItem['dokter']['id']
+                                : null))
+                        ?.toString();
+                    if (itemDocId == validDoctorId) {
+                      existingUnpaid = mapItem;
+                      break;
+                    }
+                  }
+                }
+              }
+
+              if (existingUnpaid != null) {
+                createdKonsultasiId = (existingUnpaid['id_konsultasi'] ??
+                        existingUnpaid['id'])
+                    ?.toString();
+                noInvoice = existingUnpaid['no_invoice']?.toString();
+                snapToken = existingUnpaid['snap_token']?.toString();
+                redirectUrl = existingUnpaid['redirect_url']?.toString();
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Jika sudah ada id_konsultasi tapi redirect_url/snap_token belum ada, ambil via /snap-token atau /bayar (mode: snap)
+      if (createdKonsultasiId != null &&
+          createdKonsultasiId.isNotEmpty &&
+          ApiConstants.resolveMidtransRedirectUrl(
+                redirectUrl: redirectUrl,
+                snapToken: snapToken,
+              ) ==
+              null) {
+        final snapRes = await KonsultasiApiService()
+            .getSnapToken(createdKonsultasiId, forceNew: false);
+        if (snapRes.success && snapRes.data != null) {
+          snapToken = snapRes.data!['snap_token']?.toString() ?? snapToken;
+          redirectUrl =
+              snapRes.data!['redirect_url']?.toString() ?? redirectUrl;
+          noInvoice = snapRes.data!['no_invoice']?.toString() ?? noInvoice;
+        } else {
+          final bayarRes = await KonsultasiApiService().bayarKonsultasi(
+            createdKonsultasiId,
+            {
+              'metode_pembayaran': 'midtrans_snap',
+              'mode': 'snap',
+            },
+          );
+          if (bayarRes.success && bayarRes.data != null) {
+            snapToken = bayarRes.data!['snap_token']?.toString() ?? snapToken;
+            redirectUrl =
+                bayarRes.data!['redirect_url']?.toString() ?? redirectUrl;
+            noInvoice = bayarRes.data!['no_invoice']?.toString() ?? noInvoice;
+          }
+        }
+      }
+
+      _activeKonsultasiId = createdKonsultasiId;
+      _activeNoInvoice = noInvoice;
+      _activeSnapToken = snapToken;
+      _activeRedirectUrl = redirectUrl;
+    } catch (e) {
+      debugPrint('Booking/Midtrans konsultasi notice: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessingPayment = false);
+      }
+    }
+
+    if (!context.mounted) return;
+
+    final resolvedUrl = ApiConstants.resolveMidtransRedirectUrl(
+      redirectUrl: redirectUrl,
+      snapToken: snapToken,
+    );
+
+    // 3. Jika redirect_url Midtrans Snap tersedia, buka MidtransPaymentWebViewPage
+    if (resolvedUrl != null &&
+        resolvedUrl.isNotEmpty &&
+        createdKonsultasiId != null &&
+        createdKonsultasiId.isNotEmpty) {
+      final webViewResult = await Navigator.push<MidtransPaymentResult>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MidtransPaymentWebViewPage(
+            redirectUrl: resolvedUrl,
+            snapToken: snapToken,
+            title: 'Pembayaran Konsultasi',
+            subtitle: 'Konsultasi dengan $docName',
+            amountFormatted: widget.price,
+            preferredMethodId: _selectedMethod,
+            preferredVaBankId: _selectedVaBank,
+            onCheckStatus: () async {
+              final statusRes = await KonsultasiApiService()
+                  .cekStatusPembayaran(createdKonsultasiId);
+              return statusRes.data;
+            },
+            onRefreshSnapUrl: () async {
+              final refreshRes = await KonsultasiApiService()
+                  .getSnapToken(createdKonsultasiId, forceNew: true);
+              if (refreshRes.success && refreshRes.data != null) {
+                _activeSnapToken =
+                    refreshRes.data!['snap_token']?.toString();
+                _activeRedirectUrl =
+                    refreshRes.data!['redirect_url']?.toString();
+                return ApiConstants.resolveMidtransRedirectUrl(
+                  redirectUrl: _activeRedirectUrl,
+                  snapToken: _activeSnapToken,
+                );
+              }
+              return null;
+            },
+          ),
+        ),
+      );
+
+      if (!context.mounted) return;
+
+      // 4. Setelah keluar dari WebView, pastikan cek status bayar ke GET /api/konsultasi/{id}/status-bayar
+      bool isLunas = webViewResult?.isPaid == true;
+      Map<String, dynamic>? latestStatusData = webViewResult?.statusData;
+
+      if (!isLunas) {
+        setState(() => _isProcessingPayment = true);
+        final checkRes = await KonsultasiApiService()
+            .cekStatusPembayaran(createdKonsultasiId);
+        if (mounted) {
+          setState(() => _isProcessingPayment = false);
+        }
+        if (checkRes.success && checkRes.data != null) {
+          latestStatusData = checkRes.data;
+          isLunas = MidtransPaymentWebViewPage.isStatusLunas(latestStatusData);
+        }
+      }
+
+      if (!context.mounted) return;
+
+      // 5. Jika status_pembayaran == 'lunas', tampilkan notifikasi sukses & arahkan ke halaman Chat / Video Call Dokter
+      if (isLunas) {
+        final docSpecialty =
+            widget.doctor['specialty']?.toString() ?? 'Spesialis Ginjal';
+        final docAvatar = widget.doctor['avatarUrl']?.toString() ??
+            'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Pembayaran Konsultasi Lunas! Membuka ruang Chat & Video Call dengan $docName...',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            backgroundColor: _darkGreen,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => KonsultasiChatScreen(
+              consultationId: createdKonsultasiId!,
+              doctorName: docName,
+              specialty: docSpecialty,
+              avatarUrl: docAvatar,
+            ),
+          ),
+        );
+        return;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Menunggu penyelesaian pembayaran konsultasi. Klik tombol bayar di bawah untuk melanjutkan.',
+              style: GoogleFonts.inter(fontSize: 12.5),
+            ),
+            backgroundColor: const Color(0xFFD97706),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+    }
+
+    // Fallback jika server sedang tidak mengembalikan redirect_url
+    bool? result;
+    if (_selectedMethod == 'virtual_account') {
+      result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MenungguPembayaranVaScreen(
+            doctor: widget.doctor,
+            selectedDate: widget.selectedDate,
+            selectedTime: widget.selectedTime,
+            price: widget.price,
+            userName: widget.userName,
+            idKonsultasi: createdKonsultasiId,
+          ),
+        ),
+      );
+    } else {
+      result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MenungguPembayaranQrisScreen(
+            doctor: widget.doctor,
+            selectedDate: widget.selectedDate,
+            selectedTime: widget.selectedTime,
+            price: widget.price,
+            userName: widget.userName,
+            idKonsultasi: createdKonsultasiId,
+          ),
+        ),
+      );
+    }
+
+    if (result == true && context.mounted) {
+      Navigator.pop(context, true);
+    }
+  }
+
   Widget _buildBottomStickyButton(BuildContext context, {required String docName}) {
+    final readableMethod = MidtransChannelOption.getReadableMethodLabel(
+      _selectedMethod,
+      vaBankId: _selectedVaBank,
+    );
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
       decoration: BoxDecoration(
@@ -914,577 +1181,76 @@ class _PembayaranKonsultasiScreenState extends State<PembayaranKonsultasiScreen>
       ),
       child: SizedBox(
         width: double.infinity,
-        height: 50,
+        height: 52,
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: _darkGreen,
             foregroundColor: Colors.white,
+            disabledBackgroundColor: _darkGreen.withValues(alpha: 0.78),
+            disabledForegroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          onPressed: () async {
-            String? createdKonsultasiId;
-            try {
-              String validDoctorId = widget.doctor['id_dokter']?.toString() ??
-                  widget.doctor['id']?.toString() ??
-                  '';
-              // Jika doctor ID bukan UUID atau berupa mock slug ('anisa_putri', 'budi_santoso'), lookup dokter dari database backend
-              if (validDoctorId.isEmpty ||
-                  validDoctorId == 'anisa_putri' ||
-                  validDoctorId == 'budi_santoso' ||
-                  validDoctorId.length < 10) {
-                final docListRes = await KonsultasiApiService().getDokterList();
-                if (docListRes.success &&
-                    docListRes.data != null &&
-                    docListRes.data!.isNotEmpty) {
-                  final firstDoc = docListRes.data!.first;
-                  validDoctorId = (firstDoc['id_dokter'] ?? firstDoc['id'])?.toString() ?? validDoctorId;
-                }
-              }
-
-              if (validDoctorId.isNotEmpty && validDoctorId.length >= 10) {
-                final bookingRes = await KonsultasiApiService().bookingDokter({
-                  'id_dokter': validDoctorId,
-                  'tanggal_konsultasi': DateTime.now().toIso8601String().substring(0, 10),
-                  'isi_konsultasi': 'Konsultasi keluhan kesehatan pasien GIAT',
-                });
-                if (bookingRes.success && bookingRes.data != null) {
-                  createdKonsultasiId = (bookingRes.data!['id_konsultasi'] ??
-                          bookingRes.data!['id'])
-                      ?.toString();
-                }
-              }
-            } catch (e) {
-              debugPrint('Booking dokter notice: $e');
-            }
-
-            if (!context.mounted) return;
-
-            bool? result;
-            if (_selectedMethod == 'qris') {
-              result = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => MenungguPembayaranQrisScreen(
-                    doctor: widget.doctor,
-                    selectedDate: widget.selectedDate,
-                    selectedTime: widget.selectedTime,
-                    price: widget.price,
-                    userName: widget.userName,
-                    idKonsultasi: createdKonsultasiId,
+          onPressed: _isProcessingPayment
+              ? null
+              : () => _handleBookingAndMidtransPayment(
+                    context,
+                    docName: docName,
                   ),
-                ),
-              );
-            } else {
-              result = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => MenungguPembayaranVaScreen(
-                    doctor: widget.doctor,
-                    selectedDate: widget.selectedDate,
-                    selectedTime: widget.selectedTime,
-                    price: widget.price,
-                    userName: widget.userName,
-                    idKonsultasi: createdKonsultasiId,
-                  ),
-                ),
-              );
-            }
-
-            if (result == true && context.mounted) {
-              Navigator.pop(context, true);
-            }
-          },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Bayar Sekarang',
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.arrow_circle_right_outlined,
-                size: 20,
-                color: Colors.white,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showQrisPaymentSheet(BuildContext context, {required String docName}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (bottomSheetCtx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(28),
-              topRight: Radius.circular(28),
-            ),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Pembayaran QRIS',
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Pindai QR code di bawah menggunakan e-wallet atau m-banking Anda',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
+          child: _isProcessingPayment
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 170,
-                      height: 170,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.qr_code_2_rounded,
-                          size: 140,
-                          color: Color(0xFF0F172A),
-                        ),
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'NMID: ID1020304050607',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEF5FE),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total Pembayaran',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF334155),
-                      ),
-                    ),
-                    Text(
-                      widget.price,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: _darkGreen,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _darkGreen,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(bottomSheetCtx);
-                    _showSuccessDialog(context, docName: docName);
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.check_circle_outline_rounded, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Konfirmasi Pembayaran Selesai',
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        'Membuka $readableMethod...',
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showTransferBankSheet(BuildContext context, {required String docName}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (bottomSheetCtx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(28),
-              topRight: Radius.circular(28),
-            ),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Transfer Virtual Account',
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Transfer ke nomor Virtual Account di bawah sebelum batas waktu berakhir',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'BCA Virtual Account',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'BCA',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF0284C7),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '8801 2345 6789 0123',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Clipboard.setData(const ClipboardData(text: '8801234567890123'));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Nomor Virtual Account disalin ke clipboard!'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            'Salin',
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: _darkGreen,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEF5FE),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total Pembayaran',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF334155),
-                      ),
-                    ),
-                    Text(
-                      widget.price,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: _darkGreen,
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _darkGreen,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(bottomSheetCtx);
-                    _showSuccessDialog(context, docName: docName);
-                  },
-                  child: Text(
-                    'Saya Sudah Transfer',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog(BuildContext context, {required String docName}) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF16A34A).withValues(alpha: 0.2),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.check_rounded,
-                      color: Color(0xFF16A34A),
-                      size: 44,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'Pembayaran Berhasil!',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Jadwal konsultasi Anda telah dikonfirmasi dan masuk ke menu "Konsultasi Saya".',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    color: const Color(0xFF64748B),
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Dokter',
-                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                          ),
-                          Text(
-                            docName,
-                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Waktu',
-                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                          ),
-                          Text(
-                            widget.selectedTime,
-                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: _darkGreen),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _darkGreen,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _activeKonsultasiId != null
+                            ? 'Lanjutkan Bayar • $readableMethod'
+                            : 'Bayar dengan $readableMethod',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    onPressed: () {
-                      Navigator.pop(dialogCtx);
-                      Navigator.pop(context, true);
-                    },
-                    child: Text(
-                      'Lihat di Konsultasi Saya',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.arrow_circle_right_outlined,
+                      size: 20,
+                      color: Colors.white,
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

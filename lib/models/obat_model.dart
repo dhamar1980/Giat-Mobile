@@ -106,6 +106,9 @@ class PesananObatModel {
   final String tanggal;
   final int totalHarga;
   final String status;
+  final String statusPembayaran;
+  final String? snapToken;
+  final String? redirectUrl;
   final String? alamatPengiriman;
   final String? metodePembayaran;
   final List<dynamic> items;
@@ -117,6 +120,9 @@ class PesananObatModel {
     required this.tanggal,
     required this.totalHarga,
     required this.status,
+    this.statusPembayaran = 'menunggu_pembayaran',
+    this.snapToken,
+    this.redirectUrl,
     this.alamatPengiriman,
     this.metodePembayaran,
     required this.items,
@@ -131,12 +137,20 @@ class PesananObatModel {
       parsedTracking = (json['tracking'] as List).map((e) => TrackingStep.fromJson(Map<String, dynamic>.from(e as Map))).toList();
     }
 
+    final rawTotal = double.tryParse(
+          (json['total_bayar'] ?? json['total_harga'] ?? json['total'] ?? '0').toString(),
+        )?.round() ??
+        0;
+
     return PesananObatModel(
-      id: json['id'],
-      noPesanan: json['no_pesanan']?.toString() ?? json['kode_pesanan']?.toString() ?? 'ORD-${json['id']}',
-      tanggal: json['tanggal']?.toString() ?? json['created_at']?.toString() ?? '',
-      totalHarga: int.tryParse(json['total_harga']?.toString() ?? json['total']?.toString() ?? '0') ?? 0,
-      status: json['status']?.toString() ?? 'diproses',
+      id: json['id'] ?? json['id_pembelian'],
+      noPesanan: json['no_pesanan']?.toString() ?? json['kode_pesanan']?.toString() ?? 'ORD-${json['id'] ?? json['id_pembelian'] ?? ''}',
+      tanggal: json['tanggal']?.toString() ?? json['waktu_bayar']?.toString() ?? json['created_at']?.toString() ?? '',
+      totalHarga: rawTotal,
+      status: json['status_pesanan']?.toString() ?? json['status']?.toString() ?? 'menunggu_konfirmasi',
+      statusPembayaran: json['status_pembayaran']?.toString() ?? 'menunggu_pembayaran',
+      snapToken: json['snap_token']?.toString(),
+      redirectUrl: json['redirect_url']?.toString(),
       alamatPengiriman: json['alamat_pengiriman']?.toString(),
       metodePembayaran: json['metode_pembayaran']?.toString(),
       items: json['items'] is List ? json['items'] as List : [],

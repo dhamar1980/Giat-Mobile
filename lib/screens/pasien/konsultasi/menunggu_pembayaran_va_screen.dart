@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../widgets/midtrans_payment_webview_page.dart';
+import 'konsultasi_chat_screen.dart';
 import 'pembayaran_berhasil_konsultasi_screen.dart';
+import '../../../constants/api_constants.dart';
 import '../../../services/konsultasi_api_service.dart';
 import '../../../utils/time_utils.dart';
 
@@ -1079,7 +1082,6 @@ class _MenungguPembayaranVaScreenState extends State<MenungguPembayaranVaScreen>
                 ),
               ),
               onPressed: () async {
-                // Konfirmasi status pembayaran VA ke REST API backend
                 final konsultasiId = widget.idKonsultasi ??
                     widget.doctor['id_konsultasi']?.toString() ??
                     widget.doctor['konsultasi_id']?.toString();
@@ -1088,20 +1090,112 @@ class _MenungguPembayaranVaScreenState extends State<MenungguPembayaranVaScreen>
                     konsultasiId != 'anisa_putri' &&
                     konsultasiId != 'budi_santoso') {
                   try {
-                    await KonsultasiApiService().bayarKonsultasi(konsultasiId, {
-                      'metode_pembayaran': 'va',
-                      'bank': widget.bankName,
-                      'nomor_va': widget.vaNumber,
-                      'biaya': widget.price,
-                      'status': 'berhasil',
-                    });
-                    await KonsultasiApiService().cekStatusPembayaran(konsultasiId);
+                    final statusRes = await KonsultasiApiService()
+                        .cekStatusPembayaran(konsultasiId);
+                    final data = statusRes.data;
+                    final isLunas =
+                        MidtransPaymentWebViewPage.isStatusLunas(data);
+
+                    if (isLunas) {
+                      if (!context.mounted) return;
+                      final docName =
+                          widget.doctor['name']?.toString() ?? 'Dokter GIAT';
+                      final docSpec = widget.doctor['specialty']?.toString() ??
+                          'Spesialis Ginjal';
+                      final docAvatar =
+                          widget.doctor['avatarUrl']?.toString() ?? '';
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Pembayaran Konsultasi Lunas! Membuka Chat & Video Call dengan $docName...',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          backgroundColor: _darkGreen,
+                        ),
+                      );
+                      await Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => KonsultasiChatScreen(
+                            consultationId: konsultasiId,
+                            doctorName: docName,
+                            specialty: docSpec,
+                            avatarUrl: docAvatar,
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final redirectUrl = ApiConstants.resolveMidtransRedirectUrl(
+                      redirectUrl: data?['redirect_url']?.toString(),
+                      snapToken: data?['snap_token']?.toString(),
+                    );
+                    if (redirectUrl != null &&
+                        redirectUrl.isNotEmpty &&
+                        context.mounted) {
+                      final webViewRes =
+                          await Navigator.push<MidtransPaymentResult>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MidtransPaymentWebViewPage(
+                            redirectUrl: redirectUrl,
+                            title: 'Pembayaran Konsultasi Dokter',
+                            orderId: data?['no_invoice']?.toString(),
+                            amountFormatted: widget.price,
+                            onCheckStatus: () async {
+                              final r = await KonsultasiApiService()
+                                  .cekStatusPembayaran(konsultasiId);
+                              return r.data;
+                            },
+                          ),
+                        ),
+                      );
+                      if (!context.mounted) return;
+                      if (webViewRes?.isPaid == true) {
+                        final docName =
+                            widget.doctor['name']?.toString() ?? 'Dokter GIAT';
+                        final docSpec =
+                            widget.doctor['specialty']?.toString() ??
+                                'Spesialis Ginjal';
+                        final docAvatar =
+                            widget.doctor['avatarUrl']?.toString() ?? '';
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Pembayaran Konsultasi Lunas! Membuka Chat & Video Call dengan $docName...',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            backgroundColor: _darkGreen,
+                          ),
+                        );
+                        await Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => KonsultasiChatScreen(
+                              consultationId: konsultasiId,
+                              doctorName: docName,
+                              specialty: docSpec,
+                              avatarUrl: docAvatar,
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                    }
                   } catch (e) {
                     debugPrint('Notice bayar konsultasi VA: $e');
                   }
                 }
 
-                if (!mounted) return;
+                if (!context.mounted) return;
                 final success = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(

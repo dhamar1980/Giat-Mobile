@@ -2,6 +2,10 @@ import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../widgets/midtrans_payment_webview_page.dart';
+import 'lacak_obat_screen.dart';
+import 'pembayaran_model.dart';
+import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
 import '../../../utils/time_utils.dart';
 
@@ -26,10 +30,14 @@ class RiwayatObatDetail {
 }
 
 class RiwayatPesananData {
+  final String? rawId;
   final String orderId;
   final String orderDate;
   final String orderTime;
   final String status;
+  final String statusPembayaran;
+  final String? snapToken;
+  final String? redirectUrl;
   final Color statusColor;
   final bool isMelaluiResep;
   final String? resepNumber;
@@ -40,10 +48,14 @@ class RiwayatPesananData {
   final String paymentMethod;
 
   const RiwayatPesananData({
+    this.rawId,
     required this.orderId,
     required this.orderDate,
     required this.orderTime,
     required this.status,
+    this.statusPembayaran = 'lunas',
+    this.snapToken,
+    this.redirectUrl,
     required this.statusColor,
     required this.isMelaluiResep,
     this.resepNumber,
@@ -219,36 +231,113 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
         final List<RiwayatPesananData> list = [];
         for (var item in res.data!) {
           if (item is Map) {
-            final id = item['id']?.toString() ?? item['order_id']?.toString() ?? '#G-000';
-            final status = item['status']?.toString() ?? 'Selesai';
-            final total = int.tryParse(item['total_harga']?.toString() ?? item['total']?.toString() ?? '0') ?? 0;
+            final rawId = (item['id'] ?? item['id_pembelian'])?.toString();
+            final noPesanan = item['no_pesanan']?.toString() ??
+                item['order_id']?.toString() ??
+                (rawId != null ? 'ORD-$rawId' : '#G-000');
+            final statusBayar =
+                (item['status_pembayaran'] ?? 'lunas').toString().toLowerCase();
+            final rawStatusPesanan =
+                (item['status_pesanan'] ?? item['status'] ?? 'Sedang Diproses')
+                    .toString();
+            final isWaitingPayment = statusBayar == 'menunggu_pembayaran';
+            final displayStatus = isWaitingPayment
+                ? 'Menunggu Pembayaran'
+                : _mapOrderStatusLabel(rawStatusPesanan);
+            final total = double.tryParse(
+                      (item['total_bayar'] ??
+                              item['total_harga'] ??
+                              item['total'] ??
+                              '0')
+                          .toString(),
+                    )?.round() ??
+                0;
             final dateStr = item['created_at'] != null
                 ? TimeUtils.formatDate(item['created_at'])
                 : (item['tanggal']?.toString() ?? 'Hari ini');
             final timeStr = item['created_at'] != null
                 ? TimeUtils.formatTimeWithZone(item['created_at'])
-                : TimeUtils.replaceTimezoneSuffix(item['waktu']?.toString() ?? '14:00 WIB');
+                : TimeUtils.replaceTimezoneSuffix(
+                    item['waktu']?.toString() ?? '14:00 WIB');
 
-            list.add(RiwayatPesananData(
-              orderId: id.startsWith('#') ? id : '#$id',
-              orderDate: dateStr,
-              orderTime: timeStr,
-              status: status,
-              statusColor: status.toLowerCase().contains('selesai') ? const Color(0xFF16A34A) : _amberStatus,
-              isMelaluiResep: item['is_resep'] == true || item['resep_id'] != null,
-              resepNumber: item['resep_id']?.toString(),
-              pharmacyName: item['apotek_name']?.toString() ?? 'Apotek Mitra GIAT',
-              totalPrice: total,
-              paymentMethod: item['metode_pembayaran']?.toString().toUpperCase() ?? 'QRIS',
-              medicines: const [
+            // Parse daftar item obat jika tersedia dari backend
+            final List<RiwayatObatDetail> parsedMeds = [];
+            if (item['items'] is List && (item['items'] as List).isNotEmpty) {
+              for (final med in (item['items'] as List)) {
+                if (med is Map) {
+                  final obatMap = med['obat'] is Map ? med['obat'] as Map : null;
+                  final mName = (med['nama_obat'] ??
+                          med['nama'] ??
+                          obatMap?['nama_obat'] ??
+                          obatMap?['nama'] ??
+                          'Obat Terapi Ginjal')
+                      .toString();
+                  final mQty =
+                      int.tryParse((med['jumlah'] ?? med['qty'] ?? 1).toString()) ??
+                          1;
+                  final mPrice = double.tryParse(
+                            (med['harga_satuan'] ??
+                                    med['harga'] ??
+                                    obatMap?['harga'] ??
+                                    50000)
+                                .toString(),
+                          )?.round() ??
+                      50000;
+                  parsedMeds.add(
+                    RiwayatObatDetail(
+                      name: mName,
+                      dosage: (med['aturan_pakai'] ?? 'Sesuai petunjuk').toString(),
+                      packageInfo: (med['satuan'] ?? '1 Strip/Box').toString(),
+                      qty: mQty,
+                      price: mPrice,
+                    ),
+                  );
+                }
+              }
+            }
+            if (parsedMeds.isEmpty) {
+              parsedMeds.add(
                 RiwayatObatDetail(
                   name: 'Obat Terapi Ginjal',
                   dosage: 'Sesuai petunjuk',
                   packageInfo: '1 Box / Strip',
                   qty: 1,
-                  price: 50000,
+                  price: total > 0 ? total : 50000,
                 ),
-              ],
+              );
+            }
+
+            final apotekMap = item['apotek'] is Map ? item['apotek'] as Map : null;
+            final pharmacyName = (apotekMap?['nama_apotek'] ??
+                    apotekMap?['nama'] ??
+                    item['apotek_name'] ??
+                    'Apotek Mitra GIAT')
+                .toString();
+
+            list.add(RiwayatPesananData(
+              rawId: rawId,
+              orderId: noPesanan,
+              orderDate: dateStr,
+              orderTime: timeStr,
+              status: displayStatus,
+              statusPembayaran: statusBayar,
+              snapToken: item['snap_token']?.toString(),
+              redirectUrl: item['redirect_url']?.toString(),
+              statusColor: isWaitingPayment
+                  ? const Color(0xFFD97706)
+                  : (displayStatus.toLowerCase().contains('selesai')
+                      ? const Color(0xFF16A34A)
+                      : _amberStatus),
+              isMelaluiResep:
+                  item['is_resep'] == true || item['resep_id'] != null || item['id_resep'] != null,
+              resepNumber: (item['resep_id'] ?? item['id_resep'])?.toString(),
+              pharmacyName: pharmacyName,
+              totalPrice: total,
+              paymentMethod: (item['metode_pembayaran'] ?? 'Midtrans Snap')
+                  .toString()
+                  .replaceAll('_', ' ')
+                  .toUpperCase(),
+              medicines: parsedMeds,
             ));
           }
         }
@@ -259,6 +348,193 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
         }
       }
     } catch (_) {}
+  }
+
+  String _mapOrderStatusLabel(String raw) {
+    final lower = raw.toLowerCase().trim();
+    if (lower == 'menunggu_konfirmasi') return 'Sedang Diproses';
+    if (lower == 'diproses') return 'Sedang Diproses';
+    if (lower == 'dikirim') return 'Sedang Dikirim';
+    if (lower == 'selesai') return 'Selesai Diterima';
+    if (lower == 'dibatalkan') return 'Dibatalkan';
+    return raw;
+  }
+
+  Future<void> _handlePayOrderMidtrans(RiwayatPesananData order) async {
+    final idPesanan = order.rawId;
+    String? redirectUrl = order.redirectUrl;
+    String? snapToken = order.snapToken;
+
+    if (ApiConstants.resolveMidtransRedirectUrl(
+          redirectUrl: redirectUrl,
+          snapToken: snapToken,
+        ) ==
+        null &&
+        idPesanan != null &&
+        idPesanan.isNotEmpty) {
+      final snapRes = await PasienApiService()
+          .getSnapTokenObat(idPesanan, forceNew: false);
+      if (snapRes.success && snapRes.data != null) {
+        redirectUrl =
+            snapRes.data!['redirect_url']?.toString() ?? redirectUrl;
+        snapToken = snapRes.data!['snap_token']?.toString() ?? snapToken;
+      }
+    }
+
+    final resolvedUrl = ApiConstants.resolveMidtransRedirectUrl(
+      redirectUrl: redirectUrl,
+      snapToken: snapToken,
+    );
+
+    if (!mounted) return;
+    if (resolvedUrl == null || resolvedUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Gagal memuat URL pembayaran Midtrans untuk pesanan ${order.orderId}.',
+            style: GoogleFonts.inter(fontSize: 12.5),
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    final webViewRes = await Navigator.push<MidtransPaymentResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MidtransPaymentWebViewPage(
+          redirectUrl: resolvedUrl,
+          snapToken: snapToken,
+          title: 'Pembayaran Obat Apotek',
+          subtitle: 'Pesanan Obat Apotek Mitra GIAT',
+          amountFormatted: _formatRupiah(order.totalPrice),
+          onCheckStatus: idPesanan != null && idPesanan.isNotEmpty
+              ? () async {
+                  final r = await PasienApiService()
+                      .cekStatusPembayaranObat(idPesanan);
+                  return r.data;
+                }
+              : null,
+          onRefreshSnapUrl: idPesanan != null && idPesanan.isNotEmpty
+              ? () async {
+                  final r = await PasienApiService()
+                      .getSnapTokenObat(idPesanan, forceNew: true);
+                  if (r.success && r.data != null) {
+                    return ApiConstants.resolveMidtransRedirectUrl(
+                      redirectUrl: r.data!['redirect_url']?.toString(),
+                      snapToken: r.data!['snap_token']?.toString(),
+                    );
+                  }
+                  return null;
+                }
+              : null,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    bool isLunas = webViewRes?.isPaid == true;
+    if (!isLunas && idPesanan != null && idPesanan.isNotEmpty) {
+      final checkRes =
+          await PasienApiService().cekStatusPembayaranObat(idPesanan);
+      if (checkRes.success && checkRes.data != null) {
+        isLunas = MidtransPaymentWebViewPage.isStatusLunas(checkRes.data);
+      }
+    }
+
+    await _fetchRiwayatFromApi();
+    if (!mounted) return;
+
+    if (isLunas) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pembayaran Pesanan ${order.orderId} Berhasil (LUNAS)! Mengarahkan ke Detail & Lacak Pesanan...',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: _darkGreen,
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LacakObatScreen(
+            userName: widget.userName,
+            orderId: order.orderId,
+            pesananId: order.rawId,
+            orderData: OrderCheckoutData(
+              idPesanan: order.rawId,
+              orderNumber: order.orderId,
+              totalAmount: order.totalPrice,
+              totalAmountFormatted: _formatRupiah(order.totalPrice),
+              statusPembayaran: 'lunas',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleCheckOrderPaymentStatus(RiwayatPesananData order) async {
+    final idPesanan = order.rawId;
+    if (idPesanan == null || idPesanan.isEmpty) return;
+
+    final checkRes =
+        await PasienApiService().cekStatusPembayaranObat(idPesanan);
+    if (!mounted) return;
+    final isLunas = MidtransPaymentWebViewPage.isStatusLunas(checkRes.data);
+    await _fetchRiwayatFromApi();
+    if (!mounted) return;
+
+    if (isLunas) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pembayaran Pesanan ${order.orderId} telah LUNAS! Membuka Lacak Pesanan...',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: _darkGreen,
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LacakObatScreen(
+            userName: widget.userName,
+            orderId: order.orderId,
+            pesananId: order.rawId,
+            orderData: OrderCheckoutData(
+              idPesanan: order.rawId,
+              orderNumber: order.orderId,
+              totalAmount: order.totalPrice,
+              totalAmountFormatted: _formatRupiah(order.totalPrice),
+              statusPembayaran: 'lunas',
+            ),
+          ),
+        ),
+      );
+    } else {
+      final statusStr =
+          (checkRes.data?['status_pembayaran'] ?? 'menunggu_pembayaran')
+              .toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Status pembayaran pesanan ${order.orderId} masih ${statusStr.replaceAll('_', ' ')}. Klik "Bayar Sekarang" untuk membayar.',
+            style: GoogleFonts.inter(fontSize: 12.5),
+          ),
+          backgroundColor: const Color(0xFFD97706),
+        ),
+      );
+    }
   }
 
   List<RiwayatPesananData> get _filteredOrders {
@@ -794,7 +1070,7 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
             const Divider(height: 1, color: Color(0xFFF1F5F9)),
             const SizedBox(height: 12),
 
-            // Total Belanja
+            // Total Belanja & Tombol Aksi Pembayaran / Lacak
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -824,8 +1100,112 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
                     ],
                   ),
                 ),
+                if (order.statusPembayaran.toLowerCase() !=
+                    'menunggu_pembayaran')
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LacakObatScreen(
+                            userName: widget.userName,
+                            orderId: order.orderId,
+                            status: order.status,
+                            pesananId: order.rawId,
+                            orderData: OrderCheckoutData(
+                              idPesanan: order.rawId,
+                              orderNumber: order.orderId,
+                              totalAmount: order.totalPrice,
+                              totalAmountFormatted:
+                                  _formatRupiah(order.totalPrice),
+                              statusPembayaran: order.statusPembayaran,
+                              snapToken: order.snapToken,
+                              redirectUrl: order.redirectUrl,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _darkGreen,
+                      side: const BorderSide(color: _darkGreen, width: 1.2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.local_shipping_outlined, size: 16),
+                    label: Text(
+                      'Lacak Pesanan',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
               ],
             ),
+
+            if (order.statusPembayaran.toLowerCase() ==
+                'menunggu_pembayaran') ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _handleCheckOrderPaymentStatus(order),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _darkGreen,
+                          side: const BorderSide(color: _darkGreen, width: 1.2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: const Icon(Icons.verified_outlined, size: 16),
+                        label: Text(
+                          'Cek Status',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 40,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _handlePayOrderMidtrans(order),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _darkGreen,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: const Icon(Icons.payment_rounded, size: 16),
+                        label: Text(
+                          'Bayar Sekarang',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

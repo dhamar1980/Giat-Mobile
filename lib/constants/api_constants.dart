@@ -1,7 +1,7 @@
 /// Centralized API Constants for GIAT Backend
 class ApiConstants {
   /// URL Server / Cloudflare tunnel
-  static const String serverUrl = 'https://preserve-discover-style-que.trycloudflare.com/api';
+  static const String serverUrl = 'https://lcd-sixth-drops-disturbed.trycloudflare.com/api';
 
   /// URL LAN Wi-Fi (untuk HP di jaringan Wi-Fi lokal)
   static const String lanUrl = 'http://192.168.1.14:8000/api';
@@ -29,4 +29,28 @@ class ApiConstants {
   static const String supabaseDirectUser = 'postgres';
   static const String supabasePoolerUser = 'postgres.auaejgogiyfrefsurahd';
   static const String supabasePassword = 'KnWPC0g1ajTd2VJ8';
+
+  /// Konfigurasi Kredensial Midtrans Payment Gateway (Sandbox)
+  static const String midtransMerchantId = 'M187509004';
+  static const String midtransClientKey = 'Mid-client-uy4tnHFnIkOeFo0R';
+  static const bool midtransIsProduction = false;
+  static const String midtransEnvironment = 'sandbox';
+  static const String midtransSnapJsUrl =
+      'https://app.sandbox.midtrans.com/snap/snap.js';
+  static const String midtransRedirectionBaseUrl =
+      'https://app.sandbox.midtrans.com/snap/v4/redirection/';
+
+  /// Helper untuk membangun Redirect URL Midtrans Snap dari redirect_url atau snap_token
+  static String? resolveMidtransRedirectUrl({
+    String? redirectUrl,
+    String? snapToken,
+  }) {
+    if (redirectUrl != null && redirectUrl.trim().isNotEmpty) {
+      return redirectUrl.trim();
+    }
+    if (snapToken != null && snapToken.trim().isNotEmpty) {
+      return '$midtransRedirectionBaseUrl${snapToken.trim()}';
+    }
+    return null;
+  }
 }

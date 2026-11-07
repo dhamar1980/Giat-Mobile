@@ -763,13 +763,17 @@ class PasienApiService {
   }
 
   /// POST /pasien/obat/beli-umum
-  /// Body: {"id_obat": "...", "id_apotek": "...", "jumlah": 2, "alamat_pengiriman": "..."}
+  /// Body: {"id_obat": "...", "id_apotek": "...", "jumlah": 2, "alamat_pengiriman": "...", "metode_pembayaran": "midtrans_snap", "mode": "snap"}
   Future<ApiResponse<Map<String, dynamic>>> beliObatUmum(Map<String, dynamic> payload) async {
     try {
       final response = await _client.dio.post('/pasien/obat/beli-umum', data: payload);
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Pesanan obat berhasil dibuat.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Pesanan obat berhasil dibuat.',
+        data: data,
         statusCode: response.statusCode,
       );
     } catch (e) {
@@ -778,12 +782,17 @@ class PasienApiService {
   }
 
   /// POST /pasien/obat/checkout
+  /// Body: {"id_apotek": "...", "alamat_pengiriman": "...", "metode_pembayaran": "midtrans_snap", "mode": "snap", "items": [{"id_obat": "...", "jumlah": 2}]}
   Future<ApiResponse<Map<String, dynamic>>> checkoutObat(Map<String, dynamic> payload) async {
     try {
       final response = await _client.dio.post('/pasien/obat/checkout', data: payload);
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Checkout obat berhasil diproses.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Checkout obat berhasil diproses.',
+        data: data,
         statusCode: response.statusCode,
       );
     } catch (e) {
@@ -808,13 +817,109 @@ class PasienApiService {
   }
 
   /// POST /pasien/obat/beli-resep
-  /// Body: {"id_resep": "...", "id_apotek": "...", "alamat_pengiriman": "..."}
+  /// Body: {"id_resep": "...", "id_apotek": "...", "alamat_pengiriman": "...", "metode_pembayaran": "midtrans_snap", "mode": "snap"}
   Future<ApiResponse<Map<String, dynamic>>> beliObatResep(Map<String, dynamic> payload) async {
     try {
       final response = await _client.dio.post('/pasien/obat/beli-resep', data: payload);
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Penebusan resep berhasil diajukan.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Penebusan resep berhasil diajukan.',
+        data: data,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// POST /pasien/obat/pesanan/{id_pesanan}/snap-token (fallback POST /pasien/obat/pesanan/{id_pesanan}/bayar)
+  /// Body: {"mode": "snap", "force_new": false}
+  Future<ApiResponse<Map<String, dynamic>>> getSnapTokenObat(
+    dynamic idPesanan, {
+    bool forceNew = false,
+  }) async {
+    try {
+      dynamic response;
+      try {
+        response = await _client.dio.post(
+          '/pasien/obat/pesanan/$idPesanan/snap-token',
+          data: {
+            'mode': 'snap',
+            'force_new': forceNew,
+          },
+        );
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 404 || dioErr.response?.statusCode == 405) {
+          response = await _client.dio.post(
+            '/pasien/obat/pesanan/$idPesanan/bayar',
+            data: {
+              'metode_pembayaran': 'midtrans_snap',
+              'mode': 'snap',
+              'force_new': forceNew,
+            },
+          );
+        } else {
+          rethrow;
+        }
+      }
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
+      return ApiResponse.success(
+        message: raw?['message'] ?? 'Berhasil memuat Snap Token pesanan obat.',
+        data: data,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// POST /pasien/obat/pesanan/{id_pesanan}/bayar
+  Future<ApiResponse<Map<String, dynamic>>> bayarPesananObat(
+    dynamic idPesanan, {
+    String metodePembayaran = 'midtrans_snap',
+    String mode = 'snap',
+    bool forceNew = false,
+  }) async {
+    try {
+      final response = await _client.dio.post(
+        '/pasien/obat/pesanan/$idPesanan/bayar',
+        data: {
+          'metode_pembayaran': metodePembayaran,
+          'mode': mode,
+          'force_new': forceNew,
+        },
+      );
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
+      return ApiResponse.success(
+        message: raw?['message'] ?? 'Instruksi pembayaran pesanan berhasil diproses.',
+        data: data,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// GET /pasien/obat/pesanan/{id_pesanan}/status-bayar (Auto-Sync Live ke Midtrans API v2)
+  Future<ApiResponse<Map<String, dynamic>>> cekStatusPembayaranObat(dynamic idPesanan) async {
+    try {
+      final response = await _client.dio.get('/pasien/obat/pesanan/$idPesanan/status-bayar');
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
+      return ApiResponse.success(
+        message: raw?['message'] ?? 'Berhasil memeriksa status pembayaran pesanan obat.',
+        data: data,
         statusCode: response.statusCode,
       );
     } catch (e) {

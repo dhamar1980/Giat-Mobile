@@ -33,7 +33,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -63,7 +66,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -77,22 +83,65 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
+    }
+  }
+
+  /// GET /midtrans/config
+  Future<ApiResponse<Map<String, dynamic>>> getMidtransConfig() async {
+    try {
+      final response = await _client.dio.get('/midtrans/config');
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
+      return ApiResponse.success(
+        message: raw?['message'] ?? 'Berhasil memuat konfigurasi Midtrans.',
+        data: data,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
   /// POST /konsultasi/booking
   /// Body: {"id_dokter": "...", "tanggal_konsultasi": "...", "isi_konsultasi": "..."}
+  /// Otomatis membuat Snap Token & Redirect URL Midtrans
   Future<ApiResponse<Map<String, dynamic>>> bookingDokter(Map<String, dynamic> payload) async {
     try {
       final response = await _client.dio.post('/konsultasi/booking', data: payload);
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Booking jadwal konsultasi berhasil dibuat.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Booking jadwal konsultasi berhasil dibuat.',
+        data: data,
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      Map<String, dynamic>? errData;
+      int? status;
+      if (e is DioException) {
+        status = e.response?.statusCode;
+        final rawErr = e.response?.data;
+        if (rawErr is Map && rawErr['data'] is Map) {
+          errData = Map<String, dynamic>.from(rawErr['data'] as Map);
+        }
+      }
+      return ApiResponse(
+        success: false,
+        message: ApiClient.getErrorMessage(e),
+        data: errData,
+        statusCode: status,
+      );
     }
   }
 
@@ -100,42 +149,103 @@ class KonsultasiApiService {
   Future<ApiResponse<Map<String, dynamic>>> getDetailKonsultasi(dynamic id) async {
     try {
       final response = await _client.dio.get('/konsultasi/$id');
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Berhasil memuat rincian konsultasi.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Berhasil memuat rincian konsultasi.',
+        data: data,
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
+    }
+  }
+
+  /// POST /konsultasi/{id}/snap-token (fallback GET /konsultasi/{id}/snap-token)
+  /// Body: {"force_new": false}
+  Future<ApiResponse<Map<String, dynamic>>> getSnapToken(
+    dynamic id, {
+    bool forceNew = false,
+  }) async {
+    try {
+      dynamic response;
+      try {
+        response = await _client.dio.post(
+          '/konsultasi/$id/snap-token',
+          data: {'force_new': forceNew},
+        );
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 405 || dioErr.response?.statusCode == 404) {
+          response = await _client.dio.get(
+            '/konsultasi/$id/snap-token',
+            queryParameters: {'force_new': forceNew},
+          );
+        } else {
+          rethrow;
+        }
+      }
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
+      return ApiResponse.success(
+        message: raw?['message'] ?? 'Berhasil memuat Snap Token konsultasi.',
+        data: data,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
   /// POST /konsultasi/{id}/bayar
-  /// Body: {"metode_pembayaran": "qris"}
+  /// Body: {"metode_pembayaran": "midtrans_snap", "mode": "snap"}
   Future<ApiResponse<Map<String, dynamic>>> bayarKonsultasi(dynamic id, Map<String, dynamic> payload) async {
     try {
       final response = await _client.dio.post('/konsultasi/$id/bayar', data: payload);
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Instruksi pembayaran berhasil diproses.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Instruksi pembayaran berhasil diproses.',
+        data: data,
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
-  /// GET /konsultasi/{id}/status-bayar
+  /// GET /konsultasi/{id}/status-bayar (Auto-Sync Live ke Midtrans API v2)
   Future<ApiResponse<Map<String, dynamic>>> cekStatusPembayaran(dynamic id) async {
     try {
       final response = await _client.dio.get('/konsultasi/$id/status-bayar');
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : (raw is Map ? Map<String, dynamic>.from(raw) : null);
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Berhasil memeriksa status pembayaran.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Berhasil memeriksa status pembayaran.',
+        data: data,
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -162,7 +272,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -183,7 +296,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -197,7 +313,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -238,7 +357,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -256,7 +378,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -270,7 +395,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -288,7 +416,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -306,7 +437,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -324,7 +458,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -338,7 +475,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -356,7 +496,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -377,7 +520,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -434,7 +580,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -448,7 +597,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -482,7 +634,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 
@@ -503,7 +658,10 @@ class KonsultasiApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      return ApiResponse.error(
+        message: ApiClient.getErrorMessage(e),
+        statusCode: e is DioException ? e.response?.statusCode : null,
+      );
     }
   }
 }

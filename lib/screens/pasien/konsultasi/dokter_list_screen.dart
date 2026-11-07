@@ -6,7 +6,9 @@ import 'dokter_detail_screen.dart';
 import 'jadwalkan_konsultasi_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../notifikasi/pasien_notifikasi_screen.dart';
+import '../widgets/midtrans_payment_webview_page.dart';
 import '../widgets/pasien_bottom_navbar.dart';
+import '../../../constants/api_constants.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
@@ -683,15 +685,17 @@ class _DokterListScreenState extends State<DokterListScreen> {
       final status = (c['status'] ?? c['status_konsultasi'] ?? '').toString().toLowerCase();
       final statusBayar = (c['status_pembayaran'] ?? c['status_bayar'] ?? '').toString().toLowerCase();
 
-      // Tampilkan konsultasi yang berstatus lunas atau yang sudah aktif berlangsung
+      // Tampilkan konsultasi yang berstatus lunas, aktif berlangsung, maupun yang sedang menunggu pembayaran Midtrans
       final isLunas = statusBayar == 'lunas' ||
           statusBayar == 'paid' ||
           statusBayar == 'success' ||
+          statusBayar == 'settlement' ||
+          statusBayar == 'capture' ||
           (statusBayar.isEmpty && (status == 'berlangsung' || status == 'aktif'));
       final isWaitingPayment = status == 'menunggu_pembayaran' || statusBayar == 'menunggu_pembayaran';
       final isNotFinished = status != 'selesai' && status != 'dibatalkan' && status != 'cancelled';
 
-      return isLunas && !isWaitingPayment && isNotFinished;
+      return (isLunas || isWaitingPayment) && isNotFinished;
     }).toList();
 
     // Urutkan upcoming: yang sedang 'berlangsung'/'aktif' diutamakan, lalu urutkan dari waktu terbaru
@@ -1035,8 +1039,192 @@ class _DokterListScreenState extends State<DokterListScreen> {
     return (c['id'] ?? c['id_konsultasi'] ?? c['konsultasi_id'] ?? '').toString();
   }
 
+  Future<void> _openMidtransForConsultation(
+    Map<String, dynamic> c, {
+    required String consultationId,
+    required String doctorName,
+    required String specialty,
+    required String avatarUrl,
+  }) async {
+    String? redirectUrl = c['redirect_url']?.toString();
+    String? snapToken = c['snap_token']?.toString();
+    String? noInvoice = c['no_invoice']?.toString();
+
+    if (ApiConstants.resolveMidtransRedirectUrl(
+          redirectUrl: redirectUrl,
+          snapToken: snapToken,
+        ) ==
+        null) {
+      final snapRes = await KonsultasiApiService()
+          .getSnapToken(consultationId, forceNew: false);
+      if (snapRes.success && snapRes.data != null) {
+        redirectUrl = snapRes.data!['redirect_url']?.toString() ?? redirectUrl;
+        snapToken = snapRes.data!['snap_token']?.toString() ?? snapToken;
+        noInvoice = snapRes.data!['no_invoice']?.toString() ?? noInvoice;
+      } else {
+        final bayarRes = await KonsultasiApiService().bayarKonsultasi(
+          consultationId,
+          {'metode_pembayaran': 'midtrans_snap', 'mode': 'snap'},
+        );
+        if (bayarRes.success && bayarRes.data != null) {
+          redirectUrl =
+              bayarRes.data!['redirect_url']?.toString() ?? redirectUrl;
+          snapToken = bayarRes.data!['snap_token']?.toString() ?? snapToken;
+          noInvoice = bayarRes.data!['no_invoice']?.toString() ?? noInvoice;
+        }
+      }
+    }
+
+    final resolvedUrl = ApiConstants.resolveMidtransRedirectUrl(
+      redirectUrl: redirectUrl,
+      snapToken: snapToken,
+    );
+
+    if (!mounted) return;
+    if (resolvedUrl == null || resolvedUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Gagal memuat halaman pembayaran Midtrans untuk sesi ini.',
+            style: GoogleFonts.inter(fontSize: 12.5),
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    final webViewRes = await Navigator.push<MidtransPaymentResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MidtransPaymentWebViewPage(
+          redirectUrl: resolvedUrl,
+          snapToken: snapToken,
+          title: 'Pembayaran Konsultasi',
+          subtitle: 'Konsultasi dengan $doctorName',
+          orderId: noInvoice ?? 'KONS-$consultationId',
+          onCheckStatus: () async {
+            final res = await KonsultasiApiService()
+                .cekStatusPembayaran(consultationId);
+            return res.data;
+          },
+          onRefreshSnapUrl: () async {
+            final r = await KonsultasiApiService()
+                .getSnapToken(consultationId, forceNew: true);
+            if (r.success && r.data != null) {
+              return ApiConstants.resolveMidtransRedirectUrl(
+                redirectUrl: r.data!['redirect_url']?.toString(),
+                snapToken: r.data!['snap_token']?.toString(),
+              );
+            }
+            return null;
+          },
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    bool isLunas = webViewRes?.isPaid == true;
+    if (!isLunas) {
+      final checkRes =
+          await KonsultasiApiService().cekStatusPembayaran(consultationId);
+      if (checkRes.success && checkRes.data != null) {
+        isLunas = MidtransPaymentWebViewPage.isStatusLunas(checkRes.data);
+      }
+    }
+
+    await _fetchKonsultasiSaya();
+    if (!mounted) return;
+
+    if (isLunas) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pembayaran Konsultasi Lunas! Membuka ruang Chat & Video Call dengan $doctorName...',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: _darkGreen,
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => KonsultasiChatScreen(
+            doctorName: doctorName,
+            specialty: specialty,
+            avatarUrl: avatarUrl.isNotEmpty
+                ? avatarUrl
+                : 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+            consultationId: consultationId,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _checkConsultationPaymentStatus({
+    required String consultationId,
+    required String doctorName,
+    required String specialty,
+    required String avatarUrl,
+  }) async {
+    final checkRes =
+        await KonsultasiApiService().cekStatusPembayaran(consultationId);
+    if (!mounted) return;
+    final isLunas = MidtransPaymentWebViewPage.isStatusLunas(checkRes.data);
+    await _fetchKonsultasiSaya();
+    if (!mounted) return;
+
+    if (isLunas) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pembayaran Terverifikasi Lunas! Membuka Chat & Video Call dengan $doctorName...',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: _darkGreen,
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => KonsultasiChatScreen(
+            doctorName: doctorName,
+            specialty: specialty,
+            avatarUrl: avatarUrl.isNotEmpty
+                ? avatarUrl
+                : 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+            consultationId: consultationId,
+          ),
+        ),
+      );
+    } else {
+      final statusStr =
+          (checkRes.data?['status_pembayaran'] ?? 'menunggu_pembayaran')
+              .toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Status pembayaran masih ${statusStr.replaceAll('_', ' ')}. Silakan klik "Bayar Sekarang" untuk menyelesaikan di Midtrans.',
+            style: GoogleFonts.inter(fontSize: 12.5),
+          ),
+          backgroundColor: const Color(0xFFD97706),
+        ),
+      );
+    }
+  }
+
   Widget _buildConsultationItemCard(Map<String, dynamic> c, {required bool isOngoing}) {
     final id = (c['id'] ?? c['id_konsultasi'] ?? c['konsultasi_id'] ?? '').toString();
+    final statusKons = (c['status'] ?? c['status_konsultasi'] ?? '').toString().toLowerCase();
+    final statusBayar = (c['status_pembayaran'] ?? c['status_bayar'] ?? '').toString().toLowerCase();
+    final isWaitingPayment = statusKons == 'menunggu_pembayaran' || statusBayar == 'menunggu_pembayaran';
     final dokter = (c['dokter'] is Map) ? (c['dokter'] as Map) : <String, dynamic>{};
     String doctorName = (dokter['nama'] ?? c['nama_dokter'] ?? 'Dr. Anisa Putri').toString();
     String specialty = (dokter['spesialisasi'] ?? c['spesialisasi'] ?? 'Spesialis Penyakit Dalam').toString();
@@ -1127,15 +1315,21 @@ class _DokterListScreenState extends State<DokterListScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: isOngoing ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                                  color: isWaitingPayment
+                                      ? const Color(0xFFFEF3C7)
+                                      : (isOngoing ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9)),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  isOngoing ? 'Aktif' : 'Selesai',
+                                  isWaitingPayment
+                                      ? 'Menunggu Pembayaran'
+                                      : (isOngoing ? 'Aktif' : 'Selesai'),
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: isOngoing ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                                    color: isWaitingPayment
+                                        ? const Color(0xFFD97706)
+                                        : (isOngoing ? const Color(0xFF16A34A) : const Color(0xFF64748B)),
                                   ),
                                 ),
                               ),
@@ -1204,56 +1398,122 @@ class _DokterListScreenState extends State<DokterListScreen> {
 
                 const SizedBox(height: 14),
 
-                // Action Button: navigates with this exact consultation ID!
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isOngoing ? _darkGreen : Colors.white,
-                      foregroundColor: isOngoing ? Colors.white : _darkGreen,
-                      side: isOngoing ? BorderSide.none : const BorderSide(color: _darkGreen, width: 1.5),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => KonsultasiChatScreen(
-                            doctorName: doctorName,
-                            specialty: specialty,
-                            avatarUrl: avatarUrl.isNotEmpty
-                                ? avatarUrl
-                                : 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
-                            consultationId: id,
+                // Action Button: jika menunggu_pembayaran tampilkan Bayar Sekarang & Cek Status
+                if (isWaitingPayment)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 46,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _darkGreen,
+                              side: const BorderSide(color: _darkGreen, width: 1.3),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () => _checkConsultationPaymentStatus(
+                              consultationId: id,
+                              doctorName: doctorName,
+                              specialty: specialty,
+                              avatarUrl: avatarUrl,
+                            ),
+                            icon: const Icon(Icons.verified_outlined, size: 17),
+                            label: Text(
+                              'Cek Status',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
-                      );
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isOngoing ? Icons.videocam_rounded : Icons.chat_outlined,
-                          size: 19,
-                          color: isOngoing ? Colors.white : _darkGreen,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: SizedBox(
+                          height: 46,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _darkGreen,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () => _openMidtransForConsultation(
+                              c,
+                              consultationId: id,
+                              doctorName: doctorName,
+                              specialty: specialty,
+                              avatarUrl: avatarUrl,
+                            ),
+                            icon: const Icon(Icons.payment_rounded, size: 18),
+                            label: Text(
+                              'Bayar Sekarang',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          isOngoing ? 'Masuk Konsultasi' : 'Lihat Riwayat Chat',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                      ),
+                    ],
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isOngoing ? _darkGreen : Colors.white,
+                        foregroundColor: isOngoing ? Colors.white : _darkGreen,
+                        side: isOngoing ? BorderSide.none : const BorderSide(color: _darkGreen, width: 1.5),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => KonsultasiChatScreen(
+                              doctorName: doctorName,
+                              specialty: specialty,
+                              avatarUrl: avatarUrl.isNotEmpty
+                                  ? avatarUrl
+                                  : 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+                              consultationId: id,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isOngoing ? Icons.videocam_rounded : Icons.chat_outlined,
+                            size: 19,
                             color: isOngoing ? Colors.white : _darkGreen,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Text(
+                            isOngoing ? 'Masuk Konsultasi' : 'Lihat Riwayat Chat',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isOngoing ? Colors.white : _darkGreen,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

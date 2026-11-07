@@ -130,7 +130,9 @@ class ApiClient {
           return handler.next(response);
         },
         onError: (DioException error, handler) async {
-          debugPrint('❌ [API Error] ${error.response?.statusCode} ${error.requestOptions.path}: ${error.message}');
+          debugPrint(
+            '❌ [API Error] ${error.response?.statusCode} ${error.requestOptions.path}: ${error.message} | Response: ${error.response?.data}',
+          );
           
           // Handle 401 Unauthenticated: only redirect if user had an active real token
           if (error.response?.statusCode == 401) {

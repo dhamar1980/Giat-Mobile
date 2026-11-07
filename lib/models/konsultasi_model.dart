@@ -60,6 +60,10 @@ class KonsultasiSession {
   final String status;
   final String statusPembayaran;
   final String? metodePembayaran;
+  final String? noInvoice;
+  final String? snapToken;
+  final String? redirectUrl;
+  final String? roomId;
   final String? videoCallUrl;
   final int totalBiaya;
   final String? isiKonsultasi;
@@ -75,6 +79,10 @@ class KonsultasiSession {
     required this.status,
     required this.statusPembayaran,
     this.metodePembayaran,
+    this.noInvoice,
+    this.snapToken,
+    this.redirectUrl,
+    this.roomId,
     this.videoCallUrl,
     this.totalBiaya = 150000,
     this.isiKonsultasi,
@@ -85,17 +93,24 @@ class KonsultasiSession {
     final dokterData = json['dokter'] is Map<String, dynamic> ? json['dokter'] as Map<String, dynamic> : {};
 
     return KonsultasiSession(
-      id: json['id'],
+      id: json['id'] ?? json['id_konsultasi'],
       idDokter: json['id_dokter'] ?? dokterData['id'],
       namaDokter: dokterData['nama']?.toString() ?? json['nama_dokter']?.toString() ?? 'Dokter GIAT',
       spesialisasiDokter: dokterData['spesialisasi']?.toString() ?? json['spesialisasi']?.toString() ?? 'Spesialis Ginjal',
       avatarDokter: dokterData['foto_profile']?.toString() ?? json['avatar_dokter']?.toString(),
       tanggalKonsultasi: json['tanggal_konsultasi']?.toString() ?? json['tanggal']?.toString() ?? '',
-      status: json['status']?.toString() ?? 'menunggu_pembayaran',
-      statusPembayaran: json['status_pembayaran']?.toString() ?? json['status_bayar']?.toString() ?? 'belum_dibayar',
+      status: json['status_konsultasi']?.toString() ?? json['status']?.toString() ?? 'menunggu_pembayaran',
+      statusPembayaran: json['status_pembayaran']?.toString() ?? json['status_bayar']?.toString() ?? 'menunggu_pembayaran',
       metodePembayaran: json['metode_pembayaran']?.toString(),
+      noInvoice: json['no_invoice']?.toString(),
+      snapToken: json['snap_token']?.toString(),
+      redirectUrl: json['redirect_url']?.toString(),
+      roomId: json['room_id']?.toString(),
       videoCallUrl: json['video_call_url']?.toString(),
-      totalBiaya: int.tryParse(json['total_biaya']?.toString() ?? json['tarif']?.toString() ?? '150000') ?? 150000,
+      totalBiaya: double.tryParse(
+            (json['total_biaya'] ?? json['biaya'] ?? json['jumlah_bayar'] ?? json['tarif'] ?? '150000').toString(),
+          )?.round() ??
+          150000,
       isiKonsultasi: json['isi_konsultasi']?.toString() ?? json['keluhan']?.toString(),
       resep: json['resep'],
     );

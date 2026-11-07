@@ -2,10 +2,13 @@ import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'detail_resep_screen.dart';
+import 'lacak_obat_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../widgets/midtrans_payment_webview_page.dart';
 import 'pembayaran_model.dart';
 import 'pembayaran_qris_screen.dart';
 import 'pembayaran_transfer_bank_screen.dart';
+import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
 import '../../../utils/time_utils.dart';
 
@@ -16,11 +19,13 @@ import '../../../utils/time_utils.dart';
 class CheckoutResepScreen extends StatefulWidget {
   final String userName;
   final ResepDokterData? resepData;
+  final List<Map<String, dynamic>>? cartItems;
 
   const CheckoutResepScreen({
     super.key,
     this.userName = 'Pasien',
     this.resepData,
+    this.cartItems,
   });
 
   @override
@@ -37,8 +42,14 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
   // Delivery method state: 'antar' or 'ambil'
   String _metodePengambilan = 'antar';
 
-  // Payment method state: 'qris' or 'transfer'
-  String _metodePembayaran = 'qris';
+  // Payment method state: 'gopay', 'virtual_account', 'credit_card', 'shopeepay', 'qris'
+  String _metodePembayaran = 'gopay';
+  String _selectedVaBank = 'bca_va';
+  bool _isProcessingCheckout = false;
+  String? _activePesananId;
+  String? _activeNoPesanan;
+  String? _activeSnapToken;
+  String? _activeRedirectUrl;
 
   // Patient address state
   String _recipientName = 'Budi Santoso';
@@ -851,161 +862,72 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // SECTION 7: METODE PEMBAYARAN
+  // SECTION 7: METODE PEMBAYARAN (DIPECAH PER KANAL MIDTRANS)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildMetodePembayaranSection() {
-    final isQris = _metodePembayaran == 'qris';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Metode Pembayaran',
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Metode Pembayaran',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 9,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF86EFAC),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.verified_user_rounded,
+                    size: 12,
+                    color: _darkGreen,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Midtrans Snap',
+                    style: GoogleFonts.inter(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: _darkGreen,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-
-        // Opsi 1: QRIS (Selected)
-        GestureDetector(
-          onTap: () => setState(() => _metodePembayaran = 'qris'),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              color: isQris ? const Color(0xFFF0FDF4) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isQris ? _darkGreen : _cardBorderColor,
-                width: isQris ? 1.5 : 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _buildRadioIcon(selected: isQris),
-                const SizedBox(width: 10),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: _darkGreen,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'QRIS',
-                        style: GoogleFonts.inter(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'GoPay, OVO, ShopeePay, BCA, dll.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  'Instan',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF065A37),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 10),
-
-        // Opsi 2: Transfer Bank (Virtual Account)
-        GestureDetector(
-          onTap: () => setState(() => _metodePembayaran = 'transfer'),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              color: !isQris ? const Color(0xFFF0FDF4) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: !isQris ? _darkGreen : _cardBorderColor,
-                width: !isQris ? 1.5 : 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _buildRadioIcon(selected: !isQris),
-                const SizedBox(width: 10),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F2FE),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.account_balance_outlined, color: _darkGreen, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Transfer Bank',
-                        style: GoogleFonts.inter(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Virtual Account BCA, Mandiri, BNI, BRI',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B), size: 22),
-              ],
-            ),
-          ),
+        MidtransPaymentMethodSelector(
+          selectedMethodId: _metodePembayaran,
+          selectedVaBankId: _selectedVaBank,
+          onMethodChanged: (methodId) {
+            setState(() {
+              _metodePembayaran = methodId;
+            });
+          },
+          onVaBankChanged: (bankId) {
+            setState(() {
+              _selectedVaBank = bankId;
+            });
+          },
         ),
       ],
     );
@@ -1132,37 +1054,77 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
   // TOMBOL KONFIRMASI & BAYAR
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildKonfirmasiDanBayarButton(BuildContext context) {
+    final readableMethod = MidtransChannelOption.getReadableMethodLabel(
+      _metodePembayaran,
+      vaBankId: _selectedVaBank,
+    );
     return SizedBox(
       width: double.infinity,
-      height: 48,
+      height: 50,
       child: ElevatedButton(
-        onPressed: () => _handleKonfirmasiDanBayar(context),
+        onPressed: _isProcessingCheckout
+            ? null
+            : () => _handleKonfirmasiDanBayar(context),
         style: ElevatedButton.styleFrom(
           backgroundColor: _darkGreen,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: _darkGreen.withValues(alpha: 0.78),
+          disabledForegroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
           elevation: 0,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Konfirmasi & Bayar',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+        child: _isProcessingCheckout
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      'Membuka $readableMethod...',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      _activePesananId != null
+                          ? 'Lanjutkan Bayar • $readableMethod'
+                          : 'Bayar dengan $readableMethod',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_circle_right_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.arrow_circle_right_outlined,
-              color: Colors.white,
-              size: 20,
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1305,46 +1267,349 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // ACTION: KONFIRMASI & BAYAR
+  // ACTION: KONFIRMASI & BAYAR (MIDTRANS SNAP)
   // ───────────────────────────────────────────────────────────────────────────
-  void _handleKonfirmasiDanBayar(BuildContext context) {
+  Future<void> _handleKonfirmasiDanBayar(BuildContext context) async {
+    if (_isProcessingCheckout) return;
+    setState(() => _isProcessingCheckout = true);
+
     final rxNumber = widget.resepData?.rxNumber ?? 'RX-2026-0901-08';
     final itemCount = widget.resepData != null
         ? '${widget.resepData!.medications.length} jenis obat'
-        : '2 jenis obat';
+        : (widget.cartItems != null && widget.cartItems!.isNotEmpty
+            ? '${widget.cartItems!.length} jenis obat'
+            : '2 jenis obat');
+
+    String? idPesanan = _activePesananId;
+    String? noPesanan = _activeNoPesanan;
+    String? snapToken = _activeSnapToken;
+    String? redirectUrl = _activeRedirectUrl;
+    int finalTotalAmount = _totalPembayaran;
+
+    try {
+      // 1. Jika belum punya pesanan yang dibuat pada sesi checkout ini, buat pesanan baru dengan mode: "snap"
+      if (idPesanan == null || idPesanan.isEmpty) {
+        String? validApotekId;
+        List<Map<String, dynamic>> resolvedItems = [];
+
+        // Ambil katalog obat dari backend untuk memastikan id_obat dan id_apotek valid (UUID)
+        final katalogRes = await PasienApiService().getObatList();
+        final katalogList = katalogRes.data ?? [];
+        if (katalogList.isNotEmpty) {
+          final firstObat = katalogList.first;
+          if (firstObat is Map) {
+            validApotekId = (firstObat['id_apotek'] ??
+                    (firstObat['apotek'] is Map
+                        ? firstObat['apotek']['id'] ??
+                            firstObat['apotek']['id_apotek']
+                        : null))
+                ?.toString();
+          }
+        }
+
+        // Susun items untuk POST /api/pasien/obat/checkout
+        if (widget.cartItems != null && widget.cartItems!.isNotEmpty) {
+          for (final ci in widget.cartItems!) {
+            String rawId = (ci['id_obat'] ?? ci['id'] ?? '').toString();
+            final qty = int.tryParse((ci['jumlah'] ?? 1).toString()) ?? 1;
+            if (rawId.length < 10 && katalogList.isNotEmpty) {
+              final namaMatch = (ci['nama'] ?? '').toString().toLowerCase();
+              final matched = katalogList.firstWhere(
+                (k) =>
+                    k is Map &&
+                    (k['nama_obat'] ?? k['nama'] ?? '')
+                        .toString()
+                        .toLowerCase()
+                        .contains(namaMatch.split(' ').first),
+                orElse: () => katalogList.first,
+              );
+              if (matched is Map) {
+                rawId = (matched['id_obat'] ?? matched['id'] ?? rawId).toString();
+                validApotekId ??= (matched['id_apotek'] ??
+                        (matched['apotek'] is Map
+                            ? matched['apotek']['id'] ??
+                                matched['apotek']['id_apotek']
+                            : null))
+                    ?.toString();
+              }
+            }
+            if (rawId.isNotEmpty) {
+              resolvedItems.add({'id_obat': rawId, 'jumlah': qty});
+            }
+          }
+        } else if (katalogList.isNotEmpty) {
+          final first = katalogList.first;
+          if (first is Map) {
+            final idObat = (first['id_obat'] ?? first['id'] ?? '').toString();
+            if (idObat.isNotEmpty) {
+              resolvedItems.add({'id_obat': idObat, 'jumlah': 1});
+            }
+          }
+        }
+
+        Map<String, dynamic>? createdData;
+
+        // A. Coba POST /api/pasien/obat/checkout dengan "mode": "snap"
+        if (resolvedItems.isNotEmpty) {
+          final checkoutPayload = <String, dynamic>{
+            if (validApotekId != null && validApotekId.isNotEmpty)
+              'id_apotek': validApotekId,
+            'alamat_pengiriman': _recipientAddress,
+            'metode_pembayaran': 'midtrans_snap',
+            'mode': 'snap',
+            'items': resolvedItems,
+          };
+          final checkoutRes =
+              await PasienApiService().checkoutObat(checkoutPayload);
+          if (checkoutRes.success && checkoutRes.data != null) {
+            createdData = checkoutRes.data;
+          }
+        }
+
+        // B. Jika dari resep & checkout belum menghasilkan data, coba POST /api/pasien/obat/beli-resep
+        if (createdData == null && widget.resepData != null) {
+          final cleanRx = rxNumber.replaceAll('No.', '').trim();
+          final resepRes = await PasienApiService().beliObatResep({
+            'id_resep': cleanRx,
+            'resep_id': cleanRx,
+            if (validApotekId != null && validApotekId.isNotEmpty)
+              'id_apotek': validApotekId,
+            'alamat_pengiriman': _recipientAddress,
+            'metode_pembayaran': 'midtrans_snap',
+            'mode': 'snap',
+          });
+          if (resepRes.success && resepRes.data != null) {
+            createdData = resepRes.data;
+          }
+        }
+
+        // C. Fallback ke POST /api/pasien/obat/beli-umum jika diperlukan
+        if (createdData == null && resolvedItems.isNotEmpty) {
+          final firstItem = resolvedItems.first;
+          final beliUmumRes = await PasienApiService().beliObatUmum({
+            'id_obat': firstItem['id_obat'],
+            if (validApotekId != null && validApotekId.isNotEmpty)
+              'id_apotek': validApotekId,
+            'jumlah': firstItem['jumlah'] ?? 1,
+            'alamat_pengiriman': _recipientAddress,
+            'metode_pembayaran': 'midtrans_snap',
+            'mode': 'snap',
+          });
+          if (beliUmumRes.success && beliUmumRes.data != null) {
+            createdData = beliUmumRes.data;
+          }
+        }
+
+        if (createdData != null) {
+          idPesanan =
+              (createdData['id'] ?? createdData['id_pembelian'])?.toString();
+          noPesanan = createdData['no_pesanan']?.toString();
+          snapToken = createdData['snap_token']?.toString();
+          redirectUrl = createdData['redirect_url']?.toString();
+          final parsedTotal = double.tryParse(
+                (createdData['total_bayar'] ??
+                        createdData['total_harga'] ??
+                        _totalPembayaran)
+                    .toString(),
+              )?.round();
+          if (parsedTotal != null && parsedTotal > 0) {
+            finalTotalAmount = parsedTotal;
+          }
+        }
+      }
+
+      // 2. Jika idPesanan sudah ada namun redirect_url / snap_token belum ada, panggil /snap-token
+      if (idPesanan != null &&
+          idPesanan.isNotEmpty &&
+          ApiConstants.resolveMidtransRedirectUrl(
+                redirectUrl: redirectUrl,
+                snapToken: snapToken,
+              ) ==
+              null) {
+        final snapRes = await PasienApiService()
+            .getSnapTokenObat(idPesanan, forceNew: false);
+        if (snapRes.success && snapRes.data != null) {
+          snapToken = snapRes.data!['snap_token']?.toString() ?? snapToken;
+          redirectUrl =
+              snapRes.data!['redirect_url']?.toString() ?? redirectUrl;
+          noPesanan = snapRes.data!['no_pesanan']?.toString() ?? noPesanan;
+        }
+      }
+
+      _activePesananId = idPesanan;
+      _activeNoPesanan = noPesanan;
+      _activeSnapToken = snapToken;
+      _activeRedirectUrl = redirectUrl;
+    } catch (e) {
+      debugPrint('Checkout Midtrans obat notice: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessingCheckout = false);
+      }
+    }
+
+    if (!context.mounted) return;
+
+    final resolvedUrl = ApiConstants.resolveMidtransRedirectUrl(
+      redirectUrl: redirectUrl,
+      snapToken: snapToken,
+    );
+
+    final readableMethod = MidtransChannelOption.getReadableMethodLabel(
+      _metodePembayaran,
+      vaBankId: _selectedVaBank,
+    );
 
     final orderData = OrderCheckoutData(
-      orderNumber: 'ORD-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-001',
+      idPesanan: idPesanan,
+      orderNumber: noPesanan ??
+          'ORD-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-001',
       prescriptionNumber: rxNumber,
       itemCount: itemCount,
-      totalAmount: _totalPembayaran,
-      totalAmountFormatted: _formatCurrency(_totalPembayaran),
-      paymentMethod: _metodePembayaran == 'qris' ? 'QRIS' : 'BCA Virtual Account',
+      totalAmount: finalTotalAmount,
+      totalAmountFormatted: _formatCurrency(finalTotalAmount),
+      paymentMethod: readableMethod,
       virtualAccountNumber: '8077 0812 3456 7890',
-      transactionTime: '01 Sept 2026, 14:32 ${TimeUtils.getTimeZoneName()}',
-      pickupMethod: _metodePengambilan == 'antar' ? 'Antar ke Alamat' : 'Ambil di Apotek',
+      transactionTime: TimeUtils.formatDate(
+        DateTime.now().toIso8601String(),
+        useIndonesianMonth: true,
+      ),
+      pickupMethod: _metodePengambilan == 'antar'
+          ? 'Antar ke Alamat'
+          : 'Ambil di Apotek',
       recipientName: _recipientName,
       recipientPhone: _recipientPhone,
       recipientAddress: _recipientAddress,
       estimatedArrival: 'Hari ini, 16:30 - 17:00 ${TimeUtils.getTimeZoneName()}',
+      snapToken: snapToken,
+      redirectUrl: resolvedUrl,
+      statusPembayaran: 'menunggu_pembayaran',
     );
 
-    // Kirim konfirmasi tebus resep ke REST API Pasien Laravel Sanctum
-    PasienApiService().beliObatResep({
-      'resep_id': rxNumber,
-      'metode_pengambilan': _metodePengambilan,
-      'metode_pembayaran': _metodePembayaran,
-      'penerima': _recipientName,
-      'nomor_telepon': _recipientPhone,
-      'alamat_pengiriman': _recipientAddress,
-      'total_biaya': _totalPembayaran,
-    });
+    // 3. Jika redirect_url Midtrans Snap tersedia, buka MidtransPaymentWebViewPage
+    if (resolvedUrl != null &&
+        resolvedUrl.isNotEmpty &&
+        idPesanan != null &&
+        idPesanan.isNotEmpty) {
+      final webViewResult = await Navigator.push<MidtransPaymentResult>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MidtransPaymentWebViewPage(
+            redirectUrl: resolvedUrl,
+            snapToken: snapToken,
+            title: 'Pembayaran Obat Apotek',
+            subtitle: 'Pesanan Obat Apotek Mitra GIAT',
+            amountFormatted: orderData.totalAmountFormatted,
+            preferredMethodId: _metodePembayaran,
+            preferredVaBankId: _selectedVaBank,
+            onCheckStatus: () async {
+              final statusRes =
+                  await PasienApiService().cekStatusPembayaranObat(idPesanan);
+              return statusRes.data;
+            },
+            onRefreshSnapUrl: () async {
+              final refreshRes = await PasienApiService()
+                  .getSnapTokenObat(idPesanan, forceNew: true);
+              if (refreshRes.success && refreshRes.data != null) {
+                _activeSnapToken =
+                    refreshRes.data!['snap_token']?.toString();
+                _activeRedirectUrl =
+                    refreshRes.data!['redirect_url']?.toString();
+                return ApiConstants.resolveMidtransRedirectUrl(
+                  redirectUrl: _activeRedirectUrl,
+                  snapToken: _activeSnapToken,
+                );
+              }
+              return null;
+            },
+          ),
+        ),
+      );
 
-    if (_metodePembayaran == 'qris') {
+      if (!context.mounted) return;
+
+      // 4. Setelah keluar dari WebView, panggil GET /api/pasien/obat/pesanan/{id}/status-bayar
+      bool isLunas = webViewResult?.isPaid == true;
+      Map<String, dynamic>? latestStatusData = webViewResult?.statusData;
+
+      if (!isLunas) {
+        setState(() => _isProcessingCheckout = true);
+        final checkRes =
+            await PasienApiService().cekStatusPembayaranObat(idPesanan);
+        if (mounted) {
+          setState(() => _isProcessingCheckout = false);
+        }
+        if (checkRes.success && checkRes.data != null) {
+          latestStatusData = checkRes.data;
+          isLunas = MidtransPaymentWebViewPage.isStatusLunas(latestStatusData);
+        }
+      }
+
+      if (!context.mounted) return;
+
+      final updatedOrderData = orderData.copyWith(
+        statusPembayaran: isLunas ? 'lunas' : 'menunggu_pembayaran',
+        statusPesanan: latestStatusData?['status_pesanan']?.toString() ??
+            orderData.statusPesanan,
+      );
+
+      // 5. Jika status_pembayaran == 'lunas', arahkan pasien ke halaman Detail / Lacak Pesanan Obat
+      if (isLunas) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Pembayaran Obat Berhasil (Lunas)! Mengarahkan ke halaman Detail & Lacak Pesanan...',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            backgroundColor: _darkGreen,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LacakObatScreen(
+              userName: widget.userName,
+              orderData: updatedOrderData,
+            ),
+          ),
+        );
+        return;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Pesanan obat berstatus Menunggu Pembayaran. Anda dapat melanjutkan pembayaran di halaman Detail / Riwayat Pesanan.',
+              style: GoogleFonts.inter(fontSize: 12.5),
+            ),
+            backgroundColor: const Color(0xFFD97706),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LacakObatScreen(
+              userName: widget.userName,
+              orderData: updatedOrderData,
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    // Fallback jika redirect_url tidak tersedia
+    if (_metodePembayaran == 'virtual_account') {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => PembayaranQrisScreen(
+          builder: (context) => PembayaranTransferBankScreen(
             userName: widget.userName,
             orderData: orderData,
           ),
@@ -1354,7 +1619,7 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => PembayaranTransferBankScreen(
+          builder: (context) => PembayaranQrisScreen(
             userName: widget.userName,
             orderData: orderData,
           ),

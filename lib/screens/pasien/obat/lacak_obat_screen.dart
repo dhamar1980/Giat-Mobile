@@ -2,6 +2,10 @@ import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../widgets/midtrans_payment_webview_page.dart';
+import 'pembayaran_model.dart';
+import '../../../constants/api_constants.dart';
+import '../../../services/pasien_api_service.dart';
 import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13,6 +17,8 @@ class LacakObatScreen extends StatefulWidget {
   final String orderId;
   final String estimasiTiba;
   final String status;
+  final OrderCheckoutData? orderData;
+  final String? pesananId;
 
   const LacakObatScreen({
     super.key,
@@ -20,6 +26,8 @@ class LacakObatScreen extends StatefulWidget {
     this.orderId = '#G-9021',
     this.estimasiTiba = 'Hari ini, 15:30 WIB',
     this.status = 'Sedang Diproses',
+    this.orderData,
+    this.pesananId,
   });
 
   @override
@@ -31,6 +39,179 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
   static const _amberStatus = Color(0xFFE5A100);
+
+  late String _displayOrderNo;
+  late String _displayStatusPesanan;
+  late String _statusPembayaran;
+  String? _pesananUuid;
+  String? _snapToken;
+  String? _redirectUrl;
+  bool _isCheckingPayment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pesananUuid = widget.pesananId ?? widget.orderData?.idPesanan;
+    _displayOrderNo = widget.orderData?.orderNumber ?? widget.orderId;
+    _displayStatusPesanan = widget.orderData != null
+        ? _formatStatusPesanan(widget.orderData!.statusPesanan)
+        : widget.status;
+    _statusPembayaran =
+        widget.orderData?.statusPembayaran ?? 'lunas';
+    _snapToken = widget.orderData?.snapToken;
+    _redirectUrl = widget.orderData?.redirectUrl;
+
+    if (_pesananUuid != null && _pesananUuid!.isNotEmpty) {
+      _syncPaymentAndTrackingStatus(silent: true);
+    }
+  }
+
+  String _formatStatusPesanan(String raw) {
+    final s = raw.toLowerCase().trim();
+    if (s == 'menunggu_konfirmasi') return 'Menunggu Konfirmasi';
+    if (s == 'diproses') return 'Sedang Diproses';
+    if (s == 'dikirim') return 'Dalam Pengiriman';
+    if (s == 'selesai') return 'Pesanan Selesai';
+    if (s == 'dibatalkan') return 'Dibatalkan';
+    return widget.status;
+  }
+
+  Future<void> _syncPaymentAndTrackingStatus({bool silent = false}) async {
+    final id = _pesananUuid;
+    if (id == null || id.isEmpty) return;
+
+    if (!silent && mounted) {
+      setState(() => _isCheckingPayment = true);
+    }
+
+    try {
+      final statusRes = await PasienApiService().cekStatusPembayaranObat(id);
+      if (!mounted) return;
+      if (statusRes.success && statusRes.data != null) {
+        final d = statusRes.data!;
+        final isPaid = MidtransPaymentWebViewPage.isStatusLunas(d);
+        setState(() {
+          _statusPembayaran = isPaid
+              ? 'lunas'
+              : (d['status_pembayaran']?.toString() ?? _statusPembayaran);
+          if (d['no_pesanan'] != null) {
+            _displayOrderNo = d['no_pesanan'].toString();
+          }
+          if (d['status_pesanan'] != null) {
+            _displayStatusPesanan =
+                _formatStatusPesanan(d['status_pesanan'].toString());
+          }
+          _snapToken = d['snap_token']?.toString() ?? _snapToken;
+          _redirectUrl = d['redirect_url']?.toString() ?? _redirectUrl;
+        });
+
+        if (!silent) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isPaid
+                    ? 'Pembayaran Pesanan $_displayOrderNo telah LUNAS!'
+                    : 'Status pembayaran masih ${_statusPembayaran.replaceAll('_', ' ')}.',
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              backgroundColor:
+                  isPaid ? _darkGreen : const Color(0xFFD97706),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Sync status bayar obat notice: $e');
+    } finally {
+      if (mounted && !silent) {
+        setState(() => _isCheckingPayment = false);
+      }
+    }
+  }
+
+  Future<void> _openMidtransSnapPayment() async {
+    final id = _pesananUuid;
+    String? resolvedUrl = ApiConstants.resolveMidtransRedirectUrl(
+      redirectUrl: _redirectUrl,
+      snapToken: _snapToken,
+    );
+
+    if (resolvedUrl == null && id != null && id.isNotEmpty) {
+      setState(() => _isCheckingPayment = true);
+      final snapRes =
+          await PasienApiService().getSnapTokenObat(id, forceNew: false);
+      if (mounted) {
+        setState(() => _isCheckingPayment = false);
+      }
+      if (snapRes.success && snapRes.data != null) {
+        _snapToken = snapRes.data!['snap_token']?.toString() ?? _snapToken;
+        _redirectUrl =
+            snapRes.data!['redirect_url']?.toString() ?? _redirectUrl;
+        resolvedUrl = ApiConstants.resolveMidtransRedirectUrl(
+          redirectUrl: _redirectUrl,
+          snapToken: _snapToken,
+        );
+      }
+    }
+
+    if (!mounted) return;
+    if (resolvedUrl == null || resolvedUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'URL pembayaran Midtrans tidak ditemukan untuk pesanan ini.',
+            style: GoogleFonts.inter(fontSize: 12.5),
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    final webViewRes = await Navigator.push<MidtransPaymentResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MidtransPaymentWebViewPage(
+          redirectUrl: resolvedUrl,
+          snapToken: _snapToken,
+          title: 'Pembayaran Obat Apotek',
+          subtitle: 'Pesanan Obat Apotek Mitra GIAT',
+          amountFormatted: widget.orderData?.totalAmountFormatted,
+          onCheckStatus: id != null && id.isNotEmpty
+              ? () async {
+                  final r =
+                      await PasienApiService().cekStatusPembayaranObat(id);
+                  return r.data;
+                }
+              : null,
+          onRefreshSnapUrl: id != null && id.isNotEmpty
+              ? () async {
+                  final r = await PasienApiService()
+                      .getSnapTokenObat(id, forceNew: true);
+                  if (r.success && r.data != null) {
+                    _snapToken = r.data!['snap_token']?.toString();
+                    _redirectUrl = r.data!['redirect_url']?.toString();
+                    return ApiConstants.resolveMidtransRedirectUrl(
+                      redirectUrl: _redirectUrl,
+                      snapToken: _snapToken,
+                    );
+                  }
+                  return null;
+                }
+              : null,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    if (webViewRes?.isPaid == true) {
+      setState(() => _statusPembayaran = 'lunas');
+    }
+    await _syncPaymentAndTrackingStatus(silent: false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -229,13 +410,19 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
   // 2. HEADER STATUS PESANAN CARD
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildHeaderStatusCard() {
+    final isWaitingPayment =
+        _statusPembayaran.toLowerCase() == 'menunggu_pembayaran';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _cardBorderColor),
+        border: Border.all(
+          color: isWaitingPayment ? const Color(0xFFF59E0B) : _cardBorderColor,
+          width: isWaitingPayment ? 1.4 : 1.0,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -250,49 +437,58 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF8F6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.local_shipping_outlined,
-                      color: _darkGreen,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'No. Pesanan',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
-                        ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF8F6),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      Text(
-                        widget.orderId,
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0F172A),
-                        ),
+                      child: const Icon(
+                        Icons.local_shipping_outlined,
+                        color: _darkGreen,
+                        size: 24,
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'No. Pesanan',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                          Text(
+                            _displayOrderNo,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: _amberStatus,
+                  color: isWaitingPayment
+                      ? const Color(0xFFD97706)
+                      : _amberStatus,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
@@ -303,7 +499,9 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
                   ],
                 ),
                 child: Text(
-                  widget.status,
+                  isWaitingPayment
+                      ? 'Menunggu Pembayaran'
+                      : _displayStatusPesanan,
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
@@ -320,28 +518,158 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
             children: [
               const Icon(Icons.access_time_rounded, size: 16, color: _darkGreen),
               const SizedBox(width: 6),
-              RichText(
-                text: TextSpan(
-                  text: 'Estimasi tiba: ',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF475569),
-                  ),
-                  children: [
-                    TextSpan(
-                      text: widget.estimasiTiba,
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
-                      ),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    text: 'Estimasi tiba: ',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF475569),
                     ),
-                  ],
+                    children: [
+                      TextSpan(
+                        text: widget.orderData?.estimatedArrival ??
+                            widget.estimasiTiba,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+          if (isWaitingPayment) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.payment_rounded,
+                        size: 17,
+                        color: Color(0xFFD97706),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Pesanan ini menunggu pembayaran via Midtrans Snap.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF92400E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 40,
+                          child: OutlinedButton.icon(
+                            onPressed: _isCheckingPayment
+                                ? null
+                                : () =>
+                                    _syncPaymentAndTrackingStatus(silent: false),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _darkGreen,
+                              side: const BorderSide(
+                                color: _darkGreen,
+                                width: 1.2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            icon: _isCheckingPayment
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: _darkGreen,
+                                    ),
+                                  )
+                                : const Icon(Icons.verified_outlined, size: 16),
+                            label: Text(
+                              'Cek Status',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: SizedBox(
+                          height: 40,
+                          child: ElevatedButton.icon(
+                            onPressed: _isCheckingPayment
+                                ? null
+                                : _openMidtransSnapPayment,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _darkGreen,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            icon: const Icon(Icons.payment_rounded, size: 16),
+                            label: Text(
+                              'Bayar Sekarang',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(
+                  Icons.verified_rounded,
+                  size: 16,
+                  color: Color(0xFF16A34A),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Status Pembayaran: LUNAS (Midtrans)',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF16A34A),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
