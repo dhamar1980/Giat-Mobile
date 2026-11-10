@@ -828,9 +828,9 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     final diagnosis = (item['diagnosis'] ?? item['catatan_dokter'] ?? 'Penerbitan resep obat elektronik').toString();
 
     String timeStr = '14:00 WIB';
-    final createdAt = item['created_at'];
-    if (createdAt != null) {
-      timeStr = TimeUtils.formatChatTime(createdAt);
+    final rawTs = item['updated_at'] ?? item['created_at'];
+    if (rawTs != null) {
+      timeStr = '${TimeUtils.formatChatTime(rawTs, separator: ':')} ${TimeUtils.getTimeZoneName()}';
     }
 
     final rawObat = item['obat'] ?? item['items'];

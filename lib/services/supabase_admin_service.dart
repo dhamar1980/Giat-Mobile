@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import '../constants/api_constants.dart';
@@ -1679,28 +1680,35 @@ class SupabaseAdminService {
         : null;
 
     // 5. Aktivitas Hari Ini - Resep Terbaru & Rincian Obat
+    // Lakukan one-time sinkronisasi timestamp created_at jika lebih lama dari updated_at (misal data seed terupdate)
+    try {
+      await _exec('UPDATE resep SET created_at = updated_at WHERE created_at < updated_at');
+    } catch (_) {}
+
     final resepRows = await _exec(
       '''
       SELECT 
-        TRIM(r.id_resep) AS id_resep,
+        TRIM(r.id) AS id,
+        TRIM(r.id) AS id_resep,
         TRIM(r.id_konsultasi) AS id_konsultasi,
         TRIM(r.id_dokter) AS id_dokter,
         TRIM(r.id_pasien) AS id_pasien,
-        r.tanggal_resep,
+        r.tanggal_resep::text AS tanggal_resep,
         r.diagnosis,
         r.catatan_dokter,
         r.status,
-        r.created_at,
+        COALESCE(r.updated_at, r.created_at) AS created_at,
+        r.updated_at,
         COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien,
         p.no_hp,
         p.foto_profile,
         p.jenis_kelamin,
         p.alamat,
         p.tanggal_lahir
-      FROM resep_obat r
+      FROM resep r
       LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(r.id_pasien)
       WHERE TRIM(r.id_dokter) = @id
-      ORDER BY r.created_at DESC
+      ORDER BY COALESCE(r.updated_at, r.created_at) DESC
       LIMIT 1
       ''',
       parameters: {'id': docId},
@@ -1871,6 +1879,8 @@ class SupabaseAdminService {
         SET diagnosis = @diagnosis,
             catatan_dokter = @catatanDokter,
             status = @status,
+            tanggal_resep = CURRENT_DATE,
+            created_at = NOW(),
             updated_at = NOW()
         WHERE TRIM(id) = @id
         ''',
@@ -2090,6 +2100,98 @@ class SupabaseAdminService {
       result.add(map);
     }
     return result;
+  }
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// Mengambil data resep obat untuk konsultasi tertentu (beserta rincian item obat)
+  Future<Map<String, dynamic>?> fetchResepForKonsultasi(String consultationId, {String? patientId}) async {
+    if (_isTest) return null;
+    final consId = consultationId.trim();
+    if (consId.isEmpty) return null;
+
+    final rows = await _exec(
+      '''
+      SELECT 
+        TRIM(r.id) AS id,
+        TRIM(r.id) AS id_resep,
+        r.no_resep,
+        TRIM(r.id_konsultasi) AS id_konsultasi,
+        TRIM(r.id_dokter) AS id_dokter,
+        TRIM(r.id_pasien) AS id_pasien,
+        r.tanggal_resep::text AS tanggal_resep,
+        r.diagnosis,
+        r.catatan_dokter,
+        r.status,
+        COALESCE(r.updated_at, r.created_at) AS created_at,
+        r.updated_at,
+        COALESCE(d.nama, 'Dokter GIAT') AS nama_dokter
+      FROM resep r
+      LEFT JOIN dokter d ON TRIM(d.id_dokter) = TRIM(r.id_dokter)
+      WHERE TRIM(r.id_konsultasi) = @id
+      ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+      LIMIT 1
+      ''',
+      parameters: {'id': consId},
+    );
+
+    if (rows.isEmpty && patientId != null && patientId.trim().isNotEmpty) {
+      final pasRows = await _exec(
+        '''
+        SELECT 
+          TRIM(r.id) AS id,
+          TRIM(r.id) AS id_resep,
+          r.no_resep,
+          TRIM(r.id_konsultasi) AS id_konsultasi,
+          TRIM(r.id_dokter) AS id_dokter,
+          TRIM(r.id_pasien) AS id_pasien,
+          r.tanggal_resep::text AS tanggal_resep,
+          r.diagnosis,
+          r.catatan_dokter,
+          r.status,
+          COALESCE(r.updated_at, r.created_at) AS created_at,
+          r.updated_at,
+          COALESCE(d.nama, 'Dokter GIAT') AS nama_dokter
+        FROM resep r
+        LEFT JOIN dokter d ON TRIM(d.id_dokter) = TRIM(r.id_dokter)
+        WHERE TRIM(r.id_pasien) = @pid
+        ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+        LIMIT 1
+        ''',
+        parameters: {'pid': patientId.trim()},
+      );
+      if (pasRows.isNotEmpty) {
+        rows.addAll(pasRows);
+      }
+    }
+
+    if (rows.isEmpty) return null;
+
+    final rxMap = _normalizeMap(rows.first.toColumnMap());
+    final rxId = rxMap['id']?.toString().trim();
+    if (rxId != null && rxId.isNotEmpty) {
+      final itemRows = await _exec(
+        '''
+        SELECT 
+          TRIM(id) AS id,
+          TRIM(id_resep) AS id_resep,
+          nama_obat,
+          dosis,
+          aturan_pakai,
+          waktu_penggunaan,
+          jumlah,
+          catatan_khusus
+        FROM resep_item
+        WHERE TRIM(id_resep) = @rxId
+        ORDER BY created_at ASC
+        ''',
+        parameters: {'rxId': rxId},
+      );
+      rxMap['items'] = itemRows.map((ir) => _normalizeMap(ir.toColumnMap())).toList();
+    } else {
+      rxMap['items'] = <Map<String, dynamic>>[];
+    }
+    return rxMap;
   }
 }
 

@@ -16,6 +16,7 @@ import '../../../services/storage_service.dart';
 import '../../../widgets/incoming_call_dialog.dart';
 import '../../../widgets/typing_indicator_widget.dart';
 import '../../../utils/time_utils.dart';
+import '../../../services/supabase_admin_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RUANG CHAT DOKTER-PASIEN (Realtime Chat & Video Call GIAT Telemedicine)
@@ -124,6 +125,12 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
 
     if (tipeLower == 'auto') {
       return true;
+    }
+
+    if (tipeLower == 'prescription' ||
+        lower.startsWith('resep obat elektronik') ||
+        lower.startsWith('resep digital')) {
+      return false;
     }
 
     if (lower == 'konsultasi keluhan kesehatan ginjal pasien giat' ||
@@ -248,6 +255,55 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
         }
       }
 
+      // 3. Muat resep obat elektronik real jika sudah diterbitkan untuk konsultasi / pasien ini
+      try {
+        final rx = await SupabaseAdminService.instance.fetchResepForKonsultasi(
+          _consultationId,
+          patientId: widget.patient.id,
+        );
+        if (rx != null) {
+          final rawItems = rx['items'] as List<dynamic>? ?? [];
+          final List<DokterPrescriptionItem> items = rawItems.map<DokterPrescriptionItem>((it) {
+            return DokterPrescriptionItem(
+              id: (it['id'] ?? 'item_${DateTime.now().millisecondsSinceEpoch}').toString(),
+              medicineName: (it['nama_obat'] ?? 'Obat').toString(),
+              dose: (it['dosis'] ?? '-').toString(),
+              frequency: (it['aturan_pakai'] ?? '3x1').toString(),
+              quantity: (it['jumlah'] ?? 1).toString(),
+              duration: '3 hari',
+              usageTime: (it['waktu_penggunaan'] ?? 'Sesudah Makan').toString(),
+              specialNotes: (it['catatan_khusus'] ?? '').toString(),
+            );
+          }).toList();
+
+          final timeStr = TimeUtils.formatChatTime(rx['updated_at'] ?? rx['created_at']);
+          final rxId = 'rx_${rx['id'] ?? rx['id_resep']}';
+
+          // Bersihkan pesan plain-text placeholder resep jika ada dari backend/firebase
+          loaded.removeWhere((m) =>
+              m.sender != 'prescription' &&
+              (m.text.startsWith('Resep Obat Elektronik Diterbitkan') ||
+                  m.text.startsWith('Resep Digital Diterbitkan')));
+
+          final existingIdx = loaded.indexWhere((m) => m.sender == 'prescription' || m.id == rxId);
+          final rxCardMsg = _ChatMessage(
+            id: rxId,
+            sender: 'prescription',
+            text: 'Resep Obat Elektronik Diterbitkan',
+            time: timeStr,
+            prescriptionItems: items,
+          );
+
+          if (existingIdx != -1) {
+            loaded[existingIdx] = rxCardMsg;
+          } else {
+            loaded.add(rxCardMsg);
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error fetchResepForKonsultasi in room chat: $e');
+      }
+
       if (mounted && loaded.isNotEmpty) {
         setState(() {
           _messages = loaded;
@@ -259,6 +315,48 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
     }
   }
 
+  Future<void> _loadPrescriptionCardRealtime() async {
+    try {
+      final rx = await SupabaseAdminService.instance.fetchResepForKonsultasi(
+        _consultationId,
+        patientId: widget.patient.id,
+      );
+      if (rx != null && mounted) {
+        final rawItems = rx['items'] as List<dynamic>? ?? [];
+        final List<DokterPrescriptionItem> items = rawItems.map<DokterPrescriptionItem>((it) {
+          return DokterPrescriptionItem(
+            id: (it['id'] ?? 'item_${DateTime.now().millisecondsSinceEpoch}').toString(),
+            medicineName: (it['nama_obat'] ?? 'Obat').toString(),
+            dose: (it['dosis'] ?? '-').toString(),
+            frequency: (it['aturan_pakai'] ?? '3x1').toString(),
+            quantity: (it['jumlah'] ?? 1).toString(),
+            duration: '3 hari',
+            usageTime: (it['waktu_penggunaan'] ?? 'Sesudah Makan').toString(),
+            specialNotes: (it['catatan_khusus'] ?? '').toString(),
+          );
+        }).toList();
+
+        final timeStr = TimeUtils.formatChatTime(rx['updated_at'] ?? rx['created_at']);
+        final rxId = 'rx_${rx['id'] ?? rx['id_resep']}';
+
+        setState(() {
+          _messages.removeWhere((m) =>
+              m.sender == 'prescription' ||
+              (m.text.startsWith('Resep Obat Elektronik Diterbitkan') ||
+                  m.text.startsWith('Resep Digital Diterbitkan')));
+          _messages.add(_ChatMessage(
+            id: rxId,
+            sender: 'prescription',
+            text: 'Resep Obat Elektronik Diterbitkan',
+            time: timeStr,
+            prescriptionItems: items,
+          ));
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {}
+  }
+
   void _setupRealtimeListeners() {
     // 1. Mendengarkan pesan realtime dari Firebase (<100ms)
     _msgSub = _firebaseService.listenMessages(_consultationId).listen((ChatMessage msg) {
@@ -268,6 +366,14 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
         tipe: msg.tipe,
         senderRole: msg.senderRole,
       )) {
+        return;
+      }
+
+      final isRx = (msg.tipe.toLowerCase() == 'prescription') ||
+          msg.pesan.startsWith('Resep Obat Elektronik Diterbitkan') ||
+          msg.pesan.startsWith('Resep Digital Diterbitkan');
+      if (isRx) {
+        _loadPrescriptionCardRealtime();
         return;
       }
       final isSystem = _isSystemNotification(
@@ -561,9 +667,15 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
 
     if (publishedItems != null && publishedItems.isNotEmpty && mounted) {
       final timeStr = TimeUtils.formatChatTime(DateTime.now());
+      final rxTempId = 'rx_${DateTime.now().millisecondsSinceEpoch}';
 
       setState(() {
+        _messages.removeWhere((m) =>
+            m.sender == 'prescription' ||
+            m.text.startsWith('Resep Obat Elektronik Diterbitkan') ||
+            m.text.startsWith('Resep Digital Diterbitkan'));
         _messages.add(_ChatMessage(
+          id: rxTempId,
           sender: 'prescription',
           text: 'Resep Obat Elektronik Diterbitkan',
           time: timeStr,
@@ -572,9 +684,26 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
       });
       _scrollToBottom();
 
-      // Kirim pesan sinyal real-time ke room chat
+      final itemsSummary = publishedItems.map((p) => '${p.medicineName} (${p.quantity})').join(', ');
+      final myId = _currentUser?.id?.toString() ?? '1';
+      final myName = _currentUser?.nama.isNotEmpty == true ? _currentUser!.nama : 'Dokter GIAT';
+
+      // 1. Kirim pesan realtime ke Firebase RTDB (<100ms sync)
       try {
-        final itemsSummary = publishedItems.map((p) => '${p.medicineName} (${p.quantity})').join(', ');
+        final chatMsg = ChatMessage(
+          id: rxTempId,
+          idSender: myId,
+          senderName: myName,
+          senderRole: 'dokter',
+          pesan: 'Resep Obat Elektronik Diterbitkan: $itemsSummary',
+          tipe: 'prescription',
+          createdAt: DateTime.now().toUtc().toIso8601String(),
+        );
+        await _firebaseService.pushMessage(_consultationId, chatMsg);
+      } catch (_) {}
+
+      // 2. Kirim pesan sinyal ke API backend
+      try {
         await _apiService.sendMessage(
           _consultationId,
           pesan: 'Resep Obat Elektronik Diterbitkan: $itemsSummary',

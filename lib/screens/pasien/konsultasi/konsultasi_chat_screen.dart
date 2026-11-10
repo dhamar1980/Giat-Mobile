@@ -14,6 +14,8 @@ import '../../../services/storage_service.dart';
 import '../../../widgets/incoming_call_dialog.dart';
 import '../../../widgets/typing_indicator_widget.dart';
 import '../../../utils/time_utils.dart';
+import '../obat/resep_dokter_screen.dart';
+import '../../../services/supabase_admin_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI CHAT SCREEN (Realtime Chat & Video Call GIAT Telemedicine)
@@ -121,6 +123,12 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
       return true;
     }
 
+    if (tipeLower == 'prescription' ||
+        lower.startsWith('resep obat elektronik') ||
+        lower.startsWith('resep digital')) {
+      return false;
+    }
+
     if (_bookingIsiKonsultasi != null &&
         _bookingIsiKonsultasi!.trim().isNotEmpty &&
         lower == _bookingIsiKonsultasi!.trim().toLowerCase()) {
@@ -226,6 +234,35 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
     }
   }
 
+  Future<void> _loadPrescriptionCardRealtime() async {
+    try {
+      final rx = await SupabaseAdminService.instance.fetchResepForKonsultasi(
+        _activeConsultationId,
+        patientId: _currentUser?.id?.toString(),
+      );
+      if (rx != null && mounted) {
+        final timeStr = TimeUtils.formatChatTime(rx['updated_at'] ?? rx['created_at']);
+        final rxId = 'rx_${rx['id'] ?? rx['id_resep']}';
+        final rawItems = rx['items'] as List<dynamic>? ?? [];
+
+        setState(() {
+          _messages.removeWhere((m) =>
+              m['sender'] == 'prescription' ||
+              (m['text'] ?? '').toString().startsWith('Resep Obat Elektronik Diterbitkan'));
+          _messages.add({
+            'id': rxId,
+            'sender': 'prescription',
+            'text': 'Resep Obat Elektronik Diterbitkan',
+            'time': timeStr,
+            'items': rawItems,
+            'no_resep': rx['no_resep'] ?? 'RXP-GIAT',
+          });
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {}
+  }
+
   void _setupRealtimeListeners() {
     if (_activeConsultationId.isEmpty) return;
 
@@ -238,6 +275,14 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
         tipe: msg.tipe,
         senderRole: msg.senderRole,
       )) {
+        return;
+      }
+
+      final isRx = (msg.tipe.toLowerCase() == 'prescription') ||
+          msg.pesan.startsWith('Resep Obat Elektronik Diterbitkan') ||
+          msg.pesan.startsWith('Resep Digital Diterbitkan');
+      if (isRx) {
+        _loadPrescriptionCardRealtime();
         return;
       }
 
@@ -470,6 +515,36 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
               }
             }
           }
+          // 3. Muat resep digital jika ada untuk konsultasi ini dari Supabase
+          try {
+            final rx = await SupabaseAdminService.instance.fetchResepForKonsultasi(
+              _activeConsultationId,
+              patientId: _currentUser?.id?.toString(),
+            );
+            if (rx != null) {
+              final timeStr = TimeUtils.formatChatTime(rx['updated_at'] ?? rx['created_at']);
+              final rxId = 'rx_${rx['id'] ?? rx['id_resep']}';
+              final rawItems = rx['items'] as List<dynamic>? ?? [];
+
+              _messages.removeWhere((m) =>
+                  m['sender'] != 'prescription' &&
+                  (m['text'] ?? '').toString().startsWith('Resep Obat Elektronik Diterbitkan'));
+
+              final exists = _messages.any((m) => m['sender'] == 'prescription' || m['id'] == rxId);
+              if (!exists) {
+                _messages.add({
+                  'id': rxId,
+                  'sender': 'prescription',
+                  'text': 'Resep Obat Elektronik Diterbitkan',
+                  'time': timeStr,
+                  'items': rawItems,
+                  'no_resep': rx['no_resep'] ?? 'RXP-GIAT',
+                });
+                hasNew = true;
+              }
+            }
+          } catch (_) {}
+
           if (hasNew && mounted) {
             setState(() {
               _isLoadingMessages = false;
@@ -829,6 +904,12 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
                             child: _buildSystemNotificationCard(msg),
                           );
                         }
+                        if (sender == 'prescription' || (msg['tipe'] ?? '') == 'prescription') {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildPrescriptionNotificationCard(msg),
+                          );
+                        }
                         final isDoctor = sender == 'doctor';
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
@@ -963,6 +1044,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
                       ),
                       const SizedBox(height: 2),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
                             width: 7,
@@ -973,12 +1055,16 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          Text(
-                            'Online Sekarang',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF16A34A),
+                          Flexible(
+                            child: Text(
+                              'Online Sekarang',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF16A34A),
+                              ),
                             ),
                           ),
                         ],
@@ -1104,6 +1190,144 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // RESEP OBAT DIGITAL CARD (Pemberitahuan Resep Diterbitkan untuk Pasien)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildPrescriptionNotificationCard(Map<String, dynamic> msg) {
+    final rawItems = msg['items'] as List<dynamic>? ?? [];
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 320),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.receipt_long_rounded, color: _darkGreen, size: 22),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Resep Digital Diterbitkan',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        'Diberikan oleh $_doctorName',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20, color: Color(0xFFE2E8F0)),
+            if (rawItems.isNotEmpty)
+              ...rawItems.map((item) {
+                final m = item is Map ? item : <String, dynamic>{};
+                final name = (m['nama_obat'] ?? m['name'] ?? 'Obat').toString();
+                final qty = (m['jumlah'] ?? m['quantity'] ?? '1').toString();
+                final freq = (m['aturan_pakai'] ?? m['frequency'] ?? '3x1').toString();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.check_circle_rounded, size: 16, color: _darkGreen),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$name ($qty) - $freq',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF334155),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              })
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  msg['text']?.toString() ?? 'Resep obat elektronik telah diterbitkan.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    color: const Color(0xFF334155),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ResepDokterScreen()),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _darkGreen,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.medication_liquid_rounded, size: 16, color: Colors.white),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Buka di Menu Resep Dokter',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
