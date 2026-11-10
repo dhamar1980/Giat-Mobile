@@ -549,4 +549,49 @@ class TimeUtils {
     }
     return '$startTime – 14.30 ${getTimeZoneName()} ($durationMinutes Menit)';
   }
+
+  /// Membersihkan input waktu dari PostgreSQL driver (misal: 'Time(10:26:16.000)', '10:26:16', '10:26', DateTime, dll)
+  /// Menghasilkan format 'HH:mm' yang bersih, atau null jika input kosong/invalid.
+  static String? cleanTimeString(dynamic input) {
+    if (input == null) return null;
+    final str = input.toString().trim();
+    if (str.isEmpty || str == 'null') return null;
+
+    // Menangani format PostgreSQL Time object: 'Time(10:26:16.000)' atau 'Time(10:26)'
+    final timeMatch = RegExp(r'Time\s*\(\s*(\d{1,2}):(\d{2})').firstMatch(str);
+    if (timeMatch != null) {
+      final h = timeMatch.group(1)!.padLeft(2, '0');
+      final m = timeMatch.group(2)!;
+      return '$h:$m';
+    }
+
+    // Menangani format standar '10:26:16' atau '10:26'
+    final standardMatch = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(str);
+    if (standardMatch != null) {
+      final h = standardMatch.group(1)!.padLeft(2, '0');
+      final m = standardMatch.group(2)!;
+      return '$h:$m';
+    }
+
+    // Menangani jika input berupa ISO DateTime '2026-11-10T10:26:00' atau '2026-11-10 10:26:00'
+    final dtMatch = RegExp(r'[T\s](\d{1,2}):(\d{2})').firstMatch(str);
+    if (dtMatch != null) {
+      final h = dtMatch.group(1)!.padLeft(2, '0');
+      final m = dtMatch.group(2)!;
+      return '$h:$m';
+    }
+
+    // Fallback: hapus Time() jika membungkus karakter lain
+    final stripped = str.replaceAll(RegExp(r'^Time\s*\(\s*|\s*\)$'), '').trim();
+    if (stripped.length >= 5 && stripped.contains(':')) {
+      final parts = stripped.split(':');
+      if (parts.length >= 2) {
+        final h = (int.tryParse(parts[0]) ?? 0).toString().padLeft(2, '0');
+        final m = parts[1].length >= 2 ? parts[1].substring(0, 2) : parts[1].padLeft(2, '0');
+        return '$h:$m';
+      }
+    }
+
+    return stripped.isNotEmpty ? stripped : null;
+  }
 }

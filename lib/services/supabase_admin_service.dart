@@ -1388,12 +1388,21 @@ class SupabaseAdminService {
   Map<String, dynamic> _normalizeMap(Map<String, dynamic> raw) {
     final result = <String, dynamic>{};
     raw.forEach((key, value) {
-      if (value is DateTime) {
+      if (value == null) {
+        result[key] = null;
+      } else if (value is DateTime) {
         result[key] = value.toIso8601String();
-      } else if (value is String) {
-        result[key] = value.trim();
       } else {
-        result[key] = value;
+        final strVal = value.toString().trim();
+        // Tangani objek Time dari postgres package (misal Time(10:26:16.000) atau Time(10:26:16))
+        final timeMatch = RegExp(r'^Time\s*\(\s*(\d{1,2}:\d{2}(?::\d{2})?)').firstMatch(strVal);
+        if (timeMatch != null) {
+          result[key] = timeMatch.group(1);
+        } else if (value is String) {
+          result[key] = strVal;
+        } else {
+          result[key] = value;
+        }
       }
     });
     return result;
@@ -1437,5 +1446,301 @@ class SupabaseAdminService {
         return 'Fitur Baru';
     }
   }
+
+  // ===========================================================================
+  // MODUL DOKTER: DASHBOARD, PESAN TERBARU, JADWAL, DAN RESEP REAL SUPABASE
+  // ===========================================================================
+
+  /// Menentukan ID Dokter (`id_dokter` / `user.id`) yang sedang login di Supabase
+  Future<String?> resolveCurrentDokterId({String? overrideDokterId, String? doctorName}) async {
+    if (overrideDokterId != null && overrideDokterId.trim().length >= 30) {
+      return overrideDokterId.trim();
+    }
+
+    final user = await StorageService().getUser();
+    if (user != null) {
+      final rawId = user.id.toString().trim();
+      if (rawId.length >= 30) {
+        final check = await _exec(
+          'SELECT TRIM(id_dokter) AS id FROM dokter WHERE TRIM(id_dokter) = @id LIMIT 1',
+          parameters: {'id': rawId},
+        );
+        if (check.isNotEmpty) {
+          return rawId;
+        }
+      }
+
+      final email = user.email.trim().toLowerCase();
+      if (email.isNotEmpty) {
+        final byEmail = await _exec(
+          '''
+          SELECT TRIM(d.id_dokter) AS id
+          FROM "user" u
+          JOIN dokter d ON TRIM(d.id_dokter) = TRIM(u.id)
+          WHERE LOWER(TRIM(u.email)) = @email
+          LIMIT 1
+          ''',
+          parameters: {'email': email},
+        );
+        if (byEmail.isNotEmpty) {
+          final id = byEmail.first.toColumnMap()['id']?.toString().trim();
+          if (id != null && id.isNotEmpty) return id;
+        }
+      }
+
+      final nama = user.nama.trim();
+      if (nama.isNotEmpty && !nama.toLowerCase().contains('pasien')) {
+        final byNama = await _exec(
+          'SELECT TRIM(id_dokter) AS id FROM dokter WHERE LOWER(TRIM(nama)) ILIKE @nama LIMIT 1',
+          parameters: {'nama': '%$nama%'},
+        );
+        if (byNama.isNotEmpty) {
+          final id = byNama.first.toColumnMap()['id']?.toString().trim();
+          if (id != null && id.isNotEmpty) return id;
+        }
+      }
+    }
+
+    if (doctorName != null && doctorName.trim().isNotEmpty) {
+      final byFallbackName = await _exec(
+        'SELECT TRIM(id_dokter) AS id FROM dokter WHERE LOWER(TRIM(nama)) ILIKE @nama LIMIT 1',
+        parameters: {'nama': '%${doctorName.trim().toLowerCase()}%'},
+      );
+      if (byFallbackName.isNotEmpty) {
+        final id = byFallbackName.first.toColumnMap()['id']?.toString().trim();
+        if (id != null && id.isNotEmpty) return id;
+      }
+    }
+
+    // Default fallback ke dokter pertama di database
+    final firstDoc = await _exec('SELECT TRIM(id_dokter) AS id FROM dokter ORDER BY created_at ASC LIMIT 1');
+    if (firstDoc.isNotEmpty) {
+      return firstDoc.first.toColumnMap()['id']?.toString().trim();
+    }
+    return null;
+  }
+
+  /// Mengambil data dashboard real untuk dokter dari Supabase (profil, pesan terbaru, jadwal, ringkasan aktivitas)
+  Future<Map<String, dynamic>> fetchDokterDashboard({String? dokterId, String? doctorName}) async {
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) {
+      throw Exception('Dokter ID tidak ditemukan di database Supabase.');
+    }
+
+    // 1. Profil dokter
+    final profileRows = await _exec(
+      '''
+      SELECT 
+        TRIM(d.id_dokter) AS id_dokter,
+        d.nama,
+        d.spesialisasi,
+        d.institusi,
+        d.no_str,
+        d.no_sip,
+        d.no_hp,
+        d.tarif_konsultasi,
+        d.foto_profile,
+        d.bio,
+        u.email
+      FROM dokter d
+      LEFT JOIN "user" u ON TRIM(u.id) = TRIM(d.id_dokter)
+      WHERE TRIM(d.id_dokter) = @id
+      LIMIT 1
+      ''',
+      parameters: {'id': docId},
+    );
+    final Map<String, dynamic> doctorMap = profileRows.isNotEmpty
+        ? _normalizeMap(profileRows.first.toColumnMap())
+        : {'id_dokter': docId, 'nama': doctorName ?? 'Dokter GIAT'};
+
+    // 2. Pesan terbaru (Pesan terakhir dari setiap pasien, unik per pasien)
+    final msgRows = await _exec(
+      '''
+      WITH latest_messages AS (
+        SELECT 
+          k.id AS id_konsultasi,
+          k.id_pasien,
+          kp.pesan,
+          kp.id_sender,
+          kp.created_at,
+          ROW_NUMBER() OVER (PARTITION BY k.id_pasien ORDER BY kp.created_at DESC) as rn
+        FROM konsultasi_pesan kp
+        JOIN konsultasi k ON TRIM(k.id) = TRIM(kp.id_konsultasi)
+        WHERE TRIM(k.id_dokter) = @id
+      )
+      SELECT 
+        lm.id_konsultasi,
+        lm.id_pasien,
+        COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien,
+        p.no_hp,
+        p.foto_profile,
+        p.jenis_kelamin,
+        p.alamat,
+        p.tanggal_lahir,
+        lm.pesan,
+        TRIM(lm.id_sender) AS id_sender,
+        lm.created_at
+      FROM latest_messages lm
+      LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(lm.id_pasien)
+      WHERE lm.rn = 1
+      ORDER BY lm.created_at DESC
+      LIMIT 5
+      ''',
+      parameters: {'id': docId},
+    );
+    final List<Map<String, dynamic>> recentMessages =
+        msgRows.map((r) => _normalizeMap(r.toColumnMap())).toList();
+
+    // 3. Jadwal Hari Ini / Konsultasi Aktif (Unik per pasien, diprioritaskan yang aktif/terdekat)
+    final scheduleRows = await _exec(
+      '''
+      WITH ranked_schedules AS (
+        SELECT 
+          TRIM(k.id) AS id,
+          TRIM(k.id_pasien) AS id_pasien,
+          TRIM(k.id_dokter) AS id_dokter,
+          k.tanggal_konsultasi,
+          k.jam_mulai::text AS jam_mulai,
+          k.jam_selesai::text AS jam_selesai,
+          k.status,
+          k.jenis_layanan,
+          k.keluhan_awal,
+          COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien,
+          p.no_hp,
+          p.foto_profile,
+          p.jenis_kelamin,
+          p.alamat,
+          p.tanggal_lahir,
+          ROW_NUMBER() OVER (
+            PARTITION BY k.id_pasien 
+            ORDER BY 
+              CASE 
+                WHEN DATE(k.tanggal_konsultasi) = CURRENT_DATE THEN 1
+                WHEN k.status = 'berlangsung' THEN 2
+                WHEN k.status = 'terjadwal' THEN 3
+                ELSE 4
+              END,
+              k.tanggal_konsultasi DESC,
+              k.jam_mulai ASC
+          ) as rn
+        FROM konsultasi k
+        LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
+        WHERE TRIM(k.id_dokter) = @id
+      )
+      SELECT * FROM ranked_schedules WHERE rn = 1
+      ORDER BY 
+        CASE 
+          WHEN DATE(tanggal_konsultasi) = CURRENT_DATE THEN 1
+          WHEN status = 'berlangsung' THEN 2
+          WHEN status = 'terjadwal' THEN 3
+          ELSE 4
+        END,
+        tanggal_konsultasi DESC,
+        jam_mulai ASC
+      LIMIT 5
+      ''',
+      parameters: {'id': docId},
+    );
+    final List<Map<String, dynamic>> todaySchedules =
+        scheduleRows.map((r) => _normalizeMap(r.toColumnMap())).toList();
+
+    // 4. Aktivitas Hari Ini - Konsultasi Terbaru
+    final activeConsultationRows = await _exec(
+      '''
+      SELECT 
+        TRIM(k.id) AS id,
+        TRIM(k.id_pasien) AS id_pasien,
+        k.tanggal_konsultasi,
+        k.jam_mulai::text AS jam_mulai,
+        k.status,
+        k.keluhan_awal,
+        COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien,
+        p.no_hp,
+        p.foto_profile,
+        p.jenis_kelamin,
+        p.alamat,
+        p.tanggal_lahir
+      FROM konsultasi k
+      LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
+      WHERE TRIM(k.id_dokter) = @id
+      ORDER BY k.created_at DESC
+      LIMIT 1
+      ''',
+      parameters: {'id': docId},
+    );
+    final Map<String, dynamic>? latestConsultation = activeConsultationRows.isNotEmpty
+        ? _normalizeMap(activeConsultationRows.first.toColumnMap())
+        : null;
+
+    // 5. Aktivitas Hari Ini - Resep Terbaru & Rincian Obat
+    final resepRows = await _exec(
+      '''
+      SELECT 
+        TRIM(r.id_resep) AS id_resep,
+        TRIM(r.id_konsultasi) AS id_konsultasi,
+        TRIM(r.id_dokter) AS id_dokter,
+        TRIM(r.id_pasien) AS id_pasien,
+        r.tanggal_resep,
+        r.diagnosis,
+        r.catatan_dokter,
+        r.status,
+        r.created_at,
+        COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien,
+        p.no_hp,
+        p.foto_profile,
+        p.jenis_kelamin,
+        p.alamat,
+        p.tanggal_lahir
+      FROM resep_obat r
+      LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(r.id_pasien)
+      WHERE TRIM(r.id_dokter) = @id
+      ORDER BY r.created_at DESC
+      LIMIT 1
+      ''',
+      parameters: {'id': docId},
+    );
+
+    Map<String, dynamic>? latestPrescription;
+    if (resepRows.isNotEmpty) {
+      latestPrescription = _normalizeMap(resepRows.first.toColumnMap());
+      final rxId = latestPrescription['id_resep']?.toString().trim();
+      if (rxId != null && rxId.isNotEmpty) {
+        final itemsRows = await _exec(
+          '''
+          SELECT 
+            TRIM(id) AS id,
+            TRIM(id_resep) AS id_resep,
+            nama_obat,
+            dosis,
+            aturan_pakai,
+            waktu_penggunaan,
+            jumlah,
+            catatan_khusus
+          FROM resep_item
+          WHERE TRIM(id_resep) = @rxId
+          ORDER BY created_at ASC
+          ''',
+          parameters: {'rxId': rxId},
+        );
+        latestPrescription['obat'] =
+            itemsRows.map((r) => _normalizeMap(r.toColumnMap())).toList();
+      } else {
+        latestPrescription['obat'] = <Map<String, dynamic>>[];
+      }
+    }
+
+    return {
+      'dokter': doctorMap,
+      'pesan_terbaru': recentMessages,
+      'jadwal_hari_ini': todaySchedules,
+      'konsultasi_terbaru': latestConsultation,
+      'resep_terbaru': latestPrescription != null ? [latestPrescription] : <Map<String, dynamic>>[],
+      'ringkasan_aktivitas': {
+        'konsultasi': latestConsultation,
+        'resep': latestPrescription,
+      },
+    };
+  }
 }
+
 

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'api_response.dart';
+import 'supabase_admin_service.dart';
 
 /// Service for all `/dokter` API endpoints
 class DokterApiService {
@@ -11,12 +12,29 @@ class DokterApiService {
 
   final ApiClient _client = ApiClient();
 
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
   // =========================================================================
   // 1. DASHBOARD & NOTIFIKASI
   // =========================================================================
 
-  /// GET /dokter/dashboard
-  Future<ApiResponse<Map<String, dynamic>>> getDashboard() async {
+  /// GET /dokter/dashboard (Terintegrasi langsung dengan Supabase PostgreSQL & REST API)
+  Future<ApiResponse<Map<String, dynamic>>> getDashboard({String? dokterId, String? doctorName}) async {
+    if (!_isTest) {
+      try {
+        final supabaseData = await SupabaseAdminService.instance.fetchDokterDashboard(
+          dokterId: dokterId,
+          doctorName: doctorName,
+        );
+        return ApiResponse.success(
+          message: 'Berhasil memuat dashboard dokter dari Supabase.',
+          data: supabaseData,
+        );
+      } catch (e) {
+        // Fallback to REST API if Supabase query fails
+      }
+    }
+
     try {
       final response = await _client.dio.get('/dokter/dashboard');
       return ApiResponse.success(

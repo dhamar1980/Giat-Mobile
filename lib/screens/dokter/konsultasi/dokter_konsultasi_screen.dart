@@ -87,10 +87,9 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
           // Scheduled time text
           String timeText = 'Hari ini';
           final tgl = map['tanggal_konsultasi'];
-          final jmMulai = map['jam_mulai']?.toString();
-          if (jmMulai != null && jmMulai.isNotEmpty) {
-            final timeOnly = jmMulai.length >= 5 ? jmMulai.substring(0, 5) : jmMulai;
-            timeText = '$timeOnly WIB';
+          final cleanTime = TimeUtils.cleanTimeString(map['jam_mulai']);
+          if (cleanTime != null && cleanTime.isNotEmpty) {
+            timeText = '$cleanTime WIB';
           } else if (tgl != null) {
             timeText = TimeUtils.formatDate(tgl, useIndonesianMonth: true);
           }
@@ -183,6 +182,17 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
     super.dispose();
   }
 
+  int _consultationPriority(KonsultasiStatus status) {
+    switch (status) {
+      case KonsultasiStatus.berlangsung:
+        return 3;
+      case KonsultasiStatus.terjadwal:
+        return 2;
+      case KonsultasiStatus.selesai:
+        return 1;
+    }
+  }
+
   List<DokterConsultation> _getFilteredConsultations() {
     final all = _allConsultations;
     List<DokterConsultation> list;
@@ -202,11 +212,33 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
       }
     }
 
-    if (_searchQuery.trim().isEmpty) return list;
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.toLowerCase().trim();
+      list = list.where((item) {
+        return item.patientName.toLowerCase().contains(q);
+      }).toList();
+    }
 
-    return list.where((item) {
-      return item.patientName.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+    // Deduplikasi per pasien agar setiap pasien hanya memiliki tepat 1 kartu (tidak dobel-dobel)
+    final Map<String, DokterConsultation> deduplicated = {};
+    for (var item in list) {
+      final patientKey = item.patientName.toLowerCase().trim();
+      if (!deduplicated.containsKey(patientKey)) {
+        deduplicated[patientKey] = item;
+      } else {
+        final existing = deduplicated[patientKey]!;
+        // Prioritaskan status: berlangsung > terjadwal > selesai
+        if (_consultationPriority(item.status) > _consultationPriority(existing.status)) {
+          deduplicated[patientKey] = item;
+        } else if (item.status == existing.status) {
+          if (item.messageCount > existing.messageCount) {
+            deduplicated[patientKey] = item;
+          }
+        }
+      }
+    }
+
+    return deduplicated.values.toList();
   }
 
   DokterPatient _findPatient(String patientId) {

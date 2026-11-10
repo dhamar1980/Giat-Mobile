@@ -805,34 +805,6 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          InkWell(
-                            onTap: _showEditConsultationIdDialog,
-                            borderRadius: BorderRadius.circular(4),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '#${_activeConsultationId.length > 8 ? '${_activeConsultationId.substring(0, 8)}...' : _activeConsultationId}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: _darkGreen,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  const Icon(Icons.edit_rounded, size: 9, color: _darkGreen),
-                                ],
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ],

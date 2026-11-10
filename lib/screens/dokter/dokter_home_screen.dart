@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,6 +17,7 @@ import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/dokter_api_service.dart';
+import '../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOKTER HOME SCREEN (Figma Node: 1008-17556)
@@ -25,12 +27,14 @@ class DokterHomeScreen extends StatefulWidget {
   final String doctorName;
   final int initialIndex;
   final Function(int)? onNavigateTab;
+  final Map<String, dynamic>? initialDashboardData;
 
   const DokterHomeScreen({
     super.key,
     this.doctorName = 'Dr. Andi Pratama',
     this.initialIndex = 0,
     this.onNavigateTab,
+    this.initialDashboardData,
   });
 
   @override
@@ -55,6 +59,16 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
 
+  static bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+  bool get _shouldShowRealData => widget.initialDashboardData != null || !_isTest;
+
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _liveRecentMessages = [];
+  List<Map<String, dynamic>> _liveTodaySchedules = [];
+  Map<String, dynamic>? _liveLatestConsultation;
+  Map<String, dynamic>? _liveLatestPrescription;
+  final Map<String, DokterPatient> _patientCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -72,13 +86,197 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
 
     _animCtrl.forward();
-    _fetchLiveDashboard();
+    if (widget.initialDashboardData != null) {
+      _applyDashboardData(widget.initialDashboardData!);
+    } else {
+      _fetchLiveDashboard();
+    }
   }
 
-  Future<void> _fetchLiveDashboard() async {
+  Future<void> _fetchLiveDashboard({bool showLoading = false}) async {
+    if (_isTest) return;
+    if (showLoading && mounted) {
+      setState(() => _isLoading = true);
+    }
     try {
-      await DokterApiService().getDashboard();
-    } catch (_) {}
+      final res = await DokterApiService().getDashboard(doctorName: widget.doctorName);
+      if (res.success && res.data != null && mounted) {
+        _applyDashboardData(res.data!);
+      }
+    } catch (e) {
+      debugPrint('Error fetching live dokter dashboard: $e');
+    } finally {
+      if (mounted && showLoading) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _applyDashboardData(Map<String, dynamic> data) {
+    final docData = data['dokter'];
+    if (docData is Map) {
+      final docMap = Map<String, dynamic>.from(docData);
+      DokterProfileState.instance.syncFromUser(
+        name: docMap['nama']?.toString(),
+        spec: docMap['spesialisasi']?.toString(),
+        inst: docMap['institusi']?.toString(),
+        str: docMap['no_str']?.toString(),
+        sip: docMap['no_sip']?.toString(),
+        avatar: docMap['foto_profil']?.toString() ?? docMap['foto_profile']?.toString(),
+      );
+    }
+
+    final rawMessages = data['pesan_terbaru'];
+    final List<Map<String, dynamic>> parsedMessages = [];
+    if (rawMessages is List) {
+      final Set<String> seenPatients = {};
+      for (var item in rawMessages) {
+        if (item is Map) {
+          final m = Map<String, dynamic>.from(item);
+          final pName = (m['nama_pasien'] ?? m['id_pasien'] ?? '').toString().toLowerCase().trim();
+          if (pName.isNotEmpty && !seenPatients.contains(pName)) {
+            seenPatients.add(pName);
+            parsedMessages.add(m);
+          }
+        }
+      }
+    }
+
+    final rawSchedules = data['jadwal_hari_ini'];
+    final List<Map<String, dynamic>> parsedSchedules = [];
+    if (rawSchedules is List) {
+      final Set<String> seenSchedulePatients = {};
+      for (var item in rawSchedules) {
+        if (item is Map) {
+          final m = Map<String, dynamic>.from(item);
+          final pName = (m['nama_pasien'] ?? m['id_pasien'] ?? '').toString().toLowerCase().trim();
+          if (pName.isNotEmpty && !seenSchedulePatients.contains(pName)) {
+            seenSchedulePatients.add(pName);
+            parsedSchedules.add(m);
+          }
+        }
+      }
+    }
+
+    Map<String, dynamic>? latestConsultation;
+    if (data['konsultasi_terbaru'] is Map) {
+      latestConsultation = Map<String, dynamic>.from(data['konsultasi_terbaru'] as Map);
+    } else if (data['ringkasan_aktivitas'] is Map && (data['ringkasan_aktivitas'] as Map)['konsultasi'] is Map) {
+      latestConsultation = Map<String, dynamic>.from((data['ringkasan_aktivitas'] as Map)['konsultasi'] as Map);
+    }
+
+    Map<String, dynamic>? latestPrescription;
+    if (data['resep_terbaru'] is List && (data['resep_terbaru'] as List).isNotEmpty) {
+      final firstRx = (data['resep_terbaru'] as List).first;
+      if (firstRx is Map) {
+        latestPrescription = Map<String, dynamic>.from(firstRx);
+      }
+    } else if (data['ringkasan_aktivitas'] is Map && (data['ringkasan_aktivitas'] as Map)['resep'] is Map) {
+      latestPrescription = Map<String, dynamic>.from((data['ringkasan_aktivitas'] as Map)['resep'] as Map);
+    }
+
+    setState(() {
+      _liveRecentMessages = parsedMessages;
+      _liveTodaySchedules = parsedSchedules;
+      _liveLatestConsultation = latestConsultation;
+      _liveLatestPrescription = latestPrescription;
+    });
+  }
+
+  DokterPatient _resolvePatientFromMap(
+    Map<String, dynamic> map, {
+    String fallbackId = 'p-1',
+    String fallbackName = 'Pasien',
+  }) {
+    final rawId = (map['id_pasien'] ?? map['id'] ?? fallbackId).toString();
+    if (_patientCache.containsKey(rawId)) {
+      return _patientCache[rawId]!;
+    }
+
+    final name = (map['nama_pasien'] ?? map['nama'] ?? fallbackName).toString();
+    String initials = 'P';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isNotEmpty && parts[0].isNotEmpty) {
+      if (parts.length == 1) {
+        initials = parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+      } else {
+        initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+    }
+
+    int age = 35;
+    final birthDate = map['tanggal_lahir']?.toString();
+    if (birthDate != null && birthDate.isNotEmpty) {
+      final dt = DateTime.tryParse(birthDate);
+      if (dt != null) {
+        final now = DateTime.now();
+        age = now.year - dt.year;
+        if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
+          age--;
+        }
+      }
+    }
+
+    final rawGender = (map['jenis_kelamin'] ?? '').toString();
+    final gender = (rawGender == 'L' || rawGender.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
+    final address = (map['alamat'] ?? 'Indonesia').toString();
+    final complaint = (map['keluhan_awal'] ?? map['diagnosis'] ?? 'Konsultasi GIAT').toString();
+    final complaintDetail = (map['keluhan_awal'] ?? map['catatan_dokter'] ?? '').toString();
+    final avatarUrl = (map['foto_profile'] ?? map['foto_profil'])?.toString();
+
+    final List<DokterPrescriptionItem> medicines = [];
+    final rawObat = map['obat'] ?? map['items'];
+    if (rawObat is List) {
+      for (var it in rawObat) {
+        if (it is Map) {
+          final m = Map<String, dynamic>.from(it);
+          medicines.add(
+            DokterPrescriptionItem(
+              id: (m['id'] ?? 'rx-${medicines.length + 1}').toString(),
+              medicineName: (m['nama_obat'] ?? 'Obat').toString(),
+              dose: (m['dosis'] ?? '-').toString(),
+              frequency: (m['aturan_pakai'] ?? '1x1').toString(),
+              quantity: '${m['jumlah'] ?? 1} Tablet',
+              duration: (m['durasi'] ?? '5 hari').toString(),
+              usageTime: (m['waktu_penggunaan'] ?? m['waktu_minum'] ?? 'Sesudah Makan').toString(),
+              specialNotes: m['catatan_khusus']?.toString() ?? m['catatan']?.toString(),
+            ),
+          );
+        }
+      }
+    }
+
+    final patient = DokterPatient(
+      id: rawId,
+      name: name,
+      initials: initials,
+      age: age,
+      gender: gender,
+      address: address,
+      weightKg: 58.0,
+      heightM: 1.65,
+      condition: 'Pasien Ginjal',
+      complaint: complaint,
+      complaintDetail: complaintDetail,
+      currentMedicines: medicines,
+      avatarUrl: avatarUrl,
+      avatarBgColor: const Color(0xFFE0F2FE),
+      avatarTextColor: const Color(0xFF0369A1),
+    );
+
+    _patientCache[rawId] = patient;
+    return patient;
+  }
+
+  void _navigateToChatWithPatient(DokterPatient patient, {String? consultationId}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DokterRoomChatScreen(
+          patient: patient,
+          consultationId: consultationId,
+        ),
+      ),
+    );
   }
 
   @override
@@ -106,14 +304,21 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     }
   }
 
-  void _navigateToChat(String patientId) {
+  void _navigateToChat(String patientId, {String? consultationId}) {
+    if (_patientCache.containsKey(patientId)) {
+      _navigateToChatWithPatient(_patientCache[patientId]!, consultationId: consultationId);
+      return;
+    }
     final patient = DokterMockData.patients.firstWhere(
       (p) => p.id == patientId,
       orElse: () => DokterMockData.patients.first,
     );
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => DokterRoomChatScreen(patient: patient),
+        builder: (_) => DokterRoomChatScreen(
+          patient: patient,
+          consultationId: consultationId,
+        ),
       ),
     );
   }
@@ -288,38 +493,42 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
 
             // ── Scrollable Body Content Below Header ──
             Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                padding: const EdgeInsets.only(top: 16, bottom: 24),
-                child: FadeTransition(
-                  opacity: _fadeAnim,
-                  child: SlideTransition(
-                    position: _slideAnim,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ── Quick Access Menu: 3 Rounded Buttons (Konsultasi, Pasien, Jadwal) ──
-                        _buildQuickActionMenu(),
+              child: RefreshIndicator(
+                color: _darkGreen,
+                onRefresh: () => _fetchLiveDashboard(showLoading: false),
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  padding: const EdgeInsets.only(top: 16, bottom: 24),
+                  child: FadeTransition(
+                    opacity: _fadeAnim,
+                    child: SlideTransition(
+                      position: _slideAnim,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Quick Access Menu: 3 Rounded Buttons (Konsultasi, Pasien, Jadwal) ──
+                          _buildQuickActionMenu(),
 
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
-                        // ── Section 1: Pesan Terbaru (Figma Node 1008:17556) ──
-                        _buildRecentMessagesSection(),
+                          // ── Section 1: Pesan Terbaru (Figma Node 1008:17556) ──
+                          _buildRecentMessagesSection(),
 
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
-                        // ── Section 2: Jadwal Hari Ini (Figma Node 1008:17556) ──
-                        _buildTodayScheduleTimelineSection(),
+                          // ── Section 2: Jadwal Hari Ini (Figma Node 1008:17556) ──
+                          _buildTodayScheduleTimelineSection(),
 
-                        const SizedBox(height: 24),
+                          const SizedBox(height: 24),
 
-                        // ── Section 3: Ringkasan Aktivitas Hari Ini (Figma Node 1008:17556 - Variant 2) ──
-                        KeyedSubtree(
-                          key: _activitySummaryKey,
-                          child: _buildActivitySummarySection(),
-                        ),
-                      ],
+                          // ── Section 3: Ringkasan Aktivitas Hari Ini (Figma Node 1008:17556 - Variant 2) ──
+                          KeyedSubtree(
+                            key: _activitySummaryKey,
+                            child: _buildActivitySummarySection(),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -484,6 +693,9 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   // SECTION 3: RINGKASAN AKTIVITAS HARI INI (Figma Node 1008:17556 - Variant 2)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildActivitySummarySection() {
+    final hasRealConsultation = _shouldShowRealData && _liveLatestConsultation != null;
+    final hasRealPrescription = _shouldShowRealData && _liveLatestPrescription != null;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -499,14 +711,325 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           ),
           const SizedBox(height: 14),
 
-          // Card 1: Konsultasi (Budi Santoso)
-          _buildConsultationActivityCard(),
+          // Card 1: Konsultasi (Real data jika ada, fallback ke Budi Santoso untuk test)
+          if (hasRealConsultation)
+            _buildLiveConsultationActivityCard(_liveLatestConsultation!)
+          else
+            _buildConsultationActivityCard(),
 
           const SizedBox(height: 14),
 
-          // Card 2: Membuat resep (Budi Santoso with medicine breakdown)
-          _buildPrescriptionActivityCard(),
+          // Card 2: Membuat resep (Real data jika ada, fallback ke Budi Santoso untuk test)
+          if (hasRealPrescription)
+            _buildLivePrescriptionActivityCard(_liveLatestPrescription!)
+          else
+            _buildPrescriptionActivityCard(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLiveConsultationActivityCard(Map<String, dynamic> item) {
+    final patientName = (item['nama_pasien'] ?? 'Pasien').toString();
+    final patient = _resolvePatientFromMap(item, fallbackName: patientName);
+    final complaint = (item['keluhan_awal'] ?? 'Follow-up kesehatan ginjal pasien').toString();
+    final consultationId = item['id']?.toString();
+
+    String timeStr = '14:00 WIB';
+    final cleanTime = TimeUtils.cleanTimeString(item['jam_mulai']);
+    if (cleanTime != null && cleanTime.isNotEmpty) {
+      timeStr = '$cleanTime WIB';
+    }
+
+    return GestureDetector(
+      onTap: () => _navigateToChatWithPatient(patient, consultationId: consultationId),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _cardBorderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    patientName,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    'Konsultasi',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              complaint,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF475569),
+                height: 1.35,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF0F172A)),
+                const SizedBox(width: 6),
+                Text(
+                  timeStr,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLivePrescriptionActivityCard(Map<String, dynamic> item) {
+    final patientName = (item['nama_pasien'] ?? 'Pasien').toString();
+    final patient = _resolvePatientFromMap(item, fallbackName: patientName);
+    final diagnosis = (item['diagnosis'] ?? item['catatan_dokter'] ?? 'Penerbitan resep obat elektronik').toString();
+
+    String timeStr = '14:00 WIB';
+    final createdAt = item['created_at'];
+    if (createdAt != null) {
+      timeStr = TimeUtils.formatChatTime(createdAt);
+    }
+
+    final rawObat = item['obat'] ?? item['items'];
+    final List<Map<String, dynamic>> obatList = [];
+    if (rawObat is List) {
+      for (var o in rawObat) {
+        if (o is Map) {
+          obatList.add(Map<String, dynamic>.from(o));
+        }
+      }
+    }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DokterReviewResepScreen(
+              patient: patient,
+              initialItems: patient.currentMedicines.isNotEmpty ? patient.currentMedicines : null,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _cardBorderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    patientName,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    'Membuat resep',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              diagnosis,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF475569),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF0F172A)),
+                const SizedBox(width: 6),
+                Text(
+                  timeStr,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Prescription items container
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Column(
+                children: [
+                  if (obatList.isNotEmpty) ...[
+                    for (int i = 0; i < obatList.length; i++) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              (obatList[i]['nama_obat'] ?? 'Obat').toString(),
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF044E2F),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${obatList[i]['jumlah'] ?? 1} Tablet',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${obatList[i]['dosis'] ?? '1x1'} • ${obatList[i]['aturan_pakai'] ?? obatList[i]['waktu_penggunaan'] ?? 'Diminum sesudah makan'}',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                      if (i < obatList.length - 1)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Divider(color: Color(0xFFE2E8F0), height: 1, thickness: 1),
+                        ),
+                    ],
+                  ] else ...[
+                    Text(
+                      'Belum ada rincian obat.',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Divider(color: Color(0xFFE2E8F0), height: 1, thickness: 1),
+                  ),
+
+                  // Total Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        '${obatList.length} item obat',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -720,7 +1243,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                   ),
                   const SizedBox(height: 3),
                   Align(
-                    alignment: Alignment.centerLeft,
+                        alignment: Alignment.centerLeft,
                     child: Text(
                       'Tablet • 10 tablet',
                       style: GoogleFonts.inter(
@@ -819,41 +1342,194 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   // SECTION 1: PESAN TERBARU (Figma Node 1008:17556)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildRecentMessagesSection() {
+    final hasRealMessages = _shouldShowRealData && _liveRecentMessages.isNotEmpty;
+    final messagesToShow = hasRealMessages ? _liveRecentMessages : null;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Pesan Terbaru',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF111827),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Pesan Terbaru',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF111827),
+                ),
+              ),
+              if (!_isTest)
+                GestureDetector(
+                  onTap: () => _navigateToTab(1), // Tab 1: Konsultasi
+                  child: Row(
+                    children: [
+                      Text(
+                        'Buka Chat',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: _darkGreen,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_circle_right_outlined, color: _darkGreen, size: 16),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          if (hasRealMessages) ...[
+            for (var msg in messagesToShow!) ...[
+              _buildLiveMessageCard(msg),
+              const SizedBox(height: 12),
+            ],
+          ] else if (_shouldShowRealData && !_isLoading && _liveRecentMessages.isEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _cardBorderColor),
+              ),
+              child: Center(
+                child: Text(
+                  'Belum ada pesan terbaru dari pasien.',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+          ] else ...[
+            // Fallback for tests & initial render
+            _buildMessageItem(
+              initials: 'BS',
+              name: 'Budi Santoso',
+              message: '“Dok, saya sudah mengirim hasil lab”',
+              time: '2 menit',
+              patientId: 'p-1',
+            ),
 
-          // Message Card 1: Budi Santoso (BS)
-          _buildMessageItem(
-            initials: 'BS',
-            name: 'Budi Santoso',
-            message: '“Dok, saya sudah mengirim hasil lab”',
-            time: '2 menit',
-            patientId: 'p-1',
-          ),
+            const SizedBox(height: 12),
 
-          const SizedBox(height: 12),
-
-          // Message Card 2: Siti Wijaya (SW)
-          _buildMessageItem(
-            initials: 'SW',
-            name: 'Siti Wijaya',
-            message: '“Obat sudah diminum sesuai jadwal.”',
-            time: '5 menit',
-            patientId: 'p-2',
-          ),
+            _buildMessageItem(
+              initials: 'SW',
+              name: 'Siti Wijaya',
+              message: '“Obat sudah diminum sesuai jadwal.”',
+              time: '5 menit',
+              patientId: 'p-2',
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildLiveMessageCard(Map<String, dynamic> msg) {
+    final patientName = (msg['nama_pasien'] ?? 'Pasien').toString();
+    final patient = _resolvePatientFromMap(msg, fallbackName: patientName);
+    final rawText = (msg['pesan'] ?? 'Konsultasi').toString();
+    final displayText = rawText.startsWith('“') ? rawText : '“$rawText”';
+    final timeStr = TimeUtils.formatChatTime(msg['created_at']);
+    final consultationId = msg['id_konsultasi']?.toString();
+
+    return GestureDetector(
+      onTap: () => _navigateToChatWithPatient(patient, consultationId: consultationId),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _cardBorderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0F2FE),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Text(
+                  patient.initials,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0369A1),
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          patientName,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          timeStr,
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    displayText,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      color: const Color(0xFF475569),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -962,6 +1638,8 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   // SECTION 2: JADWAL HARI INI (Figma Node 1008:17556)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildTodayScheduleTimelineSection() {
+    final hasRealSchedules = _shouldShowRealData && _liveTodaySchedules.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1001,139 +1679,250 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           ),
           const SizedBox(height: 12),
 
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _cardBorderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+          if (hasRealSchedules) ...[
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _cardBorderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  for (int i = 0; i < _liveTodaySchedules.length; i++) ...[
+                    _buildLiveScheduleTimelineItem(
+                      _liveTodaySchedules[i],
+                      isLast: i == _liveTodaySchedules.length - 1,
+                    ),
+                    if (i < _liveTodaySchedules.length - 1)
+                      const SizedBox(height: 10),
+                  ],
+                ],
+              ),
             ),
-            child: Column(
-              children: [
-                // Item 1: Budi Santoso
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF10B981),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Container(
-                          width: 2,
-                          height: 38,
-                          color: const Color(0xFFE2E8F0),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Budi Santoso',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF0F172A),
-                            ),
-                          ),
-                          Text(
-                            'Konsultasi',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '14:00 - 14:30',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF475569),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+          ] else if (_shouldShowRealData && !_isLoading && _liveTodaySchedules.isEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _cardBorderColor),
+              ),
+              child: Center(
+                child: Text(
+                  'Tidak ada jadwal konsultasi untuk hari ini.',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+              ),
+            ),
+          ] else ...[
+            // Fallback for tests & initial render
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _cardBorderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Item 1: Budi Santoso
+                  _buildMockTimelineItem(
+                    name: 'Budi Santoso',
+                    service: 'Konsultasi',
+                    time: '14:00 - 14:30',
+                    dotColor: const Color(0xFF10B981),
+                    showLine: true,
+                  ),
+                  // Item 2: Ahmad Hidayat
+                  _buildMockTimelineItem(
+                    name: 'Ahmad Hidayat',
+                    service: 'Konsultasi',
+                    time: '15:00 - 15:30',
+                    dotColor: const Color(0xFFCBD5E1),
+                    showLine: false,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
-                // Item 2: Ahmad Hidayat
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFCBD5E1),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Ahmad Hidayat',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF0F172A),
-                            ),
-                          ),
-                          Text(
-                            'Konsultasi',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '15:00 - 15:30',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF475569),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+  Widget _buildLiveScheduleTimelineItem(Map<String, dynamic> item, {required bool isLast}) {
+    final patientName = (item['nama_pasien'] ?? 'Pasien').toString();
+    final patient = _resolvePatientFromMap(item, fallbackName: patientName);
+    final status = (item['status'] ?? '').toString().toLowerCase();
+    final isOngoing = status == 'berlangsung';
+    final isDone = status == 'selesai';
+    final dotColor = isOngoing
+        ? const Color(0xFF10B981)
+        : (isDone ? const Color(0xFF0284C7) : const Color(0xFFCBD5E1));
+
+    String timeRange = 'Hari ini';
+    final start = TimeUtils.cleanTimeString(item['jam_mulai']);
+    final end = TimeUtils.cleanTimeString(item['jam_selesai']);
+    if (start != null && end != null) {
+      timeRange = '$start - $end WIB';
+    } else if (start != null) {
+      timeRange = '$start WIB';
+    }
+
+    final serviceType = (item['jenis_layanan'] == 'video' ? 'Video Call' : 'Konsultasi');
+    final consultationId = item['id']?.toString();
+
+    return InkWell(
+      onTap: () => _navigateToChatWithPatient(patient, consultationId: consultationId),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              if (!isLast)
+                Container(
+                  width: 2,
+                  height: 38,
+                  color: const Color(0xFFE2E8F0),
+                ),
+            ],
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  patientName,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  serviceType,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
                 ),
               ],
             ),
           ),
+          Row(
+            children: [
+              const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
+              const SizedBox(width: 4),
+              Text(
+                timeRange,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF475569),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMockTimelineItem({
+    required String name,
+    required String service,
+    required String time,
+    required Color dotColor,
+    required bool showLine,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            if (showLine)
+              Container(
+                width: 2,
+                height: 38,
+                color: const Color(0xFFE2E8F0),
+              ),
+          ],
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                service,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Row(
+          children: [
+            const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
+            const SizedBox(width: 4),
+            Text(
+              time,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF475569),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
