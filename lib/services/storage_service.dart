@@ -364,5 +364,182 @@ class StorageService {
     }
     return _prefs?.getInt(_unreadNotifKey) ?? 0;
   }
+
+  // =========================================================================
+  // REMINDER & NOTIFIKASI LOCAL CACHE (OFFLINE FIRST & PERSISTENCE)
+  // =========================================================================
+  static const String _remindersCacheKey = 'giat_pasien_reminders_cache';
+  static const String _notificationsCacheKey = 'giat_pasien_notifications_cache';
+  static const String _notifiedRemindersKey = 'giat_notified_reminder_keys';
+
+  /// Menyimpan daftar pengingat pasien ke cache lokal
+  Future<void> saveRemindersCache(List<Map<String, dynamic>> reminders) async {
+    final raw = jsonEncode(reminders);
+    if (_isTest) {
+      _testMemoryStorage[_remindersCacheKey] = raw;
+      return;
+    }
+    await _prefs?.setString(_remindersCacheKey, raw);
+  }
+
+  /// Mengambil daftar pengingat pasien dari cache lokal
+  List<Map<String, dynamic>> getRemindersCache() {
+    String? raw;
+    if (_isTest) {
+      raw = _testMemoryStorage[_remindersCacheKey];
+    } else {
+      raw = _prefs?.getString(_remindersCacheKey);
+    }
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  /// Menambahkan atau memperbarui 1 pengingat di cache lokal
+  Future<void> upsertReminderInCache(Map<String, dynamic> reminder) async {
+    final list = getRemindersCache();
+    final remId = (reminder['id'] ?? reminder['id_reminder'])?.toString();
+    if (remId != null && remId.isNotEmpty) {
+      final idx = list.indexWhere(
+        (item) => (item['id'] ?? item['id_reminder'])?.toString() == remId,
+      );
+      if (idx != -1) {
+        list[idx] = {...list[idx], ...reminder};
+      } else {
+        list.insert(0, reminder);
+      }
+    } else {
+      list.insert(0, reminder);
+    }
+    await saveRemindersCache(list);
+  }
+
+  /// Menghapus pengingat dari cache lokal berdasarkan id
+  Future<void> deleteReminderFromCache(dynamic id) async {
+    if (id == null) return;
+    final list = getRemindersCache();
+    final targetId = id.toString().trim();
+    list.removeWhere(
+      (item) => (item['id'] ?? item['id_reminder'])?.toString().trim() == targetId,
+    );
+    await saveRemindersCache(list);
+  }
+
+  /// Menyimpan daftar notifikasi pasien ke cache lokal
+  Future<void> saveNotificationsCache(List<Map<String, dynamic>> notifications) async {
+    final raw = jsonEncode(notifications);
+    if (_isTest) {
+      _testMemoryStorage[_notificationsCacheKey] = raw;
+      return;
+    }
+    await _prefs?.setString(_notificationsCacheKey, raw);
+  }
+
+  /// Mengambil daftar notifikasi pasien dari cache lokal
+  List<Map<String, dynamic>> getNotificationsCache() {
+    String? raw;
+    if (_isTest) {
+      raw = _testMemoryStorage[_notificationsCacheKey];
+    } else {
+      raw = _prefs?.getString(_notificationsCacheKey);
+    }
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  /// Menambahkan 1 notifikasi baru ke paling atas cache lokal
+  Future<void> addNotificationToCache(Map<String, dynamic> notification) async {
+    final list = getNotificationsCache();
+    final notifId = notification['id']?.toString();
+    if (notifId != null && notifId.isNotEmpty) {
+      list.removeWhere((item) => item['id']?.toString() == notifId);
+    }
+    list.insert(0, notification);
+    await saveNotificationsCache(list);
+    final unread = list.where((n) => n['is_read'] != true && n['is_read'] != 1 && n['read_at'] == null).length;
+    await saveUnreadNotificationCount(unread);
+  }
+
+  /// Menandai 1 notifikasi sebagai sudah dibaca di cache lokal
+  Future<void> markNotificationReadInCache(dynamic id) async {
+    if (id == null) return;
+    final list = getNotificationsCache();
+    final targetId = id.toString().trim();
+    for (int i = 0; i < list.length; i++) {
+      if (list[i]['id']?.toString().trim() == targetId) {
+        list[i] = {...list[i], 'is_read': true};
+      }
+    }
+    await saveNotificationsCache(list);
+    final unread = list.where((n) => n['is_read'] != true && n['is_read'] != 1 && n['read_at'] == null).length;
+    await saveUnreadNotificationCount(unread);
+  }
+
+  /// Menandai semua notifikasi sebagai sudah dibaca di cache lokal
+  Future<void> markAllNotificationsReadInCache() async {
+    final list = getNotificationsCache().map((n) => {...n, 'is_read': true}).toList();
+    await saveNotificationsCache(list);
+    await saveUnreadNotificationCount(0);
+  }
+
+  /// Menghapus 1 notifikasi dari cache lokal
+  Future<void> deleteNotificationFromCache(dynamic id) async {
+    if (id == null) return;
+    final list = getNotificationsCache();
+    final targetId = id.toString().trim();
+    list.removeWhere((item) => item['id']?.toString().trim() == targetId);
+    await saveNotificationsCache(list);
+    final unread = list.where((n) => n['is_read'] != true && n['is_read'] != 1 && n['read_at'] == null).length;
+    await saveUnreadNotificationCount(unread);
+  }
+
+  /// Mengambil daftar key pengingat yang sudah dinotifikasi (`reminderId_YYYY-MM-DD_HH:mm`)
+  Set<String> getNotifiedReminderKeys() {
+    String? raw;
+    if (_isTest) {
+      raw = _testMemoryStorage[_notifiedRemindersKey];
+    } else {
+      raw = _prefs?.getString(_notifiedRemindersKey);
+    }
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toSet();
+        }
+      } catch (_) {}
+    }
+    return <String>{};
+  }
+
+  /// Menandai key pengingat sudah dinotifikasi
+  Future<void> markReminderNotified(String key) async {
+    final keys = getNotifiedReminderKeys();
+    keys.add(key);
+    // Jaga agar ukuran list tetap ringkas (maks 300 entri terakhir)
+    final list = keys.toList();
+    if (list.length > 300) {
+      list.removeRange(0, list.length - 300);
+    }
+    final raw = jsonEncode(list);
+    if (_isTest) {
+      _testMemoryStorage[_notifiedRemindersKey] = raw;
+      return;
+    }
+    await _prefs?.setString(_notifiedRemindersKey, raw);
+  }
 }
 

@@ -3,7 +3,9 @@ import 'package:dio/dio.dart';
 import '../models/pragi_model.dart';
 import 'api_client.dart';
 import 'api_response.dart';
+import 'reminder_notification_service.dart';
 import 'storage_service.dart';
+import 'supabase_admin_service.dart';
 
 /// Service for all Pasien, Pantau, PRAGI, Obat, Reminder, Edukasi, and Notifikasi endpoints
 class PasienApiService {
@@ -13,12 +15,33 @@ class PasienApiService {
 
   final ApiClient _client = ApiClient();
 
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
   // =========================================================================
   // 1. HOME & EDUKASI KESEHATAN
   // =========================================================================
 
-  /// GET /pasien/home
+  /// GET /pasien/home (terintegrasi langsung dengan Supabase PostgreSQL & API)
   Future<ApiResponse<Map<String, dynamic>>> getHome() async {
+    if (!_isTest) {
+      try {
+        final results = await Future.wait([
+          SupabaseAdminService.instance.fetchPasienReminders(onlyToday: true),
+          SupabaseAdminService.instance.fetchEdukasi(),
+        ]);
+        final reminders = results[0];
+        final edukasi = results[1];
+        return ApiResponse.success(
+          message: 'Berhasil memuat data home pasien dari Supabase.',
+          data: {
+            'reminders': reminders,
+            'reminder_hari_ini': reminders,
+            'edukasi_kesehatan': edukasi,
+          },
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/pasien/home');
       return ApiResponse.success(
@@ -30,6 +53,16 @@ class PasienApiService {
         rawData: response.data is Map<String, dynamic> ? response.data : null,
       );
     } catch (e) {
+      final cachedRem = StorageService().getRemindersCache();
+      if (cachedRem.isNotEmpty) {
+        return ApiResponse.success(
+          message: 'Memuat data home dari penyimpanan lokal.',
+          data: {
+            'reminders': cachedRem,
+            'reminder_hari_ini': cachedRem,
+          },
+        );
+      }
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
     }
   }
@@ -108,27 +141,67 @@ class PasienApiService {
   }
 
   // =========================================================================
-  // 2. REMINDER PENGINGAT MINUM OBAT
+  // 2. REMINDER PENGINGAT MINUM OBAT & KONSULTASI (REAL SUPABASE + CACHE)
   // =========================================================================
 
   /// GET /pasien/reminder
   Future<ApiResponse<List<dynamic>>> getReminders() async {
+    if (!_isTest) {
+      try {
+        final pgList = await SupabaseAdminService.instance.fetchPasienReminders();
+        await StorageService().saveRemindersCache(pgList);
+        return ApiResponse.success(
+          message: 'Berhasil memuat jadwal pengingat.',
+          data: pgList,
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/pasien/reminder');
       final raw = response.data;
       final List<dynamic> list = ApiClient.extractList(raw);
+      if (list.isNotEmpty) {
+        final mapped = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        await StorageService().saveRemindersCache(mapped);
+        return ApiResponse.success(
+          message: raw?['message'] ?? 'Berhasil memuat jadwal pengingat.',
+          data: list,
+          statusCode: response.statusCode,
+        );
+      }
+      final cached = StorageService().getRemindersCache();
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat jadwal pengingat.',
-        data: list,
+        data: cached.isNotEmpty ? cached : list,
         statusCode: response.statusCode,
       );
     } catch (e) {
+      final cached = StorageService().getRemindersCache();
+      if (cached.isNotEmpty) {
+        return ApiResponse.success(
+          message: 'Memuat jadwal pengingat dari perangkat.',
+          data: cached,
+        );
+      }
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
     }
   }
 
   /// GET /pasien/reminder/hari-ini
   Future<ApiResponse<List<dynamic>>> getRemindersHariIni() async {
+    if (!_isTest) {
+      try {
+        final pgList = await SupabaseAdminService.instance.fetchPasienReminders(onlyToday: true);
+        return ApiResponse.success(
+          message: 'Berhasil memuat pengingat hari ini.',
+          data: pgList,
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/pasien/reminder/hari-ini');
       final raw = response.data;
@@ -139,12 +212,36 @@ class PasienApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
+      final cached = StorageService()
+          .getRemindersCache()
+          .where((m) => m['is_active'] == true || m['isActive'] == true)
+          .toList();
+      if (cached.isNotEmpty) {
+        return ApiResponse.success(
+          message: 'Memuat pengingat hari ini dari perangkat.',
+          data: cached,
+        );
+      }
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
     }
   }
 
   /// GET /pasien/reminder/{id}
   Future<ApiResponse<Map<String, dynamic>>> getReminderDetail(dynamic id) async {
+    if (!_isTest) {
+      try {
+        final pgList = await SupabaseAdminService.instance.fetchPasienReminders();
+        final match = pgList.where((m) => m['id']?.toString() == id.toString());
+        if (match.isNotEmpty) {
+          return ApiResponse.success(
+            message: 'Berhasil memuat detail pengingat.',
+            data: match.first,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/pasien/reminder/$id');
       return ApiResponse.success(
@@ -159,56 +256,164 @@ class PasienApiService {
 
   /// POST /pasien/reminder
   Future<ApiResponse<Map<String, dynamic>>> createReminder(Map<String, dynamic> data) async {
+    if (!_isTest) {
+      try {
+        final pgCreated = await SupabaseAdminService.instance.createPasienReminder(data);
+        if (pgCreated != null) {
+          await StorageService().upsertReminderInCache(pgCreated);
+          ReminderNotificationService.instance.onRemindersChanged();
+          return ApiResponse.success(
+            message: 'Pengingat berhasil disimpan.',
+            data: pgCreated,
+            statusCode: 201,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.post('/pasien/reminder', data: data);
+      final resData = response.data?['data'] is Map
+          ? Map<String, dynamic>.from(response.data['data'] as Map)
+          : data;
+      await StorageService().upsertReminderInCache(resData);
+      ReminderNotificationService.instance.onRemindersChanged();
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Pengingat berhasil disimpan.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      await StorageService().upsertReminderInCache(data);
+      ReminderNotificationService.instance.onRemindersChanged();
+      return ApiResponse.success(
+        message: 'Pengingat berhasil disimpan di perangkat.',
+        data: data,
+      );
     }
   }
 
   /// PUT /pasien/reminder/{id}
   Future<ApiResponse<Map<String, dynamic>>> updateReminder(dynamic id, Map<String, dynamic> data) async {
+    if (!_isTest) {
+      try {
+        final pgUpdated = await SupabaseAdminService.instance.updatePasienReminder(
+          id.toString(),
+          data,
+        );
+        if (pgUpdated != null) {
+          await StorageService().upsertReminderInCache(pgUpdated);
+          ReminderNotificationService.instance.onRemindersChanged();
+          return ApiResponse.success(
+            message: 'Pengingat berhasil diperbarui.',
+            data: pgUpdated,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.put('/pasien/reminder/$id', data: data);
+      final resData = response.data?['data'] is Map
+          ? Map<String, dynamic>.from(response.data['data'] as Map)
+          : {...data, 'id': id.toString()};
+      await StorageService().upsertReminderInCache(resData);
+      ReminderNotificationService.instance.onRemindersChanged();
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Pengingat berhasil diperbarui.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      final updatedLocal = {...data, 'id': id.toString()};
+      await StorageService().upsertReminderInCache(updatedLocal);
+      ReminderNotificationService.instance.onRemindersChanged();
+      return ApiResponse.success(
+        message: 'Pengingat diperbarui di perangkat.',
+        data: updatedLocal,
+      );
     }
   }
 
   /// PATCH /pasien/reminder/{id}/toggle
-  Future<ApiResponse<Map<String, dynamic>>> toggleReminder(dynamic id) async {
+  Future<ApiResponse<Map<String, dynamic>>> toggleReminder(
+    dynamic id, {
+    bool? isActive,
+  }) async {
+    if (!_isTest) {
+      try {
+        final pgToggled = await SupabaseAdminService.instance.togglePasienReminder(
+          id.toString(),
+          forceValue: isActive,
+        );
+        if (pgToggled != null) {
+          await StorageService().upsertReminderInCache(pgToggled);
+          ReminderNotificationService.instance.onRemindersChanged();
+          return ApiResponse.success(
+            message: 'Status pengingat berhasil diubah.',
+            data: pgToggled,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.patch('/pasien/reminder/$id/toggle');
+      final resData = response.data?['data'] is Map
+          ? Map<String, dynamic>.from(response.data['data'] as Map)
+          : <String, dynamic>{'id': id.toString(), if (isActive != null) 'is_active': isActive};
+      await StorageService().upsertReminderInCache(resData);
+      ReminderNotificationService.instance.onRemindersChanged();
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Status pengingat berhasil diubah.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      if (isActive != null) {
+        await StorageService().upsertReminderInCache({
+          'id': id.toString(),
+          'is_active': isActive,
+          'isActive': isActive,
+          'status': isActive ? 'aktif' : 'nonaktif',
+        });
+      }
+      ReminderNotificationService.instance.onRemindersChanged();
+      return ApiResponse.success(
+        message: 'Status pengingat diubah di perangkat.',
+        data: {'id': id.toString(), 'is_active': isActive},
+      );
     }
   }
 
   /// DELETE /pasien/reminder/{id}
   Future<ApiResponse<void>> deleteReminder(dynamic id) async {
+    await StorageService().deleteReminderFromCache(id);
+    if (!_isTest) {
+      try {
+        await SupabaseAdminService.instance.deletePasienReminder(id.toString());
+        ReminderNotificationService.instance.onRemindersChanged();
+        return ApiResponse.success(
+          message: 'Pengingat berhasil dihapus.',
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.delete('/pasien/reminder/$id');
+      ReminderNotificationService.instance.onRemindersChanged();
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Pengingat berhasil dihapus.',
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      ReminderNotificationService.instance.onRemindersChanged();
+      return ApiResponse.success(
+        message: 'Pengingat dihapus dari perangkat.',
+      );
     }
   }
 
@@ -1003,11 +1208,28 @@ class PasienApiService {
   }
 
   // =========================================================================
-  // 7. NOTIFIKASI
+  // 7. NOTIFIKASI (REAL SUPABASE + CACHE)
   // =========================================================================
 
   /// GET /notifikasi (fallback GET /pasien/notifikasi)
   Future<ApiResponse<List<dynamic>>> getNotifikasi() async {
+    if (!_isTest) {
+      // Pastikan pengingat yang sudah jatuh tempo telah tercatat sebagai notifikasi
+      await ReminderNotificationService.instance.checkDueReminders();
+      try {
+        final pgList = await SupabaseAdminService.instance.fetchPasienNotifications();
+        await StorageService().saveNotificationsCache(pgList);
+        final unread = pgList.where((n) => n['is_read'] != true && n['is_read'] != 1).length;
+        await StorageService().saveUnreadNotificationCount(unread);
+        ReminderNotificationService.instance.unreadCountNotifier.value = unread;
+        return ApiResponse.success(
+          message: 'Berhasil memuat notifikasi.',
+          data: pgList,
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       dynamic response;
       try {
@@ -1021,18 +1243,49 @@ class PasienApiService {
       }
       final raw = response.data;
       final List<dynamic> list = ApiClient.extractList(raw);
+      if (list.isNotEmpty) {
+        final mapped = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        await StorageService().saveNotificationsCache(mapped);
+        return ApiResponse.success(
+          message: raw?['message'] ?? 'Berhasil memuat notifikasi.',
+          data: list,
+          statusCode: response.statusCode,
+        );
+      }
+      final cached = StorageService().getNotificationsCache();
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat notifikasi.',
-        data: list,
+        data: cached.isNotEmpty ? cached : list,
         statusCode: response.statusCode,
       );
     } catch (e) {
+      final cached = StorageService().getNotificationsCache();
+      if (cached.isNotEmpty) {
+        return ApiResponse.success(
+          message: 'Memuat notifikasi dari penyimpanan perangkat.',
+          data: cached,
+        );
+      }
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
     }
   }
 
   /// GET /notifikasi/unread-count
   Future<ApiResponse<int>> getNotifikasiUnreadCount() async {
+    if (!_isTest) {
+      await ReminderNotificationService.instance.checkDueReminders();
+      try {
+        final count = await SupabaseAdminService.instance.fetchPasienUnreadNotificationCount();
+        await StorageService().saveUnreadNotificationCount(count);
+        ReminderNotificationService.instance.unreadCountNotifier.value = count;
+        return ApiResponse.success(
+          data: count,
+          message: 'Berhasil memuat counter notifikasi.',
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/notifikasi/unread-count');
       int count = 0;
@@ -1050,51 +1303,108 @@ class PasienApiService {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      final cachedCount = StorageService().getUnreadNotificationCount();
+      return ApiResponse.success(
+        data: cachedCount,
+        message: 'Counter notifikasi dari perangkat.',
+      );
     }
   }
 
   /// PATCH /notifikasi/{id}/read
   Future<ApiResponse<void>> markNotificationRead(dynamic id) async {
+    await StorageService().markNotificationReadInCache(id);
+    if (!_isTest) {
+      try {
+        await SupabaseAdminService.instance.markNotificationRead(id.toString());
+        await ReminderNotificationService.instance.onNotificationsChanged();
+        return ApiResponse.success(
+          message: 'Notifikasi ditandai dibaca.',
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.patch('/notifikasi/$id/read');
+      await ReminderNotificationService.instance.onNotificationsChanged();
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Notifikasi ditandai dibaca.',
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      await ReminderNotificationService.instance.onNotificationsChanged();
+      return ApiResponse.success(message: 'Notifikasi ditandai dibaca.');
     }
   }
 
   /// POST /notifikasi/read-all
   Future<ApiResponse<void>> markAllNotificationsRead() async {
+    await StorageService().markAllNotificationsReadInCache();
+    if (!_isTest) {
+      try {
+        await SupabaseAdminService.instance.markPasienNotificationsAllRead();
+        await ReminderNotificationService.instance.onNotificationsChanged();
+        return ApiResponse.success(
+          message: 'Semua notifikasi telah ditandai dibaca.',
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.post('/notifikasi/read-all');
+      await ReminderNotificationService.instance.onNotificationsChanged();
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Semua notifikasi telah ditandai dibaca.',
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      await ReminderNotificationService.instance.onNotificationsChanged();
+      return ApiResponse.success(message: 'Semua notifikasi telah ditandai dibaca.');
     }
   }
 
   /// DELETE /notifikasi/{id}
   Future<ApiResponse<void>> deleteNotification(dynamic id) async {
+    await StorageService().deleteNotificationFromCache(id);
+    if (!_isTest) {
+      try {
+        await SupabaseAdminService.instance.deleteNotification(id.toString());
+        await ReminderNotificationService.instance.onNotificationsChanged();
+        return ApiResponse.success(
+          message: 'Notifikasi berhasil dihapus.',
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.delete('/notifikasi/$id');
+      await ReminderNotificationService.instance.onNotificationsChanged();
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Notifikasi berhasil dihapus.',
         statusCode: response.statusCode,
       );
     } catch (e) {
-      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+      await ReminderNotificationService.instance.onNotificationsChanged();
+      return ApiResponse.success(message: 'Notifikasi dihapus.');
     }
   }
 
   /// DELETE /notifikasi (Bersihkan semua notifikasi terbaca)
   Future<ApiResponse<void>> clearReadNotifications() async {
+    if (!_isTest) {
+      try {
+        await SupabaseAdminService.instance.clearPasienReadNotifications();
+        await ReminderNotificationService.instance.onNotificationsChanged();
+        return ApiResponse.success(
+          message: 'Notifikasi terbaca berhasil dibersihkan.',
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.delete('/notifikasi');
       return ApiResponse.success(

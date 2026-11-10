@@ -11,6 +11,7 @@ import 'screens/pasien/widgets/pasien_bottom_navbar.dart';
 import 'widgets/giat_background.dart';
 import 'widgets/app_brand_title.dart';
 import 'services/pasien_api_service.dart';
+import 'services/reminder_notification_service.dart';
 import 'services/storage_service.dart';
 import 'screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
 import 'utils/time_utils.dart';
@@ -38,33 +39,8 @@ class _MasterLayoutState extends State<MasterLayout> {
 
   static const _bgColor = Color(0xFFF6FAF7);
 
-  // Notification data
-  List<Map<String, dynamic>> _notifications = [
-    {
-      'title': 'Waktunya Minum Obat',
-      'body': 'Candesartan 8 mg (1 tablet) sesudah makan.',
-      'time': '10 menit yang lalu',
-      'isRead': false,
-      'icon': Icons.medication_rounded,
-      'color': Color(0xFF22C55E),
-    },
-    {
-      'title': 'Konsultasi Mendatang',
-      'body': 'Sesi dengan Dr. Anisa Putri dijadwalkan pukul 14:00 WIB.',
-      'time': '1 jam yang lalu',
-      'isRead': false,
-      'icon': Icons.medical_services_rounded,
-      'color': Color(0xFF3B82F6),
-    },
-    {
-      'title': 'Hasil Skrining PRAGI Tersedia',
-      'body': 'Evaluasi risiko ginjal mandiri Anda telah diperbarui.',
-      'time': 'Kemarin',
-      'isRead': true,
-      'icon': Icons.smart_toy_rounded,
-      'color': Color(0xFF8B5CF6),
-    },
-  ];
+  // Notification data (loaded from real DB / cache)
+  List<Map<String, dynamic>> _notifications = [];
 
   int _unreadCount = 0;
   late final Set<int> _activatedTabs;
@@ -75,7 +51,34 @@ class _MasterLayoutState extends State<MasterLayout> {
     _currentIndex = widget.initialIndex;
     _activatedTabs = {_currentIndex};
     _unreadCount = StorageService().getUnreadNotificationCount();
+    ReminderNotificationService.instance.startMonitoring();
+    ReminderNotificationService.instance.unreadCountNotifier
+        .addListener(_onUnreadChanged);
+    ReminderNotificationService.instance.notificationListVersion
+        .addListener(_onNotificationListChanged);
     _fetchNotificationState();
+  }
+
+  void _onUnreadChanged() {
+    if (!mounted) return;
+    setState(() {
+      _unreadCount =
+          ReminderNotificationService.instance.unreadCountNotifier.value;
+    });
+  }
+
+  void _onNotificationListChanged() {
+    if (!mounted) return;
+    _fetchNotificationState();
+  }
+
+  @override
+  void dispose() {
+    ReminderNotificationService.instance.unreadCountNotifier
+        .removeListener(_onUnreadChanged);
+    ReminderNotificationService.instance.notificationListVersion
+        .removeListener(_onNotificationListChanged);
+    super.dispose();
   }
 
   Future<void> _fetchNotificationState() async {
@@ -111,11 +114,9 @@ class _MasterLayoutState extends State<MasterLayout> {
             });
           }
         }
-        if (parsedList.isNotEmpty) {
-          setState(() {
-            _notifications = parsedList;
-          });
-        }
+        setState(() {
+          _notifications = parsedList;
+        });
       }
     } catch (_) {}
   }

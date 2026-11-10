@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import '../constants/api_constants.dart';
+import '../utils/time_utils.dart';
+import 'storage_service.dart';
 
 /// Service koneksi langsung ke Database PostgreSQL Supabase GIAT (`auaejgogiyfrefsurahd`)
 /// Memastikan seluruh data pada modul Admin 100% merupakan data real dari Supabase.
@@ -859,6 +861,527 @@ class SupabaseAdminService {
     await _exec(
       'DELETE FROM notifikasi WHERE TRIM(id) = @id',
       parameters: {'id': id.trim()},
+    );
+  }
+
+  // ===========================================================================
+  // MODUL PASIEN: PENGINGAT SAYA (REMINDERS) & NOTIFIKASI REAL SUPABASE
+  // ===========================================================================
+
+  /// Menentukan ID Pasien (`id_pasien` / `user.id`) yang sedang login di Supabase
+  Future<String?> resolveCurrentPasienId({String? overridePasienId}) async {
+    if (overridePasienId != null && overridePasienId.trim().length >= 30) {
+      return overridePasienId.trim();
+    }
+
+    final user = await StorageService().getUser();
+    if (user != null) {
+      final rawId = user.id.trim();
+      if (rawId.length >= 30) {
+        await _ensurePasienProfileExists(
+          userId: rawId,
+          nama: user.nama.isNotEmpty ? user.nama : 'Pasien GIAT',
+          noHp: user.noHp,
+          alamat: user.alamat,
+        );
+        return rawId;
+      }
+
+      final email = user.email.trim().toLowerCase();
+      if (email.isNotEmpty) {
+        final byEmail = await _exec(
+          '''
+          SELECT TRIM(u.id) AS id, COALESCE(p.nama, split_part(u.email, '@', 1)) AS nama
+          FROM "user" u
+          LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(u.id)
+          WHERE LOWER(TRIM(u.email)) = @email
+          LIMIT 1
+          ''',
+          parameters: {'email': email},
+        );
+        if (byEmail.isNotEmpty) {
+          final row = byEmail.first.toColumnMap();
+          final foundId = row['id']?.toString().trim();
+          if (foundId != null && foundId.isNotEmpty) {
+            await _ensurePasienProfileExists(
+              userId: foundId,
+              nama: row['nama']?.toString() ?? user.nama,
+              noHp: user.noHp,
+              alamat: user.alamat,
+            );
+            return foundId;
+          }
+        }
+      }
+
+      final nama = user.nama.trim();
+      if (nama.isNotEmpty && nama.toLowerCase() != 'pasien') {
+        final byNama = await _exec(
+          'SELECT TRIM(id_pasien) AS id_pasien FROM pasien WHERE LOWER(TRIM(nama)) = LOWER(@nama) LIMIT 1',
+          parameters: {'nama': nama},
+        );
+        if (byNama.isNotEmpty) {
+          final foundId = byNama.first.toColumnMap()['id_pasien']?.toString().trim();
+          if (foundId != null && foundId.isNotEmpty) return foundId;
+        }
+      }
+    }
+
+    // Fallback ke pasien utama di tabel pasien (Siti Aisyah)
+    final primary = await _exec(
+      'SELECT TRIM(id_pasien) AS id_pasien FROM pasien ORDER BY created_at ASC LIMIT 1',
+    );
+    if (primary.isNotEmpty) {
+      return primary.first.toColumnMap()['id_pasien']?.toString().trim();
+    }
+    return null;
+  }
+
+  Future<void> _ensurePasienProfileExists({
+    required String userId,
+    required String nama,
+    String? noHp,
+    String? alamat,
+  }) async {
+    try {
+      final exists = await _exec(
+        'SELECT 1 FROM pasien WHERE TRIM(id_pasien) = @id LIMIT 1',
+        parameters: {'id': userId.trim()},
+      );
+      if (exists.isEmpty) {
+        await _exec(
+          '''
+          INSERT INTO pasien (id_pasien, nama, no_hp, alamat, created_at, updated_at)
+          VALUES (@id, @nama, @noHp, @alamat, NOW(), NOW())
+          ''',
+          parameters: {
+            'id': userId.trim(),
+            'nama': nama,
+            'noHp': noHp,
+            'alamat': alamat,
+          },
+        );
+      }
+    } catch (_) {}
+  }
+
+  static String _normalizeTimeForDb(dynamic rawTime) {
+    if (rawTime == null) return '08:00:00';
+    final str = rawTime.toString().trim();
+    final match = RegExp(r'(\d{1,2})[:.](\d{1,2})(?:[:.](\d{1,2}))?').firstMatch(str);
+    if (match != null) {
+      final h = (int.tryParse(match.group(1)!) ?? 8).clamp(0, 23).toString().padLeft(2, '0');
+      final m = (int.tryParse(match.group(2)!) ?? 0).clamp(0, 59).toString().padLeft(2, '0');
+      final s = (int.tryParse(match.group(3) ?? '0') ?? 0).clamp(0, 59).toString().padLeft(2, '0');
+      return '$h:$m:$s';
+    }
+    return '08:00:00';
+  }
+
+  static String _normalizeDateForDb(dynamic rawDate) {
+    final now = TimeUtils.nowInUserZone;
+    final todayIso =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    if (rawDate == null) return todayIso;
+    final str = rawDate.toString().trim();
+    if (str.isEmpty || str.toLowerCase() == 'hari ini') return todayIso;
+
+    final isoMatch = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})').firstMatch(str);
+    if (isoMatch != null) {
+      final y = isoMatch.group(1)!.padLeft(4, '0');
+      final m = isoMatch.group(2)!.padLeft(2, '0');
+      final d = isoMatch.group(3)!.padLeft(2, '0');
+      return '$y-$m-$d';
+    }
+
+    final parsed = TimeUtils.parseBirthDate(str);
+    if (parsed != null) {
+      return '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+    }
+    return todayIso;
+  }
+
+  /// Mengambil daftar pengingat pasien real dari tabel `reminders` di Supabase
+  Future<List<Map<String, dynamic>>> fetchPasienReminders({
+    String? pasienId,
+    bool onlyToday = false,
+  }) async {
+    final resolvedId = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (resolvedId == null) return [];
+
+    final res = await _exec(
+      '''
+      SELECT
+        TRIM(id) AS id,
+        TRIM(id) AS id_reminder,
+        TRIM(id_pasien) AS id_pasien,
+        COALESCE(tipe, 'obat') AS tipe,
+        judul,
+        judul AS nama,
+        judul AS title,
+        COALESCE(subjudul, '') AS subjudul,
+        COALESCE(subjudul, '') AS keterangan,
+        COALESCE(subjudul, '') AS dosis,
+        COALESCE(subjudul, '') AS subtitle,
+        waktu::text AS waktu,
+        COALESCE(tanggal::text, CURRENT_DATE::text) AS tanggal,
+        COALESCE(pengulangan, 'harian') AS pengulangan,
+        COALESCE(status, 'aktif') AS status,
+        COALESCE(is_active, true) AS is_active,
+        created_at,
+        COALESCE(updated_at, created_at) AS updated_at
+      FROM reminders
+      WHERE TRIM(id_pasien) = @pasienId
+      ORDER BY waktu ASC, created_at DESC
+      ''',
+      parameters: {'pasienId': resolvedId},
+    );
+
+    final list = res.map((r) {
+      final m = _normalizeMap(r.toColumnMap());
+      m['type'] = m['tipe'];
+      m['isActive'] = m['is_active'] == true;
+      return m;
+    }).toList();
+
+    if (!onlyToday) return list;
+
+    final now = TimeUtils.nowInUserZone;
+    final todayIso =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    return list.where((m) {
+      final isActive = m['is_active'] == true || m['isActive'] == true;
+      if (!isActive) return false;
+      final repeat = (m['pengulangan'] ?? 'harian').toString().toLowerCase();
+      final dateStr = (m['tanggal'] ?? todayIso).toString().split(' ').first;
+      if (repeat.contains('hari')) return true;
+      return dateStr == todayIso;
+    }).toList();
+  }
+
+  /// Menyimpan pengingat baru pasien ke tabel `reminders` di Supabase
+  Future<Map<String, dynamic>?> createPasienReminder(
+    Map<String, dynamic> data, {
+    String? pasienId,
+  }) async {
+    final resolvedId = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (resolvedId == null) return null;
+
+    final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
+    final newId = uuidRes.first.toColumnMap()['id'].toString().trim();
+
+    final tipe = (data['tipe'] ?? data['type'] ?? 'obat').toString().trim().toLowerCase();
+    final judul = (data['judul'] ?? data['nama'] ?? data['title'] ?? 'Pengingat').toString().trim();
+    final subjudul = (data['subjudul'] ?? data['subtitle'] ?? data['keterangan'] ?? data['dosis'] ?? '').toString().trim();
+    final waktu = _normalizeTimeForDb(data['waktu'] ?? data['time']);
+    final tanggal = _normalizeDateForDb(data['tanggal'] ?? data['date']);
+    final rawRepeat = (data['pengulangan'] ?? 'harian').toString().toLowerCase();
+    final pengulangan = rawRepeat.contains('hari') ? 'harian' : 'sekali';
+    final isActive = data['is_active'] == null && data['isActive'] == null
+        ? true
+        : (data['is_active'] == true || data['is_active'] == 1 || data['isActive'] == true);
+    final status = isActive ? 'aktif' : 'nonaktif';
+
+    await _exec(
+      '''
+      INSERT INTO reminders (
+        id, id_pasien, tipe, judul, subjudul, waktu, tanggal,
+        pengulangan, status, is_active, created_at, updated_at
+      )
+      VALUES (
+        @id, @pasienId, @tipe, @judul, @subjudul, @waktu::time, @tanggal::date,
+        @pengulangan, @status, @isActive, NOW(), NOW()
+      )
+      ''',
+      parameters: {
+        'id': newId,
+        'pasienId': resolvedId,
+        'tipe': tipe,
+        'judul': judul,
+        'subjudul': subjudul,
+        'waktu': waktu,
+        'tanggal': tanggal,
+        'pengulangan': pengulangan,
+        'status': status,
+        'isActive': isActive,
+      },
+    );
+
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    return {
+      'id': newId,
+      'id_reminder': newId,
+      'id_pasien': resolvedId,
+      'tipe': tipe,
+      'type': tipe,
+      'judul': judul,
+      'nama': judul,
+      'title': judul,
+      'subjudul': subjudul,
+      'keterangan': subjudul,
+      'dosis': subjudul,
+      'subtitle': subjudul,
+      'waktu': waktu,
+      'tanggal': tanggal,
+      'pengulangan': pengulangan,
+      'status': status,
+      'is_active': isActive,
+      'isActive': isActive,
+      'created_at': nowIso,
+      'updated_at': nowIso,
+    };
+  }
+
+  /// Memperbarui data pengingat pasien di tabel `reminders` di Supabase
+  Future<Map<String, dynamic>?> updatePasienReminder(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
+    final trimmedId = id.trim();
+    final tipe = (data['tipe'] ?? data['type'] ?? 'obat').toString().trim().toLowerCase();
+    final judul = (data['judul'] ?? data['nama'] ?? data['title'] ?? 'Pengingat').toString().trim();
+    final subjudul = (data['subjudul'] ?? data['subtitle'] ?? data['keterangan'] ?? data['dosis'] ?? '').toString().trim();
+    final waktu = _normalizeTimeForDb(data['waktu'] ?? data['time']);
+    final tanggal = _normalizeDateForDb(data['tanggal'] ?? data['date']);
+    final rawRepeat = (data['pengulangan'] ?? 'harian').toString().toLowerCase();
+    final pengulangan = rawRepeat.contains('hari') ? 'harian' : 'sekali';
+    final isActive = data['is_active'] == null && data['isActive'] == null
+        ? true
+        : (data['is_active'] == true || data['is_active'] == 1 || data['isActive'] == true);
+    final status = isActive ? 'aktif' : 'nonaktif';
+
+    await _exec(
+      '''
+      UPDATE reminders
+      SET tipe = @tipe,
+          judul = @judul,
+          subjudul = @subjudul,
+          waktu = @waktu::time,
+          tanggal = @tanggal::date,
+          pengulangan = @pengulangan,
+          status = @status,
+          is_active = @isActive,
+          updated_at = NOW()
+      WHERE TRIM(id) = @id
+      ''',
+      parameters: {
+        'id': trimmedId,
+        'tipe': tipe,
+        'judul': judul,
+        'subjudul': subjudul,
+        'waktu': waktu,
+        'tanggal': tanggal,
+        'pengulangan': pengulangan,
+        'status': status,
+        'isActive': isActive,
+      },
+    );
+
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    return {
+      'id': trimmedId,
+      'id_reminder': trimmedId,
+      'tipe': tipe,
+      'type': tipe,
+      'judul': judul,
+      'nama': judul,
+      'title': judul,
+      'subjudul': subjudul,
+      'keterangan': subjudul,
+      'dosis': subjudul,
+      'subtitle': subjudul,
+      'waktu': waktu,
+      'tanggal': tanggal,
+      'pengulangan': pengulangan,
+      'status': status,
+      'is_active': isActive,
+      'isActive': isActive,
+      'updated_at': nowIso,
+    };
+  }
+
+  /// Mengubah status aktif / nonaktif pengingat pasien di tabel `reminders`
+  Future<Map<String, dynamic>?> togglePasienReminder(
+    String id, {
+    bool? forceValue,
+  }) async {
+    final trimmedId = id.trim();
+    final current = await _exec(
+      'SELECT is_active FROM reminders WHERE TRIM(id) = @id LIMIT 1',
+      parameters: {'id': trimmedId},
+    );
+    if (current.isEmpty) return null;
+
+    final currentActive = current.first.toColumnMap()['is_active'] == true;
+    final nextActive = forceValue ?? !currentActive;
+    final nextStatus = nextActive ? 'aktif' : 'nonaktif';
+
+    await _exec(
+      '''
+      UPDATE reminders
+      SET is_active = @isActive,
+          status = @status,
+          updated_at = NOW()
+      WHERE TRIM(id) = @id
+      ''',
+      parameters: {
+        'id': trimmedId,
+        'isActive': nextActive,
+        'status': nextStatus,
+      },
+    );
+
+    return {
+      'id': trimmedId,
+      'is_active': nextActive,
+      'isActive': nextActive,
+      'status': nextStatus,
+    };
+  }
+
+  /// Menghapus pengingat pasien dari tabel `reminders` di Supabase
+  Future<bool> deletePasienReminder(String id) async {
+    await _exec(
+      'DELETE FROM reminders WHERE TRIM(id) = @id',
+      parameters: {'id': id.trim()},
+    );
+    return true;
+  }
+
+  /// Mengambil daftar notifikasi pasien real dari tabel `notifikasi` di Supabase
+  Future<List<Map<String, dynamic>>> fetchPasienNotifications({
+    String? pasienId,
+  }) async {
+    final resolvedId = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (resolvedId == null) return [];
+
+    final res = await _exec(
+      '''
+      SELECT
+        TRIM(id) AS id,
+        TRIM(id_user) AS id_user,
+        judul,
+        pesan,
+        COALESCE(kategori, 'sistem') AS kategori,
+        COALESCE(kategori, 'sistem') AS tipe,
+        is_read,
+        created_at
+      FROM notifikasi
+      WHERE TRIM(id_user) = @pasienId
+      ORDER BY created_at DESC
+      LIMIT 50
+      ''',
+      parameters: {'pasienId': resolvedId},
+    );
+
+    return res.map((r) => _normalizeMap(r.toColumnMap())).toList();
+  }
+
+  /// Mengambil jumlah notifikasi belum dibaca (`is_read = false`) untuk pasien
+  Future<int> fetchPasienUnreadNotificationCount({String? pasienId}) async {
+    final resolvedId = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (resolvedId == null) return 0;
+
+    final res = await _exec(
+      '''
+      SELECT COUNT(*)::int AS cnt
+      FROM notifikasi
+      WHERE TRIM(id_user) = @pasienId
+        AND is_read = false
+      ''',
+      parameters: {'pasienId': resolvedId},
+    );
+    if (res.isEmpty) return 0;
+    return int.tryParse(res.first.toColumnMap()['cnt']?.toString() ?? '0') ?? 0;
+  }
+
+  /// Membuat notifikasi baru untuk pasien di tabel `notifikasi` Supabase
+  /// (Digunakan saat waktu Pengingat Saya tiba)
+  Future<Map<String, dynamic>?> createPasienNotification({
+    String? pasienId,
+    required String judul,
+    required String pesan,
+    String kategori = 'obat',
+  }) async {
+    final resolvedId = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (resolvedId == null) return null;
+
+    // Cegah duplikasi notifikasi pengingat yang sama pada hari yang sama
+    final existing = await _exec(
+      '''
+      SELECT
+        TRIM(id) AS id,
+        TRIM(id_user) AS id_user,
+        judul,
+        pesan,
+        COALESCE(kategori, 'obat') AS kategori,
+        COALESCE(kategori, 'obat') AS tipe,
+        is_read,
+        created_at
+      FROM notifikasi
+      WHERE TRIM(id_user) = @pasienId
+        AND judul = @judul
+        AND pesan = @pesan
+        AND created_at::date = CURRENT_DATE
+      LIMIT 1
+      ''',
+      parameters: {
+        'pasienId': resolvedId,
+        'judul': judul,
+        'pesan': pesan,
+      },
+    );
+    if (existing.isNotEmpty) {
+      return _normalizeMap(existing.first.toColumnMap());
+    }
+
+    final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
+    final newId = uuidRes.first.toColumnMap()['id'].toString().trim();
+
+    await _exec(
+      '''
+      INSERT INTO notifikasi (id, id_user, judul, pesan, kategori, is_read, created_at)
+      VALUES (@id, @pasienId, @judul, @pesan, @kategori, false, NOW())
+      ''',
+      parameters: {
+        'id': newId,
+        'pasienId': resolvedId,
+        'judul': judul,
+        'pesan': pesan,
+        'kategori': kategori,
+      },
+    );
+
+    return {
+      'id': newId,
+      'id_user': resolvedId,
+      'judul': judul,
+      'pesan': pesan,
+      'kategori': kategori,
+      'tipe': kategori,
+      'is_read': false,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
+  /// Menandai semua notifikasi milik pasien sudah dibaca
+  Future<void> markPasienNotificationsAllRead({String? pasienId}) async {
+    final resolvedId = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (resolvedId == null) return;
+    await _exec(
+      'UPDATE notifikasi SET is_read = true WHERE TRIM(id_user) = @pasienId',
+      parameters: {'pasienId': resolvedId},
+    );
+  }
+
+  /// Menghapus semua notifikasi milik pasien yang sudah dibaca
+  Future<void> clearPasienReadNotifications({String? pasienId}) async {
+    final resolvedId = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (resolvedId == null) return;
+    await _exec(
+      'DELETE FROM notifikasi WHERE TRIM(id_user) = @pasienId AND is_read = true',
+      parameters: {'pasienId': resolvedId},
     );
   }
 

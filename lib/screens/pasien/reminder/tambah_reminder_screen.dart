@@ -10,10 +10,12 @@ import '../../../utils/time_utils.dart';
 
 class TambahReminderScreen extends StatefulWidget {
   final String initialCategory;
+  final Map<String, dynamic>? existingReminder;
 
   const TambahReminderScreen({
     super.key,
     this.initialCategory = 'Obat',
+    this.existingReminder,
   });
 
   @override
@@ -31,7 +33,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
   final _namaPengingatCtrl = TextEditingController();
   final _dosisCtrl = TextEditingController();
   DateTime _obatDate = DateTime.now();
-  TimeOfDay _obatTime = const TimeOfDay(hour: 8, minute: 0);
+  TimeOfDay _obatTime = TimeOfDay.now();
   String _obatPengulangan = 'Setiap Hari';
 
   // ── Controllers for Konsultasi Category (Figma 771:5091) ──
@@ -52,6 +54,8 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
   bool _isPopping = false;
   bool _isSubmitting = false;
 
+  bool get _isEditing => widget.existingReminder != null;
+
   void _handleBack() {
     if (_isPopping) return;
     _isPopping = true;
@@ -63,7 +67,54 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
   @override
   void initState() {
     super.initState();
+    final nowZone = TimeUtils.nowInUserZone;
+    _obatDate = DateTime(nowZone.year, nowZone.month, nowZone.day);
+    _obatTime = TimeOfDay(hour: nowZone.hour, minute: nowZone.minute);
     _selectedCategory = widget.initialCategory;
+
+    final existing = widget.existingReminder;
+    if (existing != null) {
+      final rawType = (existing['type'] ?? existing['tipe'] ?? 'obat').toString().toLowerCase();
+      final isKonsul = rawType.contains('konsul');
+      _selectedCategory = isKonsul ? 'Konsultasi' : 'Obat';
+
+      final title = (existing['title'] ?? existing['judul'] ?? existing['nama'] ?? '').toString();
+      final subtitle = (existing['subtitle'] ?? existing['subjudul'] ?? existing['keterangan'] ?? existing['dosis'] ?? '').toString();
+      final rawRepeat = (existing['pengulangan'] ?? 'harian').toString().toLowerCase();
+      final repeatLabel = rawRepeat.contains('hari') ? 'Setiap Hari' : 'Sekali Saja';
+
+      DateTime parsedDate = _obatDate;
+      final rawDate = (existing['tanggal'] ?? existing['date'] ?? '').toString();
+      if (rawDate.isNotEmpty && rawDate.toLowerCase() != 'hari ini') {
+        final d = TimeUtils.parseBirthDate(rawDate);
+        if (d != null) parsedDate = d;
+      }
+
+      TimeOfDay parsedTime = _obatTime;
+      final rawTime = (existing['waktu'] ?? existing['time'] ?? '').toString();
+      final tm = RegExp(r'(\d{1,2})[:.](\d{1,2})').firstMatch(rawTime);
+      if (tm != null) {
+        parsedTime = TimeOfDay(
+          hour: (int.tryParse(tm.group(1)!) ?? nowZone.hour).clamp(0, 23),
+          minute: (int.tryParse(tm.group(2)!) ?? nowZone.minute).clamp(0, 59),
+        );
+      }
+
+      if (isKonsul) {
+        _namaKonsultasiCtrl.text = title;
+        _lokasiCtrl.text = subtitle;
+        _konsultasiDate = parsedDate;
+        _konsultasiTime = parsedTime;
+        _konsultasiPengulangan = repeatLabel;
+        _catatanCtrl.text = (existing['catatan'] ?? '').toString();
+      } else {
+        _namaPengingatCtrl.text = title;
+        _dosisCtrl.text = subtitle;
+        _obatDate = parsedDate;
+        _obatTime = parsedTime;
+        _obatPengulangan = repeatLabel;
+      }
+    }
   }
 
   @override
@@ -122,9 +173,11 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
   }
 
   Future<void> _pickTime({required bool isObat}) async {
+    final nowZone = TimeUtils.nowInUserZone;
+    final defaultNow = TimeOfDay(hour: nowZone.hour, minute: nowZone.minute);
     final picked = await showTimePicker(
       context: context,
-      initialTime: isObat ? _obatTime : (_konsultasiTime ?? const TimeOfDay(hour: 10, minute: 0)),
+      initialTime: isObat ? _obatTime : (_konsultasiTime ?? defaultNow),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -151,6 +204,12 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
 
   void _simpanReminder() {
     if (_isSubmitting) return;
+    final existingId = widget.existingReminder?['id']?.toString();
+    final isActive = widget.existingReminder != null
+        ? (widget.existingReminder!['isActive'] == true ||
+            widget.existingReminder!['is_active'] == true)
+        : true;
+
     if (_selectedCategory == 'Obat') {
       final nama = _namaPengingatCtrl.text.trim();
       if (nama.isEmpty) {
@@ -166,22 +225,30 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
 
       final dateIso = '${_obatDate.year.toString().padLeft(4, '0')}-${_obatDate.month.toString().padLeft(2, '0')}-${_obatDate.day.toString().padLeft(2, '0')}';
       final timeFormatted = '${_obatTime.hour.toString().padLeft(2, '0')}:${_obatTime.minute.toString().padLeft(2, '0')}:00';
+      final pengulangan = _obatPengulangan.toLowerCase().contains('hari') ? 'harian' : 'sekali';
 
       final newReminder = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'id': (existingId != null && existingId.isNotEmpty)
+            ? existingId
+            : DateTime.now().millisecondsSinceEpoch.toString(),
+        'tipe': 'obat',
         'type': 'obat',
+        'judul': nama,
         'nama': nama,
         'title': nama,
+        'subjudul': dosis,
         'subtitle': dosis,
         'keterangan': dosis,
+        'dosis': dosis,
         'tanggal': dateIso,
         'waktu': timeFormatted,
         'time': _formatTime(_obatTime),
         'date': _formatDate(_obatDate),
-        'pengulangan': _obatPengulangan.toLowerCase().contains('hari') ? 'harian' : 'sekali',
-        'status': 'Belum di lakukan',
-        'is_active': true,
-        'isActive': true,
+        'pengulangan': pengulangan,
+        'status': isActive ? 'aktif' : 'nonaktif',
+        'is_active': isActive,
+        'isActive': isActive,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
       };
 
       Navigator.pop(context, newReminder);
@@ -198,28 +265,38 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
       final lokasi = _lokasiCtrl.text.trim().isNotEmpty
           ? _lokasiCtrl.text.trim()
           : 'Klinik / RS Rekanan';
+      final catatan = _catatanCtrl.text.trim();
+      final subjudul = catatan.isNotEmpty ? '$lokasi • $catatan' : lokasi;
 
-      final targetDate = _konsultasiDate ?? DateTime.now();
+      final nowZone = TimeUtils.nowInUserZone;
+      final targetDate = _konsultasiDate ?? DateTime(nowZone.year, nowZone.month, nowZone.day);
       final dateIso = '${targetDate.year.toString().padLeft(4, '0')}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
-      final targetTime = _konsultasiTime ?? const TimeOfDay(hour: 10, minute: 0);
+      final targetTime = _konsultasiTime ?? TimeOfDay(hour: nowZone.hour, minute: nowZone.minute);
       final timeFormatted = '${targetTime.hour.toString().padLeft(2, '0')}:${targetTime.minute.toString().padLeft(2, '0')}:00';
+      final pengulangan = _konsultasiPengulangan == 'Setiap Hari' ? 'harian' : 'sekali';
 
       final newReminder = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'id': (existingId != null && existingId.isNotEmpty)
+            ? existingId
+            : DateTime.now().millisecondsSinceEpoch.toString(),
+        'tipe': 'konsultasi',
         'type': 'konsultasi',
+        'judul': nama,
         'nama': nama,
         'title': nama,
-        'subtitle': lokasi,
-        'keterangan': '$lokasi - ${_catatanCtrl.text.trim()}',
+        'subjudul': subjudul,
+        'subtitle': subjudul,
+        'keterangan': subjudul,
         'tanggal': dateIso,
         'waktu': timeFormatted,
         'time': _formatTime(targetTime),
         'date': _formatDate(targetDate),
-        'pengulangan': _konsultasiPengulangan == 'Setiap Hari' ? 'harian' : 'sekali',
-        'catatan': _catatanCtrl.text.trim(),
-        'status': 'Akan Datang',
-        'is_active': true,
-        'isActive': true,
+        'pengulangan': pengulangan,
+        'catatan': catatan,
+        'status': isActive ? 'aktif' : 'nonaktif',
+        'is_active': isActive,
+        'isActive': isActive,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
       };
 
       Navigator.pop(context, newReminder);
@@ -338,7 +415,7 @@ class _TambahReminderScreenState extends State<TambahReminderScreen> {
                 ],
               ),
               child: Text(
-                'Tambah Pengingat Baru',
+                _isEditing ? 'Edit Pengingat' : 'Tambah Pengingat Baru',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,

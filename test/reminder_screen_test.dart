@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:giat/screens/pasien/reminder/reminder_list_screen.dart';
 import 'package:giat/screens/pasien/reminder/tambah_reminder_screen.dart';
+import 'package:giat/screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
+import 'package:giat/services/reminder_notification_service.dart';
+import 'package:giat/services/storage_service.dart';
+import 'package:giat/utils/time_utils.dart';
 
 void main() {
   testWidgets('ReminderListScreen renders correctly with stacked header and cards without status badges', (tester) async {
@@ -126,5 +131,53 @@ void main() {
     final setiapHariInPopupFinder = find.text('Setiap Hari').last;
     final setiapHariBox = tester.getRect(setiapHariInPopupFinder);
     expect(setiapHariBox.top >= repeatButtonBox.top, isTrue);
+  });
+
+  testWidgets('When a reminder reaches its scheduled time, it triggers a notification and appears in PasienNotifikasiScreen', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await StorageService().init();
+
+    final now = TimeUtils.nowInUserZone;
+    final hh = now.hour.toString().padLeft(2, '0');
+    final mm = now.minute.toString().padLeft(2, '0');
+    final dateIso =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    // Save an active reminder scheduled for current time
+    await StorageService().saveRemindersCache([
+      {
+        'id': 'rem-test-due-001',
+        'judul': 'Minum Obat Amlodipine 10mg',
+        'subjudul': '1 Tablet Sesudah Makan',
+        'tipe': 'obat',
+        'waktu': '$hh:$mm:00',
+        'tanggal': dateIso,
+        'pengulangan': 'harian',
+        'is_active': true,
+      },
+    ]);
+
+    // Trigger due check
+    await ReminderNotificationService.instance.checkDueReminders(allowInTest: true);
+
+    // Verify notification was created in cache and unread count updated
+    final cachedNotifs = StorageService().getNotificationsCache();
+    expect(cachedNotifs.isNotEmpty, isTrue);
+    expect(
+      cachedNotifs.any((n) =>
+          (n['judul']?.toString() ?? '').contains('Minum Obat Amlodipine 10mg')),
+      isTrue,
+    );
+    expect(ReminderNotificationService.instance.unreadCountNotifier.value, greaterThanOrEqualTo(1));
+
+    // Render PasienNotifikasiScreen and verify the triggered reminder notification appears
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PasienNotifikasiScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Minum Obat Amlodipine 10mg'), findsWidgets);
   });
 }

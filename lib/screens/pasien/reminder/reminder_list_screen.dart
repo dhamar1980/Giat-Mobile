@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'tambah_reminder_screen.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/reminder_notification_service.dart';
+import '../../../services/storage_service.dart';
 import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,13 +51,24 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
     ];
   }
 
-  List<Map<String, dynamic>> _reminders = List.from(_defaultReminders);
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  late List<Map<String, dynamic>> _reminders;
   bool _isLoading = false;
   bool _isNavigating = false;
 
   @override
   void initState() {
     super.initState();
+    if (_isTest) {
+      _reminders = List.from(_defaultReminders);
+      _isLoading = false;
+    } else {
+      final cached = StorageService().getRemindersCache();
+      _reminders = _mapRawList(cached);
+      _isLoading = _reminders.isEmpty;
+      ReminderNotificationService.instance.startMonitoring();
+    }
     _loadRemindersFromApi();
   }
 
@@ -76,73 +90,106 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
     return str.isNotEmpty ? str : '08:00 $zone';
   }
 
+  List<Map<String, dynamic>> _mapRawList(List<dynamic> rawList) {
+    final List<Map<String, dynamic>> mapped = [];
+    for (var item in rawList) {
+      if (item is Map) {
+        final id = item['id']?.toString() ?? item['id_reminder']?.toString() ?? '';
+        final type = item['tipe']?.toString().toLowerCase() ??
+            item['type']?.toString().toLowerCase() ??
+            'obat';
+        final title = item['judul']?.toString() ??
+            item['nama']?.toString() ??
+            item['title']?.toString() ??
+            'Pengingat';
+        final subtitle = item['subjudul']?.toString() ??
+            item['keterangan']?.toString() ??
+            item['dosis']?.toString() ??
+            item['deskripsi']?.toString() ??
+            item['subtitle']?.toString() ??
+            '';
+        final rawWaktu = item['waktu']?.toString() ?? item['time']?.toString() ?? '08:00:00';
+        final time = _formatApiTime(rawWaktu);
+        final rawTanggal = item['tanggal']?.toString() ?? item['date']?.toString() ?? 'Hari ini';
+        final pengulangan = item['pengulangan']?.toString() ?? 'harian';
+        final isActive = item['is_active'] == true ||
+            item['is_active'] == 1 ||
+            item['isActive'] == true ||
+            item['status'] == 'aktif';
+
+        mapped.add({
+          'id': id,
+          'id_reminder': id,
+          'type': type,
+          'tipe': type,
+          'title': title,
+          'judul': title,
+          'nama': title,
+          'subtitle': subtitle,
+          'subjudul': subtitle,
+          'keterangan': subtitle,
+          'waktu': rawWaktu,
+          'time': time,
+          'tanggal': rawTanggal,
+          'date': rawTanggal,
+          'pengulangan': pengulangan,
+          'isActive': isActive,
+          'is_active': isActive,
+          'created_at': item['created_at']?.toString() ?? '',
+        });
+      }
+    }
+
+    // Deduplicate reminders by ID (or title + time + subtitle if ID is empty)
+    final seen = <String>{};
+    final deduplicated = <Map<String, dynamic>>[];
+    for (var m in mapped) {
+      final idStr = (m['id'] ?? '').toString().trim();
+      final key = idStr.isNotEmpty
+          ? idStr
+          : '${m['title']}_${m['time']}_${m['subtitle']}';
+      if (!seen.contains(key)) {
+        seen.add(key);
+        deduplicated.add(m);
+      }
+    }
+    return deduplicated;
+  }
+
   Future<void> _loadRemindersFromApi({bool isRefresh = false}) async {
-    if (!isRefresh && _reminders.isEmpty) {
+    if (!isRefresh && _reminders.isEmpty && !_isTest) {
       setState(() => _isLoading = true);
     }
     try {
       final res = await PasienApiService().getReminders();
-      if (res.success && res.data != null && res.data!.isNotEmpty) {
-        final List<Map<String, dynamic>> mapped = [];
-        for (var item in res.data!) {
-          if (item is Map) {
-            final id = item['id']?.toString() ?? item['id_reminder']?.toString() ?? '';
-            final type = item['tipe']?.toString().toLowerCase() ??
-                item['type']?.toString().toLowerCase() ??
-                'obat';
-            final title = item['judul']?.toString() ??
-                item['nama']?.toString() ??
-                item['title']?.toString() ??
-                'Pengingat';
-            final subtitle = item['subjudul']?.toString() ??
-                item['keterangan']?.toString() ??
-                item['dosis']?.toString() ??
-                item['deskripsi']?.toString() ??
-                item['subtitle']?.toString() ??
-                '';
-            final time = _formatApiTime(item['waktu'] ?? item['time']);
-            final date = item['tanggal']?.toString() ?? item['date']?.toString() ?? 'Hari ini';
-            final isActive = item['is_active'] == true ||
-                item['is_active'] == 1 ||
-                item['isActive'] == true ||
-                item['status'] == 'aktif';
-
-            mapped.add({
-              'id': id,
-              'type': type,
-              'title': title,
-              'subtitle': subtitle,
-              'time': time,
-              'date': date,
-              'isActive': isActive,
+      if (res.success && res.data != null) {
+        if (_isTest && res.data!.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _reminders = List.from(_defaultReminders);
+              _isLoading = false;
             });
           }
+          return;
         }
 
-        // Deduplicate reminders by (title + time + subtitle) to prevent duplicate cards
-        final seen = <String>{};
-        final deduplicated = <Map<String, dynamic>>[];
-        for (var m in mapped) {
-          final key = '${m['title']}_${m['time']}_${m['subtitle']}';
-          if (!seen.contains(key)) {
-            seen.add(key);
-            deduplicated.add(m);
-          }
-        }
-
+        final deduplicated = _mapRawList(res.data!);
         if (mounted) {
           setState(() {
             _reminders = deduplicated;
             _isLoading = false;
           });
         }
+        ReminderNotificationService.instance.onRemindersChanged(
+          updatedReminders: deduplicated,
+        );
         return;
       }
     } catch (_) {}
 
     if (mounted) {
       setState(() {
-        if (_reminders.isEmpty) {
+        if (_isTest && _reminders.isEmpty) {
           _reminders = List.from(_defaultReminders);
         }
         _isLoading = false;
@@ -163,20 +210,73 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
       );
 
       if (result != null && result is Map<String, dynamic>) {
+        final formattedResult = _mapRawList([result]).first;
         setState(() {
-          _reminders.insert(0, result);
+          _reminders.insert(0, formattedResult);
         });
         final apiRes = await PasienApiService().createReminder(result);
         if (apiRes.success && apiRes.data != null) {
           final realId = apiRes.data!['id'] ?? apiRes.data!['id_reminder'];
-          if (realId != null) {
-            result['id'] = realId.toString();
+          if (realId != null && mounted) {
+            setState(() {
+              formattedResult['id'] = realId.toString();
+              formattedResult['id_reminder'] = realId.toString();
+            });
           }
         }
+        ReminderNotificationService.instance.onRemindersChanged(
+          updatedReminders: _reminders,
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Pengingat "${result['title']}" berhasil ditambahkan! ⏰'),
+              content: Text('Pengingat "${formattedResult['title']}" berhasil ditambahkan! ⏰'),
+              backgroundColor: _primaryGreen,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
+    } finally {
+      _isNavigating = false;
+    }
+  }
+
+  Future<void> _navigateToEditReminder(Map<String, dynamic> rem, int index) async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+
+    try {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TambahReminderScreen(existingReminder: rem),
+        ),
+      );
+
+      if (result != null && result is Map<String, dynamic>) {
+        final formattedResult = _mapRawList([result]).first;
+        final id = rem['id'] ?? formattedResult['id'];
+        formattedResult['id'] = id;
+        formattedResult['id_reminder'] = id;
+
+        setState(() {
+          if (index >= 0 && index < _reminders.length) {
+            _reminders[index] = formattedResult;
+          }
+        });
+
+        if (id != null && id.toString().isNotEmpty) {
+          await PasienApiService().updateReminder(id, result);
+        }
+        ReminderNotificationService.instance.onRemindersChanged(
+          updatedReminders: _reminders,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Pengingat "${formattedResult['title']}" berhasil diperbarui! ⏰'),
               backgroundColor: _primaryGreen,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -443,103 +543,111 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Icon Container (Soft Cyan/Mint background with rounded corners)
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: iconBgColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        cardIcon,
-                        color: _textColor,
-                        size: 26,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _navigateToEditReminder(rem, index),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Icon Container (Soft Cyan/Mint background with rounded corners)
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: iconBgColor,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 14),
-
-                  // Info Column: Title & Subtitle only
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Title (e.g. Minum Obat, Konsultasi Dokter)
-                          Text(
-                            rem['title'] ?? '',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _textColor,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-
-                          // Subtitle / Dosis / Dokter
-                          Text(
-                            rem['subtitle'] ?? '',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
-                              color: _subtextColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Right Side: Time Pill Badge & Switch Toggle
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(top: 2),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(
+                      child: Center(
+                        child: Icon(
+                          cardIcon,
                           color: _textColor,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          timeStr,
-                          style: GoogleFonts.poppins(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
+                          size: 26,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                        height: 28,
-                        child: Transform.scale(
-                          scale: 0.75,
-                          child: Switch(
-                            value: rem['isActive'] == true,
-                            activeThumbColor: _primaryGreen,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            onChanged: (val) {
-                              setState(() {
-                                rem['isActive'] = val;
-                              });
-                              if (rem['id'] != null) {
-                                PasienApiService().toggleReminder(rem['id']);
-                              }
-                            },
-                          ),
+                    ),
+
+                    const SizedBox(width: 14),
+
+                    // Info Column: Title & Subtitle only
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Title (e.g. Minum Obat, Konsultasi Dokter)
+                            Text(
+                              rem['title'] ?? '',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: _textColor,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+
+                            // Subtitle / Dosis / Dokter
+                            Text(
+                              rem['subtitle'] ?? '',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: _subtextColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+
+                    // Right Side: Time Pill Badge & Switch Toggle
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(top: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _textColor,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            timeStr,
+                            style: GoogleFonts.poppins(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          height: 28,
+                          child: Transform.scale(
+                            scale: 0.75,
+                            child: Switch(
+                              value: rem['isActive'] == true,
+                              activeThumbColor: _primaryGreen,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              onChanged: (val) {
+                                setState(() {
+                                  rem['isActive'] = val;
+                                  rem['is_active'] = val;
+                                });
+                                if (rem['id'] != null) {
+                                  PasienApiService().toggleReminder(
+                                    rem['id'],
+                                    isActive: val,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

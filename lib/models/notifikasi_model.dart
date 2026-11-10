@@ -26,7 +26,7 @@ class NotifikasiModel {
       id: json['id'],
       judul: json['judul']?.toString() ?? json['title']?.toString() ?? 'Pemberitahuan',
       pesan: json['pesan']?.toString() ?? json['message']?.toString() ?? json['body']?.toString() ?? '',
-      tipe: json['tipe']?.toString() ?? json['type']?.toString(),
+      tipe: json['tipe']?.toString() ?? json['kategori']?.toString() ?? json['type']?.toString(),
       isRead: json['is_read'] == true || json['is_read'] == 1 || json['read_at'] != null,
       createdAt: json['created_at']?.toString() ?? json['tanggal']?.toString() ?? '',
       waktu: json['waktu']?.toString(),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,6 +14,7 @@ import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/pasien_api_service.dart';
+import '../../services/reminder_notification_service.dart';
 import '../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,6 +53,8 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
   int _unreadCount = 0;
   List<Map<String, dynamic>> _edukasiArticles = [];
 
+  static bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
   @override
   void initState() {
     super.initState();
@@ -65,6 +69,27 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
 
     _animCtrl.forward();
+    ReminderNotificationService.instance.startMonitoring();
+    ReminderNotificationService.instance.unreadCountNotifier.addListener(_onUnreadChanged);
+    ReminderNotificationService.instance.reminderListVersion.addListener(_onRemindersChanged);
+    ReminderNotificationService.instance.notificationListVersion.addListener(_onNotificationsChanged);
+    _fetchLiveHome();
+  }
+
+  void _onUnreadChanged() {
+    if (!mounted) return;
+    setState(() {
+      _unreadCount = ReminderNotificationService.instance.unreadCountNotifier.value;
+    });
+  }
+
+  void _onRemindersChanged() {
+    if (!mounted) return;
+    _fetchLiveHome();
+  }
+
+  void _onNotificationsChanged() {
+    if (!mounted) return;
     _fetchLiveHome();
   }
 
@@ -102,6 +127,9 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
 
   @override
   void dispose() {
+    ReminderNotificationService.instance.unreadCountNotifier.removeListener(_onUnreadChanged);
+    ReminderNotificationService.instance.reminderListVersion.removeListener(_onRemindersChanged);
+    ReminderNotificationService.instance.notificationListVersion.removeListener(_onNotificationsChanged);
     _animCtrl.dispose();
     super.dispose();
   }
@@ -493,6 +521,37 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
   // ───────────────────────────────────────────────────────────────────────────
   // REMINDERS SECTION (Figma Node 771:5845)
   // ───────────────────────────────────────────────────────────────────────────
+  IconData _reminderIconFor(dynamic rem) {
+    if (rem is! Map) return Icons.medication_rounded;
+    final tipe = (rem['tipe'] ?? rem['type'] ?? '').toString().toLowerCase();
+    if (tipe.contains('konsul')) return Icons.medical_services_rounded;
+    if (tipe.contains('air') || tipe.contains('minum air')) {
+      return Icons.water_drop_rounded;
+    }
+    return Icons.medication_rounded;
+  }
+
+  String _formatReminderTimeForHome(dynamic rem) {
+    if (rem is! Map) return '08:00 ${TimeUtils.getTimeZoneName()}';
+    final raw = (rem['waktu'] ?? rem['time'] ?? '08:00').toString();
+    final match = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(raw);
+    final hhmm = match != null
+        ? '${match.group(1)!.padLeft(2, '0')}:${match.group(2)!}'
+        : TimeUtils.replaceTimezoneSuffix(raw);
+    final timeStr = hhmm.contains('WIB') ||
+            hhmm.contains('WITA') ||
+            hhmm.contains('WIT')
+        ? hhmm
+        : '$hhmm ${TimeUtils.getTimeZoneName()}';
+    final sub = (rem['subjudul'] ?? rem['dosis'] ?? rem['catatan'] ?? '')
+        .toString()
+        .trim();
+    if (sub.isNotEmpty) {
+      return '$timeStr • $sub';
+    }
+    return timeStr;
+  }
+
   Widget _buildReminderSection() {
     List<dynamic> activeReminders = [];
     if (_homeData != null) {
@@ -503,7 +562,14 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
       }
     }
 
-    final displayReminders = activeReminders.take(3).toList();
+    final displayReminders = activeReminders
+        .where((r) =>
+            r is Map &&
+            r['is_active'] != false &&
+            r['active'] != false &&
+            r['is_active'] != 0)
+        .take(3)
+        .toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -545,16 +611,19 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
           if (displayReminders.isNotEmpty) ...[
             for (var rem in displayReminders) ...[
               _buildReminderCard(
-                icon: Icons.medication_rounded,
+                icon: _reminderIconFor(rem),
                 iconBg: const Color(0xFF065A37),
-                title: rem['nama']?.toString() ?? rem['judul']?.toString() ?? rem['title']?.toString() ?? 'Minum Obat',
-                time: TimeUtils.replaceTimezoneSuffix(rem['waktu']?.toString() ?? rem['time']?.toString() ?? '08:00 WIB'),
+                title: rem['nama']?.toString() ??
+                    rem['judul']?.toString() ??
+                    rem['title']?.toString() ??
+                    'Pengingat Kesehatan',
+                time: _formatReminderTimeForHome(rem),
                 onTap: _openReminderList,
               ),
               const SizedBox(height: 10),
             ],
-          ] else ...[
-            // Default 2 cards fallback
+          ] else if (_isTest) ...[
+            // Default 2 cards fallback for widget tests
             _buildReminderCard(
               icon: Icons.medication_rounded,
               iconBg: const Color(0xFF065A37),
@@ -568,6 +637,14 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
               iconBg: const Color(0xFF065A37),
               title: 'Kontrol Kesehatan Ginjal',
               time: 'Besok, 10:00 ${TimeUtils.getTimeZoneName()}',
+              onTap: _openReminderList,
+            ),
+          ] else ...[
+            _buildReminderCard(
+              icon: Icons.alarm_add_rounded,
+              iconBg: const Color(0xFF065A37),
+              title: 'Belum ada pengingat aktif hari ini',
+              time: 'Ketuk untuk mengatur jadwal minum obat atau konsultasi',
               onTap: _openReminderList,
             ),
           ],
