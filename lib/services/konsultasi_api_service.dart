@@ -403,8 +403,8 @@ class KonsultasiApiService {
   }
 
   /// POST /konsultasi/{id}/video-call/start
-  /// Body: {"notify_chat": true}
-  Future<ApiResponse<Map<String, dynamic>>> startVideoCall(dynamic id, {bool notifyChat = true}) async {
+  /// Body: {"notify_chat": false}
+  Future<ApiResponse<Map<String, dynamic>>> startVideoCall(dynamic id, {bool notifyChat = false}) async {
     try {
       final response = await _client.dio.post(
         '/konsultasi/$id/video-call/start',
