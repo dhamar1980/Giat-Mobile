@@ -5,6 +5,7 @@ import 'detail_resep_screen.dart';
 import 'checkout_resep_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN RESEP DOKTER (Sesuai Desain Figma / Gambar 1 & 2)
@@ -32,107 +33,211 @@ class _ResepDokterScreenState extends State<ResepDokterScreen> {
   static const _infoBoxBg = Color(0xFFF1F5F9);
 
   // Daftar data resep dokter
-  late final List<ResepDokterData> _resepList;
+  List<ResepDokterData> _resepList = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _resepList = _fallbackMockResep;
     _fetchLiveResep();
-    _resepList = [
-      // 1. Resep Belum Ditebus
-      const ResepDokterData(
-        rxNumber: 'No. RX-2026-0901-08',
-        status: 'Belum Ditebus',
-        tanggalTerbit: '01 September 2026',
-        masaBerlaku: 's.d. 15 September 2026',
-        doctorName: 'Dr. Siti Rahmawati, Sp.PD-KGH',
-        doctorSpecialty: 'Spesialis Ginjal Hipertensi',
-        doctorSip: 'SIP: 446/SIP.D/35.09/2024',
-        doctorImage: 'assets/images/dokter_apoteker.jpg',
-        mitraPharmacy: 'farmasi mitra GIAT',
-        medications: [
-          ResepObatItem(
-            name: 'Ketosteril Tablet',
-            category: 'Asam Amino Esensial & Ketoanalog',
-            badgeText: 'Obat Keras',
-            aturanPakai: '3x sehari sesudah makan',
-            jumlahObat: '100 tab (1 Box)',
-          ),
-          ResepObatItem(
-            name: 'Candesartan 8mg',
-            category: 'Angiotensin ii REceptor Blocker',
-            badgeText: 'Obat Keras',
-            aturanPakai: '1x sehari pagi (30 tab)',
-            jumlahObat: '30 tab (33 Strip)',
-          ),
-        ],
-      ),
-
-      // 2. Resep Sudah Ditebus
-      const ResepDokterData(
-        rxNumber: 'No. RX-2026-0801-08',
-        status: 'Sudah Ditebus',
-        tanggalTerbit: '01 September 2026',
-        masaBerlaku: 's.d. 15 September 2026',
-        doctorName: 'Dr. Siti Rahmawati, Sp.PD-KGH',
-        doctorSpecialty: 'Spesialis Ginjal Hipertensi',
-        doctorSip: 'SIP: 446/SIP.D/35.09/2024',
-        doctorImage: 'assets/images/dokter_apoteker.jpg',
-        mitraPharmacy: 'Apotek Kimia Farma Mitra',
-        medications: [
-          ResepObatItem(
-            name: 'Amlodipine 5mg',
-            category: 'Calcium Channel Blocker',
-            badgeText: 'Obat Keras',
-            aturanPakai: '1x sehari malam',
-            jumlahObat: '30 tab',
-          ),
-          ResepObatItem(
-            name: 'Asam Folat 1mg',
-            category: 'Suplemen & Vitamin Darah',
-            badgeText: 'Obat Bebas',
-            aturanPakai: '1x sehari',
-            jumlahObat: '30 tab',
-          ),
-        ],
-      ),
-
-      // 3. Resep Kadaluwarsa
-      const ResepDokterData(
-        rxNumber: 'No. RX-2026-0801-08',
-        status: 'Kadaluwarsa',
-        tanggalTerbit: '10 Agustus 2026',
-        masaBerlaku: 's.d. 24 Agustus 2026',
-        doctorName: 'Dr. Siti Rahmawati, Sp.PD-KGH',
-        doctorSpecialty: 'Spesialis Urologi',
-        doctorSip: 'SIP: 446/SIP.D/35.09/2024',
-        doctorImage: 'assets/images/dokter_apoteker.jpg',
-        mitraPharmacy: 'Apotek Mitra GIAT',
-        warningMessage: 'Masa berlaku resep terlewati (maks. 14 hari)',
-        medications: [
-          ResepObatItem(
-            name: 'Amlodipine 5mg',
-            category: 'Calcium Channel Blocker',
-            badgeText: 'Obat Keras',
-            aturanPakai: '1x sehari malam',
-            jumlahObat: '30 tab',
-          ),
-          ResepObatItem(
-            name: 'Asam Folat 1mg',
-            category: 'Suplemen & Vitamin Darah',
-            badgeText: 'Obat Bebas',
-            aturanPakai: '1x sehari',
-            jumlahObat: '30 tab',
-          ),
-        ],
-      ),
-    ];
   }
 
-  Future<void> _fetchLiveResep() async {
+  List<ResepDokterData> get _fallbackMockResep => [
+        // 1. Resep Belum Ditebus
+        const ResepDokterData(
+          rxNumber: 'No. RX-2026-0901-08',
+          status: 'Belum Ditebus',
+          tanggalTerbit: '01 September 2026',
+          masaBerlaku: 's.d. 15 September 2026',
+          doctorName: 'Dr. Siti Rahmawati, Sp.PD-KGH',
+          doctorSpecialty: 'Spesialis Ginjal Hipertensi',
+          doctorSip: 'SIP: 446/SIP.D/35.09/2024',
+          doctorImage: 'assets/images/dokter_apoteker.jpg',
+          mitraPharmacy: 'farmasi mitra GIAT',
+          medications: [
+            ResepObatItem(
+              name: 'Ketosteril Tablet',
+              category: 'Asam Amino Esensial & Ketoanalog',
+              badgeText: 'Obat Keras',
+              aturanPakai: '3x sehari sesudah makan',
+              jumlahObat: '100 tab (1 Box)',
+            ),
+            ResepObatItem(
+              name: 'Candesartan 8mg',
+              category: 'Angiotensin ii REceptor Blocker',
+              badgeText: 'Obat Keras',
+              aturanPakai: '1x sehari pagi (30 tab)',
+              jumlahObat: '30 tab (33 Strip)',
+            ),
+          ],
+        ),
+
+        // 2. Resep Sudah Ditebus
+        const ResepDokterData(
+          rxNumber: 'No. RX-2026-0801-08',
+          status: 'Sudah Ditebus',
+          tanggalTerbit: '01 September 2026',
+          masaBerlaku: 's.d. 15 September 2026',
+          doctorName: 'Dr. Siti Rahmawati, Sp.PD-KGH',
+          doctorSpecialty: 'Spesialis Ginjal Hipertensi',
+          doctorSip: 'SIP: 446/SIP.D/35.09/2024',
+          doctorImage: 'assets/images/dokter_apoteker.jpg',
+          mitraPharmacy: 'Apotek Kimia Farma Mitra',
+          medications: [
+            ResepObatItem(
+              name: 'Amlodipine 5mg',
+              category: 'Calcium Channel Blocker',
+              badgeText: 'Obat Keras',
+              aturanPakai: '1x sehari malam',
+              jumlahObat: '30 tab',
+            ),
+            ResepObatItem(
+              name: 'Asam Folat 1mg',
+              category: 'Suplemen & Vitamin Darah',
+              badgeText: 'Obat Bebas',
+              aturanPakai: '1x sehari',
+              jumlahObat: '30 tab',
+            ),
+          ],
+        ),
+
+        // 3. Resep Kadaluwarsa
+        const ResepDokterData(
+          rxNumber: 'No. RX-2026-0801-08',
+          status: 'Kadaluwarsa',
+          tanggalTerbit: '10 Agustus 2026',
+          masaBerlaku: 's.d. 24 Agustus 2026',
+          doctorName: 'Dr. Siti Rahmawati, Sp.PD-KGH',
+          doctorSpecialty: 'Spesialis Urologi',
+          doctorSip: 'SIP: 446/SIP.D/35.09/2024',
+          doctorImage: 'assets/images/dokter_apoteker.jpg',
+          mitraPharmacy: 'Apotek Mitra GIAT',
+          warningMessage: 'Masa berlaku resep terlewati (maks. 14 hari)',
+          medications: [
+            ResepObatItem(
+              name: 'Amlodipine 5mg',
+              category: 'Calcium Channel Blocker',
+              badgeText: 'Obat Keras',
+              aturanPakai: '1x sehari malam',
+              jumlahObat: '30 tab',
+            ),
+            ResepObatItem(
+              name: 'Asam Folat 1mg',
+              category: 'Suplemen & Vitamin Darah',
+              badgeText: 'Obat Bebas',
+              aturanPakai: '1x sehari',
+              jumlahObat: '30 tab',
+            ),
+          ],
+        ),
+      ];
+
+  Future<void> _fetchLiveResep({bool showLoading = false}) async {
+    if (showLoading && mounted) {
+      setState(() => _isLoading = true);
+    }
     try {
-      await PasienApiService().getResepPasien();
-    } catch (_) {}
+      final res = await PasienApiService().getResepPasien();
+      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+        final List<ResepDokterData> parsed = [];
+        for (var item in res.data!) {
+          if (item is Map) {
+            final m = Map<String, dynamic>.from(item);
+            final rxNo = (m['no_resep'] ?? m['id_resep'] ?? m['id'] ?? 'RXP-2026').toString();
+            final statusStr = (m['status'] ?? '').toString().toLowerCase();
+
+            String statusLabel = 'Belum Ditebus';
+            if (statusStr == 'selesai' || statusStr == 'sudah ditebus' || statusStr == 'sudah_ditebus') {
+              statusLabel = 'Sudah Ditebus';
+            } else if (statusStr == 'kadaluwarsa' || statusStr == 'expired') {
+              statusLabel = 'Kadaluwarsa';
+            }
+
+            final rawTgl = m['tanggal_resep'] ?? m['created_at'];
+            final tglDate = rawTgl != null ? DateTime.tryParse(rawTgl.toString()) : null;
+            final tglStr = tglDate != null
+                ? TimeUtils.formatDate(tglDate, useIndonesianMonth: true)
+                : (rawTgl?.toString() ?? 'Hari ini');
+
+            final expiryDate = tglDate != null
+                ? tglDate.add(const Duration(days: 14))
+                : DateTime.now().add(const Duration(days: 14));
+            final expiryStr = 's.d. ${TimeUtils.formatDate(expiryDate, useIndonesianMonth: true)}';
+
+            final docName = (m['nama_dokter'] ?? 'dr. Spesialis GIAT').toString();
+            final docSpec = (m['spesialisasi_dokter'] ?? 'Spesialis Ginjal Hipertensi').toString();
+            final docSip = m['no_sip_dokter'] != null
+                ? 'SIP: ${m['no_sip_dokter']}'
+                : 'SIP: 446/SIP.D/35.09/2024';
+            final docImg = (m['foto_dokter'] ?? 'assets/images/dokter_apoteker.jpg').toString();
+
+            final rawItems = m['items'] as List<dynamic>? ?? [];
+            final List<ResepObatItem> medItems = [];
+            for (var ir in rawItems) {
+              if (ir is Map) {
+                final irMap = Map<String, dynamic>.from(ir);
+                final medName = (irMap['nama_obat'] ?? 'Obat Ginjal').toString();
+                final cat = (irMap['catatan_khusus'] ?? 'Protokol Nefrologi GIAT').toString();
+                final dosis = (irMap['dosis'] ?? '').toString();
+                final aturan = (irMap['aturan_pakai'] ?? '').toString();
+                final waktu = (irMap['waktu_penggunaan'] ?? '').toString();
+                final qty = irMap['jumlah'] != null ? '${irMap['jumlah']} tab' : '30 tab';
+
+                final aturanCombined = [
+                  if (dosis.isNotEmpty) dosis,
+                  if (aturan.isNotEmpty) aturan,
+                  if (waktu.isNotEmpty) waktu,
+                ].join(' • ');
+
+                medItems.add(ResepObatItem(
+                  name: medName,
+                  category: cat.isNotEmpty ? cat : 'Protokol Nefrologi GIAT',
+                  badgeText: 'Obat Keras',
+                  aturanPakai: aturanCombined.isNotEmpty ? aturanCombined : 'Sesuai petunjuk dokter',
+                  jumlahObat: qty,
+                ));
+              }
+            }
+
+            if (medItems.isEmpty) {
+              medItems.add(ResepObatItem(
+                name: 'Protokol Obat Ginjal',
+                category: m['diagnosis']?.toString() ?? 'Nefrologi GIAT',
+                badgeText: 'Obat Keras',
+                aturanPakai: 'Minum teratur sesuai petunjuk',
+                jumlahObat: '30 tab',
+              ));
+            }
+
+            parsed.add(ResepDokterData(
+              rxNumber: rxNo.startsWith('No.') ? rxNo : 'No. $rxNo',
+              status: statusLabel,
+              tanggalTerbit: tglStr,
+              masaBerlaku: expiryStr,
+              doctorName: docName,
+              doctorSpecialty: docSpec,
+              doctorSip: docSip,
+              doctorImage: docImg,
+              mitraPharmacy: 'farmasi mitra GIAT',
+              medications: medItems,
+            ));
+          }
+        }
+
+        if (parsed.isNotEmpty && mounted) {
+          setState(() {
+            _resepList = parsed;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching live resep dokter: $e');
+    } finally {
+      if (mounted && showLoading) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Color _getStatusColor(String status) {
@@ -162,54 +267,80 @@ class _ResepDokterScreenState extends State<ResepDokterScreen> {
           ),
 
           SafeArea(
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Top Navigation Bar: <- Kembali & Notification/Avatar Pill ──
-                  _buildTopBar(context),
+            child: RefreshIndicator(
+              color: _darkGreen,
+              onRefresh: () => _fetchLiveResep(showLoading: true),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Top Navigation Bar: <- Kembali & Notification/Avatar Pill ──
+                    _buildTopBar(context),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // ── Center Pill Title: Resep Dokter ──
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _darkGreen,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _darkGreen.withValues(alpha: 0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                    // ── Center Pill Title: Resep Dokter ──
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _darkGreen,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _darkGreen.withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          'Resep Dokter',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        'Resep Dokter',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: 0.2,
                         ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // ── Daftar Kartu Resep Dokter ──
-                  ..._resepList.map((resep) => Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: _buildResepCard(context, resep),
-                      )),
-                ],
+                    // ── Daftar Kartu Resep Dokter ──
+                    if (_resepList.isEmpty && !_isLoading) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _cardBorderColor),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Belum ada resep dokter aktif.',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: const Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      ..._resepList.map((resep) => Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: _buildResepCard(context, resep),
+                          )),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -348,21 +479,26 @@ class _ResepDokterScreenState extends State<ResepDokterScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _badgeDark,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  resep.rxNumber,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _badgeDark,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    resep.rxNumber,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(

@@ -101,6 +101,12 @@ class SupabaseAdminService {
     }
   }
 
+  /// Helper untuk menjalankan query fleksibel (khusus service internal/test)
+  Future<List<Map<String, dynamic>>> executeQuery(String sql, [Map<String, dynamic>? parameters]) async {
+    final res = await _exec(sql, parameters: parameters);
+    return res.map((r) => _normalizeMap(r.toColumnMap())).toList();
+  }
+
   /// Login pengguna langsung ke tabel `"user"` di Supabase (dengan verifikasi bcrypt)
   Future<Map<String, dynamic>?> authenticateUser({
     required String email,
@@ -1740,6 +1746,350 @@ class SupabaseAdminService {
         'resep': latestPrescription,
       },
     };
+  }
+
+  // ===========================================================================
+  // MODUL RESEP DOKTER: PENERBITAN RESEP & AKSES RESEP REAL SUPABASE
+  // ===========================================================================
+
+  /// Menyimpan resep obat elektronik baru oleh dokter ke tabel `resep` & `resep_item` Supabase
+  Future<Map<String, dynamic>> saveResepDokter({
+    required String idPasien,
+    String? patientName,
+    String? idDokter,
+    String? doctorName,
+    String? idKonsultasi,
+    String? diagnosis,
+    String? catatanDokter,
+    String status = 'aktif',
+    required List<Map<String, dynamic>> items,
+  }) async {
+    // 1. Resolve Patient ID
+    String? targetPasienId;
+    if (idPasien.trim().length >= 30) {
+      targetPasienId = idPasien.trim();
+    } else {
+      if (idKonsultasi != null && idKonsultasi.trim().isNotEmpty) {
+        final konsRow = await _exec(
+          'SELECT TRIM(id_pasien) AS id_pasien FROM konsultasi WHERE TRIM(id) = @id LIMIT 1',
+          parameters: {'id': idKonsultasi.trim()},
+        );
+        if (konsRow.isNotEmpty) {
+          targetPasienId = konsRow.first.toColumnMap()['id_pasien']?.toString().trim();
+        }
+      }
+      if (targetPasienId == null && patientName != null && patientName.trim().isNotEmpty) {
+        final pasRow = await _exec(
+          'SELECT TRIM(id_pasien) AS id_pasien FROM pasien WHERE LOWER(TRIM(nama)) = LOWER(@nama) LIMIT 1',
+          parameters: {'nama': patientName.trim()},
+        );
+        if (pasRow.isNotEmpty) {
+          targetPasienId = pasRow.first.toColumnMap()['id_pasien']?.toString().trim();
+        }
+      }
+      targetPasienId ??= await resolveCurrentPasienId();
+    }
+
+    if (targetPasienId == null || targetPasienId.isEmpty) {
+      throw Exception('ID Pasien tidak dapat diidentifikasi untuk pembuatan resep.');
+    }
+
+    // 2. Resolve Doctor ID
+    String? targetDokterId;
+    if (idDokter != null && idDokter.trim().length >= 30) {
+      targetDokterId = idDokter.trim();
+    } else {
+      if (idKonsultasi != null && idKonsultasi.trim().isNotEmpty) {
+        final konsDocRow = await _exec(
+          'SELECT TRIM(id_dokter) AS id_dokter FROM konsultasi WHERE TRIM(id) = @id LIMIT 1',
+          parameters: {'id': idKonsultasi.trim()},
+        );
+        if (konsDocRow.isNotEmpty) {
+          targetDokterId = konsDocRow.first.toColumnMap()['id_dokter']?.toString().trim();
+        }
+      }
+      targetDokterId ??= await resolveCurrentDokterId(overrideDokterId: idDokter, doctorName: doctorName);
+    }
+
+    if (targetDokterId == null || targetDokterId.isEmpty) {
+      // Fallback ke dokter pertama jika tidak teridentifikasi
+      final firstDoc = await _exec('SELECT TRIM(id_dokter) AS id_dokter FROM dokter ORDER BY created_at ASC LIMIT 1');
+      if (firstDoc.isNotEmpty) {
+        targetDokterId = firstDoc.first.toColumnMap()['id_dokter']?.toString().trim();
+      }
+    }
+
+    if (targetDokterId == null || targetDokterId.isEmpty) {
+      throw Exception('ID Dokter tidak dapat diidentifikasi.');
+    }
+
+    // 3. Resolve Consultation ID if null
+    String? resolvedKonsultasiId = idKonsultasi?.trim();
+    if (resolvedKonsultasiId == null || resolvedKonsultasiId.isEmpty) {
+      final lastKons = await _exec(
+        '''
+        SELECT TRIM(id) AS id FROM konsultasi
+        WHERE TRIM(id_pasien) = @pasId
+        ORDER BY created_at DESC
+        LIMIT 1
+        ''',
+        parameters: {'pasId': targetPasienId},
+      );
+      if (lastKons.isNotEmpty) {
+        resolvedKonsultasiId = lastKons.first.toColumnMap()['id']?.toString().trim();
+      }
+    }
+
+    // 4. Check whether a prescription already exists for this consultation (unique constraint)
+    String? existingResepId;
+    String? existingNoResep;
+    if (resolvedKonsultasiId != null && resolvedKonsultasiId.isNotEmpty) {
+      final existingRes = await _exec(
+        'SELECT TRIM(id) AS id, no_resep FROM resep WHERE TRIM(id_konsultasi) = @idKonsultasi LIMIT 1',
+        parameters: {'idKonsultasi': resolvedKonsultasiId},
+      );
+      if (existingRes.isNotEmpty) {
+        final r = existingRes.first.toColumnMap();
+        existingResepId = r['id']?.toString().trim();
+        existingNoResep = r['no_resep']?.toString().trim();
+      }
+    }
+
+    final now = DateTime.now();
+    final y = now.year.toString();
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    final seq = (now.millisecondsSinceEpoch % 1000).toString().padLeft(3, '0');
+    final generatedNoResep = existingNoResep ?? 'RXP-$y$m$d-$seq';
+
+    final String finalResepId;
+    if (existingResepId != null && existingResepId.isNotEmpty) {
+      finalResepId = existingResepId;
+      await _exec(
+        '''
+        UPDATE resep
+        SET diagnosis = @diagnosis,
+            catatan_dokter = @catatanDokter,
+            status = @status,
+            updated_at = NOW()
+        WHERE TRIM(id) = @id
+        ''',
+        parameters: {
+          'id': finalResepId,
+          'diagnosis': diagnosis ?? 'Pemeriksaan Protokol Ginjal',
+          'catatanDokter': catatanDokter ?? 'Resep elektronik diterbitkan melalui GIAT Telekonsultasi.',
+          'status': status,
+        },
+      );
+      // Hapus item obat lama agar diganti dengan daftar item obat yang baru diterbitkan
+      await _exec(
+        'DELETE FROM resep_item WHERE TRIM(id_resep) = @id',
+        parameters: {'id': finalResepId},
+      );
+    } else {
+      final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
+      finalResepId = uuidRes.first.toColumnMap()['id'].toString().trim();
+
+      // 5. Insert ke tabel BASE TABLE `resep`
+      await _exec(
+        '''
+        INSERT INTO resep (
+          id,
+          no_resep,
+          id_konsultasi,
+          id_dokter,
+          id_pasien,
+          tanggal_resep,
+          diagnosis,
+          catatan_dokter,
+          status,
+          created_at,
+          updated_at
+        ) VALUES (
+          @id,
+          @noResep,
+          @idKonsultasi,
+          @idDokter,
+          @idPasien,
+          CURRENT_DATE,
+          @diagnosis,
+          @catatanDokter,
+          @status,
+          NOW(),
+          NOW()
+        )
+        ''',
+        parameters: {
+          'id': finalResepId,
+          'noResep': generatedNoResep,
+          'idKonsultasi': resolvedKonsultasiId,
+          'idDokter': targetDokterId,
+          'idPasien': targetPasienId,
+          'diagnosis': diagnosis ?? 'Pemeriksaan Protokol Ginjal',
+          'catatanDokter': catatanDokter ?? 'Resep elektronik diterbitkan melalui GIAT Telekonsultasi.',
+          'status': status,
+        },
+      );
+    }
+
+    // 6. Insert items ke tabel `resep_item`
+    final List<Map<String, dynamic>> savedItems = [];
+    for (var item in items) {
+      final namaObat = (item['nama_obat'] ?? item['medicineName'] ?? item['name'] ?? 'Obat Ginjal').toString().trim();
+      if (namaObat.isEmpty) continue;
+
+      final dosis = (item['dosis'] ?? item['dose'] ?? '').toString().trim();
+      final aturanPakai = (item['aturan_pakai'] ?? item['frequency'] ?? '').toString().trim();
+      final waktuPenggunaan = (item['waktu_penggunaan'] ?? item['waktu_minum'] ?? item['usageTime'] ?? '').toString().trim();
+
+      final rawQty = (item['jumlah'] ?? item['quantity'] ?? '30').toString();
+      final qtyMatch = RegExp(r'\d+').firstMatch(rawQty);
+      final jumlah = qtyMatch != null ? (int.tryParse(qtyMatch.group(0)!) ?? 30) : 30;
+
+      final catatanKhusus = (item['catatan_khusus'] ?? item['specialNotes'] ?? item['catatan'] ?? '').toString().trim();
+
+      final itemIdRes = await _exec('SELECT gen_random_uuid()::text AS id');
+      final newItemId = itemIdRes.first.toColumnMap()['id'].toString().trim();
+
+      await _exec(
+        '''
+        INSERT INTO resep_item (
+          id,
+          id_resep,
+          nama_obat,
+          dosis,
+          aturan_pakai,
+          waktu_penggunaan,
+          jumlah,
+          catatan_khusus,
+          created_at,
+          updated_at
+        ) VALUES (
+          @id,
+          @idResep,
+          @namaObat,
+          @dosis,
+          @aturanPakai,
+          @waktuPenggunaan,
+          @jumlah,
+          @catatanKhusus,
+          NOW(),
+          NOW()
+        )
+        ''',
+        parameters: {
+          'id': newItemId,
+          'idResep': finalResepId,
+          'namaObat': namaObat,
+          'dosis': dosis.isNotEmpty ? dosis : null,
+          'aturanPakai': aturanPakai.isNotEmpty ? aturanPakai : null,
+          'waktuPenggunaan': waktuPenggunaan.isNotEmpty ? waktuPenggunaan : null,
+          'jumlah': jumlah,
+          'catatanKhusus': catatanKhusus.isNotEmpty ? catatanKhusus : null,
+        },
+      );
+
+      savedItems.add({
+        'id': newItemId,
+        'id_resep': finalResepId,
+        'nama_obat': namaObat,
+        'dosis': dosis,
+        'aturan_pakai': aturanPakai,
+        'waktu_penggunaan': waktuPenggunaan,
+        'jumlah': jumlah,
+        'catatan_khusus': catatanKhusus,
+      });
+    }
+
+    // 7. Notifikasi ke Pasien
+    try {
+      await createPasienNotification(
+        pasienId: targetPasienId,
+        judul: 'Resep Obat Baru Diterbitkan',
+        pesan: 'Dokter telah menerbitkan resep elektronik untuk Anda. Cek pada menu Obat > Resep Dokter.',
+        kategori: 'resep',
+      );
+    } catch (e) {
+      debugPrint('Warning: gagal membuat notifikasi pasien: $e');
+    }
+
+    return {
+      'id': finalResepId,
+      'id_resep': finalResepId,
+      'no_resep': generatedNoResep,
+      'id_konsultasi': resolvedKonsultasiId,
+      'id_dokter': targetDokterId,
+      'id_pasien': targetPasienId,
+      'tanggal_resep': '$y-$m-$d',
+      'diagnosis': diagnosis,
+      'catatan_dokter': catatanDokter,
+      'status': status,
+      'items': savedItems,
+    };
+  }
+
+  /// Mengambil daftar resep obat pasien beserta rincian item obatnya dari Supabase
+  Future<List<Map<String, dynamic>>> fetchResepForPasien({String? pasienId}) async {
+    final pid = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (pid == null) return [];
+
+    final rows = await _exec(
+      '''
+      SELECT 
+        TRIM(r.id) AS id,
+        TRIM(r.id) AS id_resep,
+        r.no_resep,
+        TRIM(r.id_konsultasi) AS id_konsultasi,
+        TRIM(r.id_dokter) AS id_dokter,
+        TRIM(r.id_pasien) AS id_pasien,
+        r.tanggal_resep::text AS tanggal_resep,
+        r.diagnosis,
+        r.catatan_dokter,
+        r.status,
+        r.created_at,
+        r.updated_at,
+        COALESCE(d.nama, 'dr. Spesialis GIAT') AS nama_dokter,
+        COALESCE(d.spesialisasi, 'Spesialis Ginjal Hipertensi (Sp.PD-KGH)') AS spesialisasi_dokter,
+        d.no_sip AS no_sip_dokter,
+        d.foto_profile AS foto_dokter,
+        d.institusi AS institusi_dokter
+      FROM resep r
+      LEFT JOIN dokter d ON TRIM(d.id_dokter) = TRIM(r.id_dokter)
+      WHERE TRIM(r.id_pasien) = @id
+      ORDER BY r.created_at DESC
+      ''',
+      parameters: {'id': pid},
+    );
+
+    final List<Map<String, dynamic>> result = [];
+    for (var row in rows) {
+      final map = _normalizeMap(row.toColumnMap());
+      final rxId = map['id']?.toString().trim() ?? map['id_resep']?.toString().trim();
+      if (rxId != null && rxId.isNotEmpty) {
+        final itemRows = await _exec(
+          '''
+          SELECT 
+            TRIM(id) AS id,
+            TRIM(id_resep) AS id_resep,
+            nama_obat,
+            dosis,
+            aturan_pakai,
+            waktu_penggunaan,
+            jumlah,
+            catatan_khusus
+          FROM resep_item
+          WHERE TRIM(id_resep) = @rxId
+          ORDER BY created_at ASC
+          ''',
+          parameters: {'rxId': rxId},
+        );
+        map['items'] = itemRows.map((ir) => _normalizeMap(ir.toColumnMap())).toList();
+      } else {
+        map['items'] = <Map<String, dynamic>>[];
+      }
+      result.add(map);
+    }
+    return result;
   }
 }
 

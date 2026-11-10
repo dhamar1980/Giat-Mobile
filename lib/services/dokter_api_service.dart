@@ -127,6 +127,36 @@ class DokterApiService {
 
   /// POST /dokter/resep
   Future<ApiResponse<Map<String, dynamic>>> createResep(Map<String, dynamic> payload) async {
+    // 1. Prioritaskan penyimpanan langsung ke Supabase PostgreSQL
+    if (!_isTest) {
+      try {
+        final pasienId = (payload['pasien_id'] ?? payload['id_pasien'] ?? '').toString();
+        final patientName = (payload['pasien_nama'] ?? payload['patient_name'] ?? '').toString();
+        final docId = (payload['id_dokter'] ?? payload['dokter_id'] ?? '').toString();
+        final docName = (payload['doctor_name'] ?? payload['dokter_nama'] ?? '').toString();
+        final consultationId = (payload['id_konsultasi'] ?? payload['konsultasi_id'] ?? '').toString();
+        final rawItems = payload['items'] as List<dynamic>? ?? [];
+        final items = rawItems.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+        final res = await SupabaseAdminService.instance.saveResepDokter(
+          idPasien: pasienId,
+          patientName: patientName.isNotEmpty ? patientName : null,
+          idDokter: docId.isNotEmpty ? docId : null,
+          doctorName: docName.isNotEmpty ? docName : null,
+          idKonsultasi: consultationId.isNotEmpty ? consultationId : null,
+          diagnosis: payload['diagnosis']?.toString(),
+          catatanDokter: (payload['catatan_dokter'] ?? payload['catatan'])?.toString(),
+          items: items,
+        );
+
+        return ApiResponse.success(
+          message: 'Resep elektronik berhasil dibuat & tersimpan di database Supabase.',
+          data: res,
+          statusCode: 201,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.post('/dokter/resep', data: payload);
       return ApiResponse.success(

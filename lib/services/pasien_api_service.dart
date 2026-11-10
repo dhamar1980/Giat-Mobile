@@ -1005,8 +1005,23 @@ class PasienApiService {
     }
   }
 
-  /// GET /pasien/obat/resep-saya
-  Future<ApiResponse<List<dynamic>>> getResepPasien() async {
+  /// GET /pasien/obat/resep-saya (terintegrasi langsung dengan Supabase PostgreSQL)
+  Future<ApiResponse<List<dynamic>>> getResepPasien({String? pasienId}) async {
+    if (!_isTest) {
+      try {
+        final realList = await SupabaseAdminService.instance.fetchResepForPasien(pasienId: pasienId);
+        if (realList.isNotEmpty) {
+          return ApiResponse.success(
+            message: 'Berhasil memuat ${realList.length} resep dokter dari database.',
+            data: realList,
+            statusCode: 200,
+          );
+        }
+      } catch (e) {
+        // Fallback ke REST API jika koneksi direct error
+      }
+    }
+
     try {
       final response = await _client.dio.get('/pasien/obat/resep-saya');
       final raw = response.data;

@@ -11,6 +11,7 @@ import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
 import '../../../utils/time_utils.dart';
+import '../../../services/pasien_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN OBAT & RESEP PASIEN (Figma Screen: Tab Obat Pasien)
@@ -39,6 +40,43 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
 
+  int _activeResepCount = 2;
+  String _latestDoctorName = 'dr. Spesialis GIAT';
+  bool _hasLoadedResep = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiveResepSummary();
+  }
+
+  Future<void> _fetchLiveResepSummary() async {
+    try {
+      final res = await PasienApiService().getResepPasien();
+      if (res.success && res.data != null && mounted) {
+        final list = res.data!;
+        int activeCount = 0;
+        String? latestDoc;
+        for (var item in list) {
+          if (item is Map) {
+            final status = (item['status'] ?? '').toString().toLowerCase();
+            if (status == 'aktif' || status == 'belum ditebus' || status == 'belum_ditebus') {
+              activeCount++;
+            }
+            if (latestDoc == null && item['nama_dokter'] != null) {
+              latestDoc = item['nama_dokter'].toString();
+            }
+          }
+        }
+        setState(() {
+          _activeResepCount = activeCount > 0 ? activeCount : list.length;
+          if (latestDoc != null) _latestDoctorName = latestDoc;
+          _hasLoadedResep = true;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final content = Column(
@@ -49,14 +87,17 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
 
         // ── Scrollable Body Content Below Header ──
         Expanded(
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.only(bottom: 110),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
+          child: RefreshIndicator(
+            color: _darkGreen,
+            onRefresh: _fetchLiveResepSummary,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: const EdgeInsets.only(bottom: 110),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 20),
@@ -85,8 +126,9 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
             ),
           ),
         ),
-      ],
-    );
+      ),
+    ],
+  );
 
     if (widget.isEmbedded) {
       return Container(
@@ -288,7 +330,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                '2 resep aktif',
+                '$_activeResepCount resep aktif',
                 style: GoogleFonts.inter(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -358,7 +400,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                                 ),
                                 const SizedBox(height: 5),
                                 Text(
-                                  'Diverifikasi oleh Dr. Sp.PD KGH untuk protokol nefrologi Anda.',
+                                  'Diverifikasi oleh $_latestDoctorName untuk protokol nefrologi Anda.',
                                   style: GoogleFonts.inter(
                                     fontSize: 12,
                                     height: 1.35,

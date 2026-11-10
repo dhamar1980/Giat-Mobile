@@ -554,6 +554,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
       MaterialPageRoute(
         builder: (_) => DokterReviewResepScreen(
           patient: widget.patient,
+          consultationId: _activeConsultationId,
         ),
       ),
     );
@@ -570,6 +571,16 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
         ));
       });
       _scrollToBottom();
+
+      // Kirim pesan sinyal real-time ke room chat
+      try {
+        final itemsSummary = publishedItems.map((p) => '${p.medicineName} (${p.quantity})').join(', ');
+        await _apiService.sendMessage(
+          _consultationId,
+          pesan: 'Resep Obat Elektronik Diterbitkan: $itemsSummary',
+          tipe: 'prescription',
+        );
+      } catch (_) {}
     }
   }
 

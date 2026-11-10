@@ -14,12 +14,14 @@ class DokterReviewResepScreen extends StatefulWidget {
   final DokterPatient patient;
   final List<DokterPrescriptionItem>? initialItems;
   final ValueChanged<List<DokterPrescriptionItem>>? onPrescriptionPublished;
+  final String? consultationId;
 
   const DokterReviewResepScreen({
     super.key,
     required this.patient,
     this.initialItems,
     this.onPrescriptionPublished,
+    this.consultationId,
   });
 
   @override
@@ -31,6 +33,7 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
   static const _bgColor = Color(0xFFF7FBF8);
   static const _border = Color(0xFFE2E8F0);
 
+  bool _isPublishing = false;
   late List<DokterPrescriptionItem> _prescriptions;
 
   @override
@@ -64,7 +67,7 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
     }
   }
 
-  void _publishPrescription() {
+  void _publishPrescription() async {
     if (_prescriptions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tambahkan minimal 1 obat sebelum menerbitkan resep.')),
@@ -72,31 +75,51 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
       return;
     }
 
-    // Kirim data resep elektronik ke REST API Dokter Laravel Sanctum
-    DokterApiService().createResep({
-      'pasien_id': widget.patient.id,
-      'pasien_nama': widget.patient.name,
-      'items': _prescriptions.map((p) => {
-        'nama_obat': p.medicineName,
-        'dosis': p.dose,
-        'aturan_pakai': p.frequency,
-        'waktu_minum': p.usageTime,
-        'jumlah': p.quantity,
-        'durasi': p.duration,
-        'catatan': p.specialNotes,
-      }).toList(),
-    });
+    setState(() => _isPublishing = true);
 
-    widget.onPrescriptionPublished?.call(_prescriptions);
+    try {
+      // Kirim data resep elektronik ke Supabase & REST API Dokter
+      final res = await DokterApiService().createResep({
+        'pasien_id': widget.patient.id,
+        'pasien_nama': widget.patient.name,
+        'id_konsultasi': widget.consultationId,
+        'diagnosis': 'Evaluasi & Protokol Terapi Ginjal GIAT',
+        'catatan_dokter': 'Gunakan obat sesuai aturan pakai dan kontrol berkala.',
+        'items': _prescriptions.map((p) => {
+          'nama_obat': p.medicineName,
+          'dosis': p.dose,
+          'aturan_pakai': p.frequency,
+          'waktu_penggunaan': p.usageTime,
+          'jumlah': p.quantity,
+          'durasi': p.duration,
+          'catatan_khusus': p.specialNotes,
+        }).toList(),
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Resep untuk ${widget.patient.name} berhasil diterbitkan!'),
-        backgroundColor: _darkGreen,
-      ),
-    );
+      widget.onPrescriptionPublished?.call(_prescriptions);
 
-    Navigator.of(context).pop(_prescriptions);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message.isNotEmpty
+                ? res.message
+                : 'Resep untuk ${widget.patient.name} berhasil diterbitkan!'),
+            backgroundColor: _darkGreen,
+          ),
+        );
+        Navigator.of(context).pop(_prescriptions);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menerbitkan resep: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPublishing = false);
+      }
+    }
   }
 
   @override
@@ -230,22 +253,31 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               elevation: 0,
                             ),
-                            onPressed: _publishPrescription,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.drive_file_rename_outline_rounded, color: Colors.white, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Terbitkan Resep',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
+                            onPressed: _isPublishing ? null : _publishPrescription,
+                            child: _isPublishing
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.2,
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.drive_file_rename_outline_rounded, color: Colors.white, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Terbitkan Resep',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
 
