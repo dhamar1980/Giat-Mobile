@@ -4,7 +4,7 @@ class ApiConstants {
   static const String serverUrl = 'https://michel-first-molecular-investigate.trycloudflare.com/api';
 
   /// URL LAN Wi-Fi (untuk HP di jaringan Wi-Fi lokal)
-  static const String lanUrl = 'http://192.168.1.14:8000/api';
+  static const String lanUrl = 'http://10.80.131.1:8000/api';
 
   /// URL Emulator Android
   static const String emulatorUrl = 'http://10.0.2.2:8000/api';
