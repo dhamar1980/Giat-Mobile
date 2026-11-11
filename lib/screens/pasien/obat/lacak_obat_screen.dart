@@ -7,7 +7,6 @@ import 'pembayaran_model.dart';
 import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
 import '../../../services/storage_service.dart';
-import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN LACAK OBAT (Figma Node: 977:10969)
@@ -535,7 +534,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'No. Pesanan',
+                            'Status Pengiriman',
                             style: GoogleFonts.inter(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w500,
@@ -543,7 +542,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
                             ),
                           ),
                           Text(
-                            _displayOrderNo,
+                            'Pesanan Obat Pasien',
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
                               fontSize: 15.5,
@@ -755,7 +754,16 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
   // 3. TIMELINE PELACAKAN PENGIRIMAN
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildTimelineCard() {
-    final zone = TimeUtils.getTimeZoneName();
+    final s = _displayStatusPesanan.toLowerCase().trim();
+    final isMenunggu = s.contains('menunggu') || s.contains('pending');
+    final isDiproses = s.contains('proses') || s.contains('racik') || s.contains('kemas');
+    final isDikirim = s.contains('kirim') || s.contains('antar');
+    final isSelesai = s.contains('selesai') || s.contains('terima');
+    final isBatal = s.contains('batal');
+
+    final apotekName = _namaApotek.isNotEmpty ? _namaApotek : 'Apotek Mitra GIAT';
+    final targetAddress = _recipientAddress.isNotEmpty ? _recipientAddress : 'alamat tujuan pengiriman';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -786,51 +794,64 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
 
           // Step 1: Resep Diterima
           _buildTrackingStep(
-            title: 'Resep Diterima & Terverifikasi Digital',
-            time: '01 Sep 2026 • 09:15 $zone',
-            desc: 'Resep dokter diverifikasi oleh sistem GIAT Smart Pharmacy.',
+            title: 'Pesanan Diterima & Terverifikasi Digital',
+            time: 'Terverifikasi Sistem',
+            desc: 'Pesanan obat diverifikasi oleh sistem GIAT Smart Pharmacy.',
             isCompleted: true,
+            isCurrent: isMenunggu,
           ),
 
           // Step 2: Telaah Resep Apoteker
           _buildTrackingStep(
-            title: 'Telaah Resep oleh Apoteker Mitra Selesai',
-            time: '01 Sep 2026 • 10:30 $zone',
-            desc: 'apt. Budi Santoso, S.Farm telah memvalidasi dosis aman ginjal.',
-            isCompleted: true,
+            title: isMenunggu
+                ? 'Menunggu Telaah Resep oleh Apoteker'
+                : 'Telaah Resep oleh Apoteker Selesai',
+            time: isMenunggu ? 'Dalam Antrean' : 'Telah Divalidasi',
+            desc: 'Apoteker mitra memvalidasi keamanan dosis dan interaksi obat.',
+            isCompleted: !isMenunggu && !isBatal,
           ),
 
-          // Step 3: Pengemasan Kedap Suhu (Current)
+          // Step 3: Pengemasan Kedap Suhu
           _buildTrackingStep(
-            title: 'Obat Sedang Dikemas Kedap Suhu',
-            time: '01 Sep 2026 • 11:10 $zone',
-            desc: 'Kemasan tersegel rapi dan higienis dari Apotek Kimia Farma Veteran.',
-            isCompleted: true,
-            isCurrent: true,
+            title: isDiproses
+                ? 'Obat Sedang Dikemas Kedap Suhu'
+                : (isDikirim || isSelesai
+                    ? 'Pengemasan Obat Kedap Suhu Selesai'
+                    : 'Persiapan Pengemasan Kedap Suhu'),
+            time: (isDiproses || isDikirim || isSelesai) ? 'Higienis & Aman' : 'Estimasi',
+            desc: 'Kemasan tersegel rapi dan higienis dari $apotekName.',
+            isCompleted: isDiproses || isDikirim || isSelesai,
+            isCurrent: isDiproses,
           ),
 
           // Step 4: Penjemputan Kurir
           _buildTrackingStep(
-            title: 'Kurir GIAT Mengambil Paket Obat',
-            time: 'Estimasi 14:00 $zone',
+            title: (isDikirim || isSelesai)
+                ? 'Kurir Telah Mengambil Paket Obat'
+                : 'Kurir GIAT Mengambil Paket Obat',
+            time: (isDikirim || isSelesai) ? 'Paket Dibawa Kurir' : 'Estimasi Pengambilan',
             desc: 'Driver spesialis logistik medis GIAT ditugaskan menuju apotek.',
-            isCompleted: false,
+            isCompleted: isDikirim || isSelesai,
           ),
 
           // Step 5: Dalam Perjalanan
           _buildTrackingStep(
-            title: 'Kurir Menuju Alamat Tujuan',
-            time: 'Estimasi 14:45 $zone',
-            desc: 'Paket dalam perjalanan ke Jl. Dharmahusada Indah No. 42.',
-            isCompleted: false,
+            title: isDikirim
+                ? 'Kurir Sedang Menuju Alamat Tujuan'
+                : (isSelesai ? 'Kurir Telah Tiba di Lokasi Tujuan' : 'Pengantaran Menuju Alamat'),
+            time: isDikirim ? 'Dalam Perjalanan' : (isSelesai ? 'Tiba di Lokasi' : 'Estimasi'),
+            desc: 'Paket dalam perjalanan ke $targetAddress.',
+            isCompleted: isDikirim || isSelesai,
+            isCurrent: isDikirim,
           ),
 
           // Step 6: Selesai
           _buildTrackingStep(
-            title: 'Pesanan Selesai Diterima',
-            time: 'Estimasi 15:30 $zone',
+            title: isSelesai ? 'Pesanan Selesai Diterima' : 'Pesanan Selesai Diterima Pasien',
+            time: isSelesai ? 'Telah Diterima' : 'Konfirmasi Penerima',
             desc: 'Tanda tangan konfirmasi dan verifikasi fisik obat oleh pasien.',
-            isCompleted: false,
+            isCompleted: isSelesai,
+            isCurrent: isSelesai,
             isLast: true,
           ),
         ],
@@ -1023,7 +1044,10 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
                       style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
                     ),
                     Text(
-                      'Rahmat Setiawan (L-4921-ZA)',
+                      (_displayStatusPesanan.toLowerCase().contains('kirim') ||
+                              _displayStatusPesanan.toLowerCase().contains('selesai'))
+                          ? 'Rahmat Setiawan (L-4921-ZA)'
+                          : 'Menunggu Penugasan Kurir',
                       style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
                     ),
                   ],
@@ -1092,7 +1116,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Catatan: Titipkan ke satpam jika penerima sedang dialisis di RS.',
+                    'Catatan: Pastikan penerima berada di alamat tujuan saat kurir mengantar paket obat.',
                     style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF475569)),
                   ),
                 ),

@@ -7,6 +7,7 @@ import 'resep_dokter_screen.dart';
 import 'pembelian_obat_screen.dart';
 import 'lacak_obat_screen.dart';
 import 'riwayat_obat_screen.dart';
+import 'pembayaran_model.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
@@ -95,6 +96,14 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
     if (s == 'selesai') return 'Pesanan Selesai';
     if (s == 'dibatalkan') return 'Dibatalkan';
     return raw.isNotEmpty ? raw : 'Sedang Diproses';
+  }
+
+  Color _getStatusBadgeBg(String raw) {
+    final s = raw.toLowerCase().trim();
+    if (s.contains('selesai')) return const Color(0xFF16A34A);
+    if (s.contains('kirim')) return const Color(0xFF0284C7);
+    if (s.contains('batal')) return const Color(0xFFDC2626);
+    return const Color(0xFFE5A100);
   }
 
   @override
@@ -796,25 +805,6 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
   // 4. STATUS PENGIRIMAN
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildStatusPengirimanSection() {
-    final orderNo = _activeOrder?['no_pesanan']?.toString() ??
-        _activeOrder?['order_id']?.toString() ??
-        '#G-9021';
-    final statusRaw = (_activeOrder?['status_pesanan'] ?? _activeOrder?['status'] ?? 'Sedang Diproses').toString();
-    final statusLabel = _formatStatusPesanan(statusRaw);
-    final tglStr = _activeOrder?['created_at'] != null
-        ? TimeUtils.formatDate(_activeOrder!['created_at'].toString(), useIndonesianMonth: true)
-        : '01 September 2026';
-
-    String itemStr = 'Kalsium Karbonat, Asam Folat';
-    if (_activeOrder?['items'] is List && (_activeOrder!['items'] as List).isNotEmpty) {
-      itemStr = (_activeOrder!['items'] as List)
-          .map((i) => (i is Map ? (i['nama_obat'] ?? i['nama'] ?? 'Obat') : 'Obat').toString())
-          .join(', ');
-    }
-    final apotekStr = _activeOrder?['nama_apotek']?.toString() ??
-        (_activeOrder?['apotek'] is Map ? _activeOrder!['apotek']['nama']?.toString() : null) ??
-        'Apotek Mitra GIAT Pasteur';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -857,296 +847,493 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Kartu Pesanan Pengiriman
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _cardBorderColor),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
+        // Jika belum ada pesanan aktif
+        if (_activeOrder == null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _cardBorderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Ornamen Gelombang
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _CardCornerContoursPainter(),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF8F6),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.local_shipping_outlined,
+                    color: _darkGreen,
+                    size: 26,
                   ),
                 ),
-
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Baris Utama: Truk Ikon & Rincian Pesanan
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF8F6),
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: const Icon(
-                              Icons.local_shipping_outlined,
-                              color: _darkGreen,
-                              size: 26,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      orderNo,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: const Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE5A100),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        statusLabel,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 5),
-                                RichText(
-                                  text: TextSpan(
-                                    text: 'Tanggal Pesanan: ',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                      color: const Color(0xFF475569),
-                                    ),
-                                    children: [
-                                      TextSpan(
-                                        text: tglStr,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                RichText(
-                                  text: TextSpan(
-                                    text: 'Item: ',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                      color: const Color(0xFF475569),
-                                    ),
-                                    children: [
-                                      TextSpan(
-                                        text: itemStr,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                RichText(
-                                  text: TextSpan(
-                                    text: 'Apotek: ',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                      color: const Color(0xFF475569),
-                                    ),
-                                    children: [
-                                      TextSpan(
-                                        text: apotekStr,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Baris Step: Telaah Resep Selesai
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: const BoxDecoration(
-                              color: _darkGreen,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.verified_user_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Telaah Resep Selesai',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Obat sedang dikemas dalam packing higienis kedap suhu',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    height: 1.35,
-                                    color: const Color(0xFF475569),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Baris Estimasi Tiba & Tombol Lacak Obat
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          RichText(
-                            text: TextSpan(
-                              text: '*Estimasi tiba: ',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                color: const Color(0xFF475569),
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: 'Hari ini, 15:30',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => _openLacakObatScreen(context),
-                            behavior: HitTestBehavior.opaque,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Lacak Obat',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: _darkGreen,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.arrow_circle_right_outlined,
-                                  color: _darkGreen,
-                                  size: 17,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                const SizedBox(height: 12),
+                Text(
+                  'Belum Ada Pengiriman Aktif',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Pesanan obat atau tebus resep Anda akan terpantau otomatis di sini.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
                   ),
                 ),
               ],
             ),
-          ),
-        ),
+          )
+        else
+          _buildActiveOrderCard(),
       ],
     );
   }
 
-  void _openLacakObatScreen(BuildContext context) {
+  Widget _buildActiveOrderCard() {
+    final orderNo = _activeOrder?['no_pesanan']?.toString() ??
+        _activeOrder?['order_id']?.toString() ??
+        'Pesanan Obat';
+    final statusRaw = (_activeOrder?['status_pesanan'] ??
+            _activeOrder?['status'] ??
+            'menunggu_konfirmasi')
+        .toString();
+    final statusLabel = _formatStatusPesanan(statusRaw);
+    final tglStr = _activeOrder?['created_at'] != null
+        ? TimeUtils.formatDate(_activeOrder!['created_at'].toString(),
+            useIndonesianMonth: true)
+        : TimeUtils.formatDate(DateTime.now().toIso8601String(),
+            useIndonesianMonth: true);
+
+    String itemStr = 'Obat Resep Terapi Ginjal';
+    if (_activeOrder?['items'] is List &&
+        (_activeOrder!['items'] as List).isNotEmpty) {
+      itemStr = (_activeOrder!['items'] as List)
+          .map((i) => (i is Map
+                  ? (i['nama_obat'] ?? i['nama'] ?? 'Obat')
+                  : 'Obat')
+              .toString())
+          .join(', ');
+    }
+    final apotekStr = _activeOrder?['nama_apotek']?.toString() ??
+        (_activeOrder?['apotek'] is Map
+            ? _activeOrder!['apotek']['nama']?.toString()
+            : null) ??
+        'Apotek Mitra GIAT';
+
+    // Status step dinamis sesuai data riil
+    String stepTitle;
+    String stepDesc;
+    IconData stepIcon;
+    Color stepColor;
+
+    final sLower = statusRaw.toLowerCase();
+    if (sLower.contains('menunggu') || sLower.contains('pending')) {
+      stepTitle = 'Menunggu Konfirmasi Apotek';
+      stepDesc = 'Apotek sedang meninjau dan memvalidasi ketersediaan obat Anda.';
+      stepIcon = Icons.access_time_rounded;
+      stepColor = const Color(0xFFE5A100);
+    } else if (sLower.contains('diproses') ||
+        sLower.contains('racik') ||
+        sLower.contains('kemas')) {
+      stepTitle = 'Obat Sedang Disiapkan';
+      stepDesc =
+          'Obat sedang dikemas dalam kemasan higienis kedap suhu oleh apoteker.';
+      stepIcon = Icons.inventory_2_outlined;
+      stepColor = _darkGreen;
+    } else if (sLower.contains('kirim') ||
+        sLower.contains('antar') ||
+        sLower.contains('jalan')) {
+      stepTitle = 'Kurir Menuju Alamat Tujuan';
+      stepDesc =
+          'Paket obat sedang diantar oleh kurir logistik medis GIAT ke lokasi Anda.';
+      stepIcon = Icons.delivery_dining_rounded;
+      stepColor = const Color(0xFF0284C7);
+    } else if (sLower.contains('selesai') || sLower.contains('terima')) {
+      stepTitle = 'Pesanan Selesai Diterima';
+      stepDesc = 'Paket obat telah berhasil diterima oleh pasien.';
+      stepIcon = Icons.check_circle_rounded;
+      stepColor = _darkGreen;
+    } else if (sLower.contains('batal')) {
+      stepTitle = 'Pesanan Dibatalkan';
+      stepDesc = 'Pesanan obat ini telah dibatalkan.';
+      stepIcon = Icons.cancel_outlined;
+      stepColor = const Color(0xFFDC2626);
+    } else {
+      stepTitle = 'Pesanan Sedang Diproses';
+      stepDesc = 'Apotek mitra GIAT sedang memproses pesanan obat Anda.';
+      stepIcon = Icons.verified_user_rounded;
+      stepColor = _darkGreen;
+    }
+
+    String estimasiText;
+    if (sLower.contains('selesai')) {
+      estimasiText = 'Telah Selesai Diterima';
+    } else if (sLower.contains('batal')) {
+      estimasiText = 'Pesanan Dibatalkan';
+    } else {
+      estimasiText = 'Hari ini, 16:30 ${TimeUtils.getTimeZoneName()}';
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            // Ornamen Gelombang
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _CardCornerContoursPainter(),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Baris Utama: Truk Ikon & Rincian Pesanan
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF8F6),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: const Icon(
+                          Icons.local_shipping_outlined,
+                          color: _darkGreen,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header Row: Judul Pesanan & Badge Status (Tanpa ID)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Pesanan Obat',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 9, vertical: 3.5),
+                                  decoration: BoxDecoration(
+                                    color: _getStatusBadgeBg(statusRaw),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    statusLabel,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            RichText(
+                              text: TextSpan(
+                                text: 'Tanggal Pesanan: ',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: const Color(0xFF475569),
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: tglStr,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            RichText(
+                              text: TextSpan(
+                                text: 'Item: ',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: const Color(0xFF475569),
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: itemStr,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            RichText(
+                              text: TextSpan(
+                                text: 'Apotek: ',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: const Color(0xFF475569),
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: apotekStr,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Baris Step: Dinamis sesuai data aktual
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: stepColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          stepIcon,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              stepTitle,
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              stepDesc,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                height: 1.35,
+                                color: const Color(0xFF475569),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Baris Estimasi Tiba & Tombol Lacak Obat
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: RichText(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            text: '*Estimasi tiba: ',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              color: const Color(0xFF475569),
+                            ),
+                            children: [
+                              TextSpan(
+                                text: estimasiText,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _openLacakObatScreen(context),
+                        behavior: HitTestBehavior.opaque,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Lacak Obat',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _darkGreen,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.arrow_circle_right_outlined,
+                              color: _darkGreen,
+                              size: 17,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLacakObatScreen(BuildContext context) async {
     final orderId = _activeOrder?['no_pesanan']?.toString() ??
         _activeOrder?['order_id']?.toString() ??
-        '#G-9021';
+        'Pesanan Obat';
     final pesananUuid = _activeOrder?['id']?.toString();
     final status = _activeOrder != null
-        ? _formatStatusPesanan(_activeOrder!['status_pesanan']?.toString() ?? _activeOrder!['status']?.toString() ?? 'Sedang Diproses')
-        : 'Sedang Diproses';
+        ? _formatStatusPesanan(_activeOrder!['status_pesanan']?.toString() ??
+            _activeOrder!['status']?.toString() ??
+            'menunggu_konfirmasi')
+        : 'Menunggu Konfirmasi';
 
-    Navigator.push(
+    OrderCheckoutData? orderData;
+    if (_activeOrder != null) {
+      final items = _activeOrder!['items'] is List
+          ? List<Map<String, dynamic>>.from(
+              (_activeOrder!['items'] as List).whereType<Map>())
+          : null;
+      final total = double.tryParse((_activeOrder!['total_bayar'] ??
+                  _activeOrder!['total_harga'] ??
+                  0)
+              .toString())
+          ?.round() ??
+          0;
+      orderData = OrderCheckoutData(
+        idPesanan: pesananUuid,
+        orderNumber: orderNoForDetail(orderId),
+        recipientName:
+            _activeOrder!['nama_penerima']?.toString() ?? widget.userName,
+        recipientPhone: _activeOrder!['no_hp_penerima']?.toString() ?? '',
+        recipientAddress: _activeOrder!['alamat_pengiriman']?.toString() ?? '',
+        statusPesanan: _activeOrder!['status_pesanan']?.toString() ??
+            'menunggu_konfirmasi',
+        statusPembayaran:
+            _activeOrder!['status_pembayaran']?.toString() ?? 'lunas',
+        totalAmount: total,
+        totalAmountFormatted: 'Rp. ${total.toString()},00',
+        items: items,
+      );
+    }
+
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => LacakObatScreen(
           userName: widget.userName,
           orderId: orderId,
           pesananId: pesananUuid,
-          estimasiTiba: 'Hari ini, 15:30 ${TimeUtils.getTimeZoneName()}',
+          estimasiTiba: 'Hari ini, 16:30 ${TimeUtils.getTimeZoneName()}',
           status: status,
+          orderData: orderData,
         ),
       ),
     );
+    if (mounted) {
+      _fetchLiveResepSummary();
+    }
   }
 
-  void _openRiwayatScreen(BuildContext context) {
-    Navigator.push(
+  String orderNoForDetail(String fallback) {
+    return _activeOrder?['no_pesanan']?.toString() ??
+        _activeOrder?['order_id']?.toString() ??
+        fallback;
+  }
+
+  Future<void> _openRiwayatScreen(BuildContext context) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => RiwayatObatScreen(
           userName: widget.userName,
+          autoFetch: true,
         ),
       ),
     );
+    if (mounted) {
+      _fetchLiveResepSummary();
+    }
   }
 }
 

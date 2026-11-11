@@ -89,145 +89,29 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
 
   String _selectedFilter = 'Semua';
   String _searchQuery = '';
+  bool _isLoading = true;
 
-  late List<RiwayatPesananData> _allOrders;
+  List<RiwayatPesananData> _allOrders = [];
 
   @override
   void initState() {
     super.initState();
+    _allOrders = [];
     if (widget.autoFetch) {
+      _isLoading = true;
       _fetchRiwayatFromApi();
+    } else {
+      _isLoading = false;
     }
-    final zone = TimeUtils.getTimeZoneName();
-    _allOrders = [
-      // 1. Pesanan #G-9021 (Sedang Diproses - Melalui Resep)
-      RiwayatPesananData(
-        orderId: '#G-9021',
-        orderDate: '01 September 2026',
-        orderTime: '14:30 $zone',
-        status: 'Sedang Diproses',
-        statusColor: _amberStatus,
-        isMelaluiResep: true,
-        resepNumber: 'No. RX-2026-0901-01',
-        doctorName: 'dr. Siti Rahmawati, Sp.PD-KGH',
-        pharmacyName: 'Apotek Kimia Farma - Veteran Surabaya',
-        totalPrice: 145000,
-        paymentMethod: 'QRIS GIAT Pay',
-        medicines: [
-          RiwayatObatDetail(
-            name: 'Kalsium Karbonat 500mg',
-            dosage: '3x sehari 1 tablet sesudah makan',
-            packageInfo: '30 tablet',
-            qty: 1,
-            price: 45000,
-          ),
-          RiwayatObatDetail(
-            name: 'Asam Folat 1mg',
-            dosage: '1x sehari 1 tablet pagi',
-            packageInfo: '30 tablet',
-            qty: 1,
-            price: 80000,
-          ),
-        ],
-      ),
-
-      // 2. Pesanan #G-8812 (Selesai - Melalui Resep)
-      RiwayatPesananData(
-        orderId: '#G-8812',
-        orderDate: '18 Agustus 2026',
-        orderTime: '10:15 $zone',
-        status: 'Selesai Diterima',
-        statusColor: _darkGreen,
-        isMelaluiResep: true,
-        resepNumber: 'No. RX-2026-0818-05',
-        doctorName: 'dr. Ahmad Hidayat, Sp.PD',
-        pharmacyName: 'Apotek Kimia Farma - Veteran Surabaya',
-        totalPrice: 790000,
-        paymentMethod: 'BCA Virtual Account',
-        medicines: [
-          RiwayatObatDetail(
-            name: 'Ketosteril Tablet',
-            dosage: '3x sehari 4 tablet sesudah makan',
-            packageInfo: '100 tablet',
-            qty: 1,
-            price: 650000,
-          ),
-          RiwayatObatDetail(
-            name: 'Candesartan 8mg',
-            dosage: '1x sehari 1 tablet pagi',
-            packageInfo: '30 tablet',
-            qty: 1,
-            price: 120000,
-          ),
-        ],
-      ),
-
-      // 3. Pesanan #G-8450 (Selesai - Tanpa Resep / Obat Bebas)
-      RiwayatPesananData(
-        orderId: '#G-8450',
-        orderDate: '02 Agustus 2026',
-        orderTime: '16:45 $zone',
-        status: 'Selesai Diterima',
-        statusColor: _darkGreen,
-        isMelaluiResep: false,
-        pharmacyName: 'Apotek K-24 Dharmahusada Surabaya',
-        totalPrice: 27500,
-        paymentMethod: 'QRIS',
-        medicines: [
-          RiwayatObatDetail(
-            name: 'Antasida Doen',
-            dosage: '1 - 2 tablet dikunyah saat perih',
-            packageInfo: 'Strip 10 Tablet kunyah',
-            qty: 2,
-            price: 13000,
-          ),
-          RiwayatObatDetail(
-            name: 'Paracetamol 500 mg',
-            dosage: '1 tablet bila demam / nyeri',
-            packageInfo: 'Strip 10 Tablet',
-            qty: 1,
-            price: 8000,
-          ),
-        ],
-      ),
-
-      // 4. Pesanan #G-7930 (Selesai - Melalui Resep)
-      RiwayatPesananData(
-        orderId: '#G-7930',
-        orderDate: '15 Juli 2026',
-        orderTime: '11:20 $zone',
-        status: 'Selesai Diterima',
-        statusColor: _darkGreen,
-        isMelaluiResep: true,
-        resepNumber: 'No. RX-2026-0715-02',
-        doctorName: 'dr. Siti Rahmawati, Sp.PD-KGH',
-        pharmacyName: 'Apotek Kimia Farma - Veteran Surabaya',
-        totalPrice: 85000,
-        paymentMethod: 'Mandiri Virtual Account',
-        medicines: [
-          RiwayatObatDetail(
-            name: 'Amlodipine 5mg',
-            dosage: '1x sehari 1 tablet malam',
-            packageInfo: '30 tablet',
-            qty: 1,
-            price: 35000,
-          ),
-          RiwayatObatDetail(
-            name: 'Asam Folat 1mg',
-            dosage: '1x sehari 1 tablet pagi',
-            packageInfo: '30 tablet',
-            qty: 1,
-            price: 30000,
-          ),
-        ],
-      ),
-    ];
   }
 
   Future<void> _fetchRiwayatFromApi() async {
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
     try {
       final res = await PasienApiService().getRiwayatPembelian();
-      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+      if (res.success && res.data != null && mounted) {
         final List<RiwayatPesananData> list = [];
         for (var item in res.data!) {
           if (item is Map) {
@@ -265,16 +149,17 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
             if (item['items'] is List && (item['items'] as List).isNotEmpty) {
               for (final med in (item['items'] as List)) {
                 if (med is Map) {
-                  final obatMap = med['obat'] is Map ? med['obat'] as Map : null;
+                  final obatMap =
+                      med['obat'] is Map ? med['obat'] as Map : null;
                   final mName = (med['nama_obat'] ??
                           med['nama'] ??
                           obatMap?['nama_obat'] ??
                           obatMap?['nama'] ??
                           'Obat Terapi Ginjal')
                       .toString();
-                  final mQty =
-                      int.tryParse((med['jumlah'] ?? med['qty'] ?? 1).toString()) ??
-                          1;
+                  final mQty = int.tryParse(
+                          (med['jumlah'] ?? med['qty'] ?? 1).toString()) ??
+                      1;
                   final mPrice = double.tryParse(
                             (med['harga_satuan'] ??
                                     med['harga'] ??
@@ -286,8 +171,10 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
                   parsedMeds.add(
                     RiwayatObatDetail(
                       name: mName,
-                      dosage: (med['aturan_pakai'] ?? 'Sesuai petunjuk').toString(),
-                      packageInfo: (med['satuan'] ?? '1 Strip/Box').toString(),
+                      dosage: (med['aturan_pakai'] ?? 'Sesuai petunjuk')
+                          .toString(),
+                      packageInfo:
+                          (med['satuan'] ?? '$mQty unit').toString(),
                       qty: mQty,
                       price: mPrice,
                     ),
@@ -299,20 +186,27 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
               parsedMeds.add(
                 RiwayatObatDetail(
                   name: 'Obat Terapi Ginjal',
-                  dosage: 'Sesuai petunjuk',
-                  packageInfo: '1 Box / Strip',
+                  dosage: 'Sesuai anjuran dokter/apoteker',
+                  packageInfo: '1 Paket Terapi',
                   qty: 1,
                   price: total > 0 ? total : 50000,
                 ),
               );
             }
 
-            final apotekMap = item['apotek'] is Map ? item['apotek'] as Map : null;
-            final pharmacyName = (apotekMap?['nama_apotek'] ??
+            final apotekMap =
+                item['apotek'] is Map ? item['apotek'] as Map : null;
+            final pharmacyName = (item['nama_apotek'] ??
+                    apotekMap?['nama_apotek'] ??
                     apotekMap?['nama'] ??
                     item['apotek_name'] ??
                     'Apotek Mitra GIAT')
                 .toString();
+
+            final docName = item['nama_dokter']?.toString() ??
+                (item['dokter'] is Map
+                    ? item['dokter']['nama']?.toString()
+                    : null);
 
             list.add(RiwayatPesananData(
               rawId: rawId,
@@ -328,9 +222,11 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
                   : (displayStatus.toLowerCase().contains('selesai')
                       ? const Color(0xFF16A34A)
                       : _amberStatus),
-              isMelaluiResep:
-                  item['is_resep'] == true || item['resep_id'] != null || item['id_resep'] != null,
+              isMelaluiResep: item['is_resep'] == true ||
+                  item['resep_id'] != null ||
+                  item['id_resep'] != null,
               resepNumber: (item['resep_id'] ?? item['id_resep'])?.toString(),
+              doctorName: docName,
               pharmacyName: pharmacyName,
               totalPrice: total,
               paymentMethod: (item['metode_pembayaran'] ?? 'Midtrans Snap')
@@ -341,13 +237,25 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
             ));
           }
         }
-        if (list.isNotEmpty) {
-          setState(() {
-            _allOrders = list;
-          });
-        }
+        setState(() {
+          _allOrders = list;
+        });
+      } else if (mounted) {
+        setState(() {
+          _allOrders = [];
+        });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _allOrders = [];
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   String _mapOrderStatusLabel(String raw) {
@@ -546,7 +454,9 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
       if (_selectedFilter == 'Obat Bebas' && order.isMelaluiResep) {
         return false;
       }
-      if (_selectedFilter == 'Diproses' && order.status != 'Sedang Diproses') {
+      if (_selectedFilter == 'Diproses' &&
+          (order.status == 'Selesai Diterima' ||
+              order.status == 'Dibatalkan')) {
         return false;
       }
       if (_selectedFilter == 'Selesai' && order.status != 'Selesai Diterima') {
@@ -557,9 +467,13 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         final matchesId = order.orderId.toLowerCase().contains(query);
-        final matchesMedicine = order.medicines.any((m) => m.name.toLowerCase().contains(query));
-        final matchesDoctor = order.doctorName?.toLowerCase().contains(query) ?? false;
-        return matchesId || matchesMedicine || matchesDoctor;
+        final matchesMedicine =
+            order.medicines.any((m) => m.name.toLowerCase().contains(query));
+        final matchesDoctor =
+            order.doctorName?.toLowerCase().contains(query) ?? false;
+        final matchesPharmacy =
+            order.pharmacyName.toLowerCase().contains(query);
+        return matchesId || matchesMedicine || matchesDoctor || matchesPharmacy;
       }
 
       return true;
@@ -596,67 +510,79 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
           ),
 
           SafeArea(
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── 1. Top Navigation Bar (<- Kembali & Action Pill) ──
-                  _buildTopBar(context),
+            child: RefreshIndicator(
+              color: _darkGreen,
+              onRefresh: _fetchRiwayatFromApi,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── 1. Top Navigation Bar (<- Kembali & Action Pill) ──
+                    _buildTopBar(context),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // ── 2. Screen Title Pill: Riwayat Pembelian Obat ──
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _darkGreen,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _darkGreen.withValues(alpha: 0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                    // ── 2. Screen Title Pill: Riwayat Pembelian Obat ──
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 26, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _darkGreen,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _darkGreen.withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          'Riwayat Pembelian Obat',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        'Riwayat Pembelian Obat',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: 0.2,
                         ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 18),
+                    const SizedBox(height: 18),
 
-                  // ── 3. Search Bar ──
-                  _buildSearchBar(),
+                    // ── 3. Search Bar ──
+                    _buildSearchBar(),
 
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  // ── 4. Filter Chips Row ──
-                  _buildFilterChips(),
+                    // ── 4. Filter Chips Row ──
+                    _buildFilterChips(),
 
-                  const SizedBox(height: 18),
+                    const SizedBox(height: 18),
 
-                  // ── 5. History Cards List ──
-                  if (orders.isEmpty)
-                    _buildEmptyState()
-                  else
-                    ...orders.map((order) => Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildRiwayatCard(order),
-                        )),
-                ],
+                    // ── 5. History Cards List ──
+                    if (_isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 48),
+                          child: CircularProgressIndicator(color: _darkGreen),
+                        ),
+                      )
+                    else if (orders.isEmpty)
+                      _buildEmptyState()
+                    else
+                      ...orders.map((order) => Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildRiwayatCard(order),
+                          )),
+                  ],
+                ),
               ),
             ),
           ),
@@ -879,7 +805,9 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              order.orderId,
+                              order.isMelaluiResep
+                                  ? 'Pesanan Resep Dokter'
+                                  : 'Pembelian Obat',
                               style: GoogleFonts.inter(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
@@ -951,17 +879,6 @@ class _RiwayatObatScreenState extends State<RiwayatObatScreen> {
                                   color: const Color(0xFF1E40AF),
                                 ),
                               ),
-                              if (order.resepNumber != null) ...[
-                                const SizedBox(width: 6),
-                                Text(
-                                  '(${order.resepNumber})',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF3B82F6),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                           if (order.doctorName != null)

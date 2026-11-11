@@ -3,9 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:giat/screens/pasien/obat/daftar_obat_screen.dart';
 import 'package:giat/screens/pasien/obat/lacak_obat_screen.dart';
 import 'package:giat/screens/pasien/obat/riwayat_obat_screen.dart';
+import 'package:giat/screens/pasien/obat/pembayaran_model.dart';
 
 void main() {
-  testWidgets('DaftarObatScreen navigates to LacakObatScreen when clicking Lacak Obat', (WidgetTester tester) async {
+  testWidgets('DaftarObatScreen displays Status Pengiriman empty state or active order', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: DaftarObatScreen(userName: 'Pasien Test'),
@@ -14,23 +15,13 @@ void main() {
 
     await tester.pump();
 
-    // Verify Lacak Obat button is present
-    final lacakFinder = find.text('Lacak Obat');
-    expect(lacakFinder, findsOneWidget);
+    // Verify Status Pengiriman section is present
+    expect(find.text('Status Pengiriman'), findsOneWidget);
+    expect(find.text('Lihat Riwayat'), findsOneWidget);
+    expect(find.text('Belum Ada Pengiriman Aktif'), findsOneWidget);
 
-    // Scroll until visible if needed and tap
-    await tester.ensureVisible(lacakFinder);
-    await tester.pumpAndSettle();
-    await tester.tap(lacakFinder);
-    await tester.pumpAndSettle();
-
-    // Verify LacakObatScreen is opened
-    expect(find.byType(LacakObatScreen), findsOneWidget);
-    expect(find.text('#G-9021'), findsWidgets);
-    expect(find.text('Aktivitas Pengiriman'), findsOneWidget);
-    expect(find.text('Alamat Tujuan Pengiriman'), findsOneWidget);
-    expect(find.byIcon(Icons.phone_outlined), findsNothing);
-    expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
   });
 
   testWidgets('DaftarObatScreen navigates to RiwayatObatScreen when clicking Lihat Riwayat', (WidgetTester tester) async {
@@ -54,14 +45,15 @@ void main() {
     // Verify RiwayatObatScreen is opened
     expect(find.byType(RiwayatObatScreen), findsOneWidget);
     expect(find.text('Riwayat Pembelian Obat'), findsOneWidget);
-    expect(find.text('Melalui Resep Dokter'), findsWidgets);
-    expect(find.text('Obat Bebas (Tanpa Resep Dokter)'), findsOneWidget);
+    expect(find.text('Semua'), findsOneWidget);
+    expect(find.text('Dengan Resep'), findsOneWidget);
+    expect(find.text('Obat Bebas'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
-    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('RiwayatObatScreen displays filter chips and orders properly', (WidgetTester tester) async {
+  testWidgets('RiwayatObatScreen displays empty state when no orders found', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: RiwayatObatScreen(userName: 'Pasien Test', autoFetch: false),
@@ -76,18 +68,44 @@ void main() {
     expect(find.text('Dengan Resep'), findsOneWidget);
     expect(find.text('Obat Bebas'), findsOneWidget);
 
-    // Verify purchase card details
-    expect(find.text('#G-9021'), findsOneWidget);
-    expect(find.text('#G-8812'), findsOneWidget);
-    expect(find.text('#G-8450'), findsOneWidget);
+    // Verify empty state is displayed instead of mock dummy orders
+    expect(find.text('Tidak Ada Riwayat Pembelian'), findsOneWidget);
+    expect(find.text('#G-9021'), findsNothing);
+    expect(find.text('#G-8812'), findsNothing);
 
-    // Tap filter "Obat Bebas"
-    await tester.tap(find.text('Obat Bebas'));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+  });
+
+  testWidgets('LacakObatScreen renders tracking timeline and order details correctly', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LacakObatScreen(
+          userName: 'Siti Aisyah',
+          orderId: 'ORD-LSW9MIAVE5',
+          status: 'Menunggu Konfirmasi',
+          orderData: const OrderCheckoutData(
+            orderNumber: 'ORD-LSW9MIAVE5',
+            statusPesanan: 'menunggu_konfirmasi',
+            statusPembayaran: 'lunas',
+            recipientName: 'Siti Aisyah',
+            recipientAddress: 'Jl. Merdeka No. 10 Bandung',
+            items: [
+              {'nama_obat': 'Ketosteril Tab', 'jumlah': 1, 'harga_satuan': 650000}
+            ],
+          ),
+        ),
+      ),
+    );
+
     await tester.pump();
 
-    // Should now show non-prescription order and filter out prescription orders
-    expect(find.text('#G-8450'), findsOneWidget);
-    expect(find.text('#G-9021'), findsNothing);
+    expect(find.text('Pesanan Obat Pasien'), findsOneWidget);
+    expect(find.text('ORD-LSW9MIAVE5'), findsNothing);
+    expect(find.text('Aktivitas Pengiriman'), findsOneWidget);
+    expect(find.text('Alamat Tujuan Pengiriman'), findsOneWidget);
+    expect(find.text('Siti Aisyah • 0812-3456-7891'), findsOneWidget);
+    expect(find.text('Ketosteril Tab'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
