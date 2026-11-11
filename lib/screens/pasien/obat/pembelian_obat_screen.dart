@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'detail_obat_screen.dart';
 import 'keranjang_screen.dart';
+import 'resep_dokter_screen.dart';
 import '../profile/profile_pasien_screen.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/cart_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN PEMBELIAN OBAT (KATALOG OBAT - Sesuai Gambar 1 & 2)
@@ -29,167 +31,119 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
   static const _redAlert = Color(0xFFDC2626);
 
   final TextEditingController _searchCtrl = TextEditingController();
-  int _cartCount = 2;
   String _searchQuery = '';
+  bool _isLoading = true;
 
   late List<ObatCatalogItem> _allMedicines;
 
   @override
   void initState() {
     super.initState();
+    _allMedicines = [];
+    CartService.instance.addListener(_onCartChanged);
     _fetchLiveMedicines();
-    _allMedicines = [
-      // 1. Antasida Doen
-      const ObatCatalogItem(
-        id: 'antasida',
-        name: 'Antasida Doen',
-        category: 'Antasida & Antiflatulen',
-        badgeText: 'Terbatas',
-        badgeColor: Color(0xFF2DD4BF),
-        packageInfo: 'Strip 10 Tablet kunyah',
-        price: 6500,
-        priceFormatted: 'Rp. 6.500,00',
-        imagePath: 'assets/images/antasida_strip.jpg',
-        perluResep: false,
-        bpomBadge: 'Katalog Resmi BPOM',
-        ginjalWarning:
-            'Pasien gangguan ginjal berat dianjurkan berkonsultasi mengenai asupan aluminium dan magnesium dalam antasida agar tidak membebani filtrasi ginjal.',
-        shortDesc:
-            'Membantu meredakan gejala kelebihan asam lambung, gastritis, tukak lambung, dan tukak usus dua belas jari seperti mual dan perih.',
-        indications: [
-          {'icon': Icons.healing_rounded, 'label': 'Asam Lambung Naik'},
-          {'icon': Icons.sentiment_dissatisfied_outlined, 'label': 'Perut Kembung'},
-          {'icon': Icons.medical_services_outlined, 'label': 'Nyeri Ulu Hati'},
-        ],
-        dosageRules: [
-          {
-            'num': '1',
-            'title': 'Dewasa',
-            'desc': '1 - 2 tablet dikunyah, 3 - 4 kali sehari, 1 jam sebelum atau 2 jam setelah makan.',
-          },
-          {
-            'num': '2',
-            'title': 'Anak-anak (6 - 12 tahun)',
-            'desc': '1/2 - 1 tablet dikunyah, 3 - 4 kali sehari sesuai anjuran tenaga medis.',
-          },
-        ],
-      ),
-
-      // 2. Paracetamol 500 mg
-      const ObatCatalogItem(
-        id: 'paracetamol',
-        name: 'Paracetamol 500 mg',
-        category: 'Analgesik & Anipiretik',
-        badgeText: 'Bebas',
-        badgeColor: Color(0xFF065A37),
-        packageInfo: 'Strip 10 Tablet',
-        price: 8000,
-        priceFormatted: 'Rp. 8.000,00',
-        imagePath: 'assets/images/paracetamol_strip.jpg',
-        perluResep: false,
-        bpomBadge: 'Katalog Resmi BPOM',
-        ginjalWarning:
-            'Pasien dengan riwayat gangguan fungsi ginjal (CKD stadium apa pun) atau penurunan laju filtrasi glomerulus (LFG) disarankan berkonsultasi terlebih dahulu dengan dokter nefrologi Anda di GIAT sebelum mengonsumsi obat ini secara berkala.',
-        shortDesc:
-            'Analgesik dan antipiretik terpercaya untuk meredakan keluhan nyeri dan demam tanpa mengganggu lambung jika digunakan sesuai dosis anjuran tenaga medis.',
-        indications: [
-          {'icon': Icons.device_thermostat_rounded, 'label': 'Demam Tinggi'},
-          {'icon': Icons.sentiment_dissatisfied_outlined, 'label': 'Sakit Kepala'},
-          {'icon': Icons.medical_services_outlined, 'label': 'Sakit gigi'},
-          {'icon': Icons.healing_rounded, 'label': 'Nyeri otot'},
-        ],
-        dosageRules: [
-          {
-            'num': '1',
-            'title': 'Dewasa & Remaja (> 12 tahun)',
-            'desc': '1 - 2 tablet, 3 - 4 kali sehari sesudah makan bila diperlukan. Maksimal 8 tablet per hari.',
-          },
-          {
-            'num': '2',
-            'title': 'Anak-anak (6 - 12 tahun)',
-            'desc': '1/2 - 1 tablet sesuai petunjuk dokter atau apoteker mitra. Jangan melebihi dosis anjuran.',
-          },
-        ],
-      ),
-
-      // 3. Ketosteril Tablet
-      const ObatCatalogItem(
-        id: 'ketosteril',
-        name: 'Ketosteril Tablet',
-        category: 'Asam Amino Esensial & Ketoanalog',
-        badgeText: 'Obat Keras',
-        badgeColor: Color(0xFFDC2626),
-        packageInfo: 'Strip 10 kaplet Terapi Ginjal',
-        price: 65000,
-        priceFormatted: 'Rp. 6.500,00',
-        imagePath: 'assets/images/antasida_strip.jpg',
-        perluResep: true,
-        bpomBadge: 'Katalog Resmi BPOM',
-        ginjalWarning:
-            'Obat keras untuk terapi insufisiensi ginjal kronis (CKD). Penggunaan dan dosis wajib dipantau langsung oleh dokter spesialis ginjal nefrologi.',
-        shortDesc:
-            'Kombinasi asam amino esensial bebas nitrogen dan ketoanalog untuk terapi nutrisi medis pada pasien penyakit ginjal kronis berdiet rendah protein.',
-        indications: [
-          {'icon': Icons.medical_services_outlined, 'label': 'Proteksi Glomerulus'},
-          {'icon': Icons.healing_rounded, 'label': 'Keseimbangan Nitrogen'},
-          {'icon': Icons.favorite_border_rounded, 'label': 'Terapi Nutrisi Ginjal'},
-        ],
-        dosageRules: [
-          {
-            'num': '1',
-            'title': 'Dewasa dengan Diet Protein Rendah',
-            'desc': '3 kali sehari 4-8 kaplet bersamaan makan. Telan utuh jangan dikunyah.',
-          },
-        ],
-      ),
-    ];
   }
 
+  @override
+  void dispose() {
+    CartService.instance.removeListener(_onCartChanged);
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
+  }
+
+  int get _cartCount => CartService.instance.totalCount;
+
   Future<void> _fetchLiveMedicines() async {
+    if (mounted && _allMedicines.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final res = await PasienApiService().getObatList(search: _searchQuery.isNotEmpty ? _searchQuery : null);
       if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
         final List<ObatCatalogItem> apiItems = [];
         for (var item in res.data!) {
           if (item is Map) {
-            final id = item['id']?.toString() ?? 'obat-${item['nama']}';
-            final name = item['nama']?.toString() ?? item['name']?.toString() ?? 'Obat';
-            final cat = item['kategori']?.toString() ?? item['category']?.toString() ?? 'Obat Bebas';
-            final price = double.tryParse(item['harga']?.toString() ?? item['price']?.toString() ?? '0') ?? 0.0;
+            final id = (item['id_obat'] ?? item['id'] ?? 'obat-${item['nama_obat'] ?? item['nama'] ?? ''}').toString();
+            final name = (item['nama_obat'] ?? item['nama'] ?? item['name'] ?? 'Obat').toString();
+            final cat = (item['kategori'] ?? item['category'] ?? 'Obat Bebas').toString();
+            final price = double.tryParse((item['harga_jual'] ?? item['harga'] ?? item['price'] ?? '0').toString()) ?? 0.0;
             final formattedPrice = 'Rp ${price.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-            final desc = item['deskripsi']?.toString() ?? item['description']?.toString() ?? '';
-            final bool perluResep = item['perlu_resep'] == true || item['is_resep'] == 1 || item['resep'] == true;
-            final img = item['gambar']?.toString() ?? item['image']?.toString() ?? 'assets/images/paracetamol_strip.jpg';
+            final desc = (item['aturan_pakai_umum'] ?? item['deskripsi'] ?? item['description'] ?? '').toString();
+            final catLower = cat.toLowerCase();
+            final nameLower = name.toLowerCase();
+            final bool isKeras = item['perlu_resep'] == true ||
+                item['is_resep'] == 1 ||
+                catLower.contains('keras') ||
+                catLower.contains('resep') ||
+                catLower.contains('ginjal') ||
+                catLower.contains('hipertensi') ||
+                catLower.contains('arb') ||
+                catLower.contains('diuretik') ||
+                nameLower.contains('ketosteril') ||
+                nameLower.contains('candesartan') ||
+                nameLower.contains('furosemide') ||
+                nameLower.contains('amlodipine');
+
+            final isTerbatas = catLower.contains('terbatas');
+            final String badgeText = isKeras ? 'Obat Keras' : (isTerbatas ? 'Terbatas' : 'Bebas');
+            final Color badgeColor = isKeras
+                ? const Color(0xFFDC2626)
+                : (isTerbatas ? const Color(0xFF2DD4BF) : const Color(0xFF065A37));
+
+            final kemasan = (item['satuan_kemasan'] ?? item['kemasan'] ?? item['package_info'] ?? '1 Strip').toString();
+            final img = (item['foto_obat'] ?? item['gambar'] ?? item['image'] ?? 'assets/images/paracetamol_strip.jpg').toString();
+
             apiItems.add(ObatCatalogItem(
               id: id,
               name: name,
               category: cat,
-              badgeText: perluResep ? 'Resep Dokter' : 'Bebas',
-              badgeColor: perluResep ? const Color(0xFFDC2626) : const Color(0xFF065A37),
-              packageInfo: item['kemasan']?.toString() ?? '1 Strip',
+              badgeText: badgeText,
+              badgeColor: badgeColor,
+              packageInfo: kemasan,
               price: price.toInt(),
               priceFormatted: formattedPrice,
               imagePath: img,
-              perluResep: perluResep,
-              bpomBadge: item['bpom']?.toString() ?? 'Katalog Resmi BPOM',
-              ginjalWarning: item['peringatan_ginjal']?.toString() ?? 'Gunakan sesuai petunjuk dokter atau apoteker.',
-              shortDesc: desc,
-              indications: const [
-                {'icon': Icons.medical_services_outlined, 'label': 'Kesehatan Ginjal'},
+              perluResep: isKeras,
+              bpomBadge: (item['bpom'] ?? 'Katalog Resmi BPOM').toString(),
+              ginjalWarning: (item['peringatan_ginjal'] ??
+                  (isKeras
+                      ? 'Obat resep dokter spesialis ginjal nefrologi. Gunakan dengan resep dan dosis yang tepat.'
+                      : 'Gunakan sesuai petunjuk dokter atau apoteker.')).toString(),
+              shortDesc: desc.isNotEmpty ? desc : 'Obat terapi untuk pasien kesehatan ginjal.',
+              indications: [
+                {'icon': Icons.medical_services_outlined, 'label': cat},
               ],
-              dosageRules: const [
-                {'num': '1', 'title': 'Aturan Pakai', 'desc': 'Sesuai petunjuk dokter / apoteker.'},
+              dosageRules: [
+                {
+                  'num': '1',
+                  'title': 'Aturan Pakai',
+                  'desc': desc.isNotEmpty ? desc : 'Sesuai petunjuk dokter / apoteker.'
+                },
               ],
             ));
           }
         }
-        if (apiItems.isNotEmpty) {
+        if (mounted) {
           setState(() {
             _allMedicines = apiItems;
           });
         }
+      } else if (mounted) {
+        setState(() {
+          _allMedicines = [];
+        });
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error fetching live medicines: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   List<ObatCatalogItem> get _filteredMedicines {
@@ -499,6 +453,15 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
   // GRID KATALOG OBAT (2 Kolom)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildKatalogGrid() {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 40),
+          child: CircularProgressIndicator(color: _darkGreen),
+        ),
+      );
+    }
+
     final list = _filteredMedicines;
 
     if (list.isEmpty) {
@@ -569,16 +532,27 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
                     height: 130,
                     width: double.infinity,
                     color: const Color(0xFFE2E8F0),
-                    child: Image.asset(
-                      item.imagePath,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 130,
-                        color: const Color(0xFFDCFCE7),
-                        child: const Icon(Icons.medication_rounded, color: _darkGreen, size: 40),
-                      ),
-                    ),
+                    child: item.imagePath.startsWith('http')
+                        ? Image.network(
+                            item.imagePath,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              height: 130,
+                              color: const Color(0xFFDCFCE7),
+                              child: const Icon(Icons.medication_rounded, color: _darkGreen, size: 40),
+                            ),
+                          )
+                        : Image.asset(
+                            item.imagePath,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              height: 130,
+                              color: const Color(0xFFDCFCE7),
+                              child: const Icon(Icons.medication_rounded, color: _darkGreen, size: 40),
+                            ),
+                          ),
                   ),
                 ),
                 // Badge top right
@@ -766,7 +740,7 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
           obatItem: item,
           initialCartCount: _cartCount,
           onCartCountChanged: (newCount) {
-            setState(() => _cartCount = newCount);
+            setState(() {});
           },
         ),
       ),
@@ -801,13 +775,18 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                _openCartCheckout(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ResepDokterScreen(userName: widget.userName),
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _darkGreen,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text('Tebus Resep', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+              child: Text('Resep Dokter', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
             ),
           ],
         ),
@@ -815,10 +794,22 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
       return;
     }
 
-    setState(() => _cartCount++);
+    CartService.instance.addItem(
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      badgeText: item.badgeText,
+      badgeColor: item.badgeColor,
+      packageInfo: item.packageInfo,
+      dosageInstruction: item.dosageRules.isNotEmpty ? (item.dosageRules.first['desc'] ?? item.packageInfo) : item.packageInfo,
+      unitPrice: item.price,
+      quantity: 1,
+      imagePath: item.imagePath,
+    );
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${item.name} ditambahkan ke keranjang! 🛒'),
+        content: Text('${item.name} berhasil ditambahkan ke keranjang belanja! 🛒'),
         backgroundColor: _darkGreen,
         duration: const Duration(seconds: 2),
       ),
@@ -833,8 +824,6 @@ class _PembelianObatScreenState extends State<PembelianObatScreen> {
       ),
     );
   }
-
-  void _openCartCheckout(BuildContext context) => _openCart(context);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

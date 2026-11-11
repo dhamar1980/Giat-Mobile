@@ -4,40 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'checkout_resep_screen.dart';
 import 'detail_resep_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../services/cart_service.dart';
+
+export '../../../services/cart_service.dart' show CartItemData;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN KERANJANG BELANJA OBAT (Figma Node: 977:10035)
 // ─────────────────────────────────────────────────────────────────────────────
-
-class CartItemData {
-  final String id;
-  final String name;
-  final String category;
-  final String badgeText;
-  final Color badgeColor;
-  final String packageInfo;
-  final String dosageInstruction;
-  final int unitPrice;
-  int quantity;
-  bool isSelected;
-  final String? imagePath;
-
-  CartItemData({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.badgeText,
-    required this.badgeColor,
-    required this.packageInfo,
-    required this.dosageInstruction,
-    required this.unitPrice,
-    this.quantity = 1,
-    this.isSelected = true,
-    this.imagePath,
-  });
-
-  int get totalPrice => unitPrice * quantity;
-}
 
 class KeranjangScreen extends StatefulWidget {
   final String userName;
@@ -62,38 +35,22 @@ class _KeranjangScreenState extends State<KeranjangScreen> {
 
   static const int _biayaLayanan = 20000;
 
-  late List<CartItemData> _items;
+  List<CartItemData> get _items => CartService.instance.items;
 
   @override
   void initState() {
     super.initState();
-    // Default 2 verified items matching prescription checkout
-    _items = [
-      CartItemData(
-        id: 'ketosteril',
-        name: 'Ketosteril Tablet',
-        category: 'Asam Amino Esensial & Ketoanalog',
-        badgeText: 'Obat Keras',
-        badgeColor: const Color(0xFFDC2626),
-        packageInfo: 'Strip 100 tablet',
-        dosageInstruction: '3x sehari sesudah makan • 100 tablet',
-        unitPrice: 650000,
-        quantity: 1,
-        isSelected: true,
-      ),
-      CartItemData(
-        id: 'candesartan',
-        name: 'Candesartan 8mg',
-        category: 'Angiotensin Receptor Blocker (ARB)',
-        badgeText: 'Obat Keras',
-        badgeColor: const Color(0xFFDC2626),
-        packageInfo: 'Strip 30 tablet',
-        dosageInstruction: '1x sehari pagi hari • 30 tablet',
-        unitPrice: 120000,
-        quantity: 1,
-        isSelected: true,
-      ),
-    ];
+    CartService.instance.addListener(_onCartChanged);
+  }
+
+  @override
+  void dispose() {
+    CartService.instance.removeListener(_onCartChanged);
+    super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
   }
 
   bool get _isAllSelected => _items.isNotEmpty && _items.every((item) => item.isSelected);
@@ -119,25 +76,16 @@ class _KeranjangScreenState extends State<KeranjangScreen> {
   }
 
   void _toggleSelectAll(bool? val) {
-    final newValue = val ?? false;
-    setState(() {
-      for (var item in _items) {
-        item.isSelected = newValue;
-      }
-    });
+    CartService.instance.toggleSelectAll(val ?? false);
   }
 
   void _incrementQty(CartItemData item) {
-    setState(() {
-      item.quantity++;
-    });
+    CartService.instance.updateQuantity(item.id, item.quantity + 1);
   }
 
   void _decrementQty(CartItemData item) {
     if (item.quantity > 1) {
-      setState(() {
-        item.quantity--;
-      });
+      CartService.instance.updateQuantity(item.id, item.quantity - 1);
     } else {
       _confirmDeleteItem(item);
     }
@@ -167,9 +115,7 @@ class _KeranjangScreenState extends State<KeranjangScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              setState(() {
-                _items.removeWhere((it) => it.id == item.id);
-              });
+              CartService.instance.removeItem(item.id);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('${item.name} dihapus dari keranjang.'),
@@ -206,9 +152,16 @@ class _KeranjangScreenState extends State<KeranjangScreen> {
         .where((i) => i.isSelected)
         .map((i) => <String, dynamic>{
               'id_obat': i.id,
+              'id': i.id,
               'nama': i.name,
+              'nama_obat': i.name,
+              'kategori': i.category,
+              'aturan_pakai': i.dosageInstruction,
+              'kemasan': i.packageInfo,
               'jumlah': i.quantity,
               'harga': i.unitPrice,
+              'subtotal': i.totalPrice,
+              'gambar': i.imagePath,
             })
         .toList();
 
@@ -548,26 +501,44 @@ class _KeranjangScreenState extends State<KeranjangScreen> {
                   activeColor: _darkGreen,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   onChanged: (val) {
-                    setState(() {
-                      item.isSelected = val ?? false;
-                    });
+                    CartService.instance.toggleSelection(item.id, val ?? false);
                   },
                 ),
               ),
               const SizedBox(width: 10),
 
               // Thumbnail Icon
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 48,
+                  height: 48,
                   color: const Color(0xFFE0F2FE),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.medication_rounded,
-                  color: _darkGreen,
-                  size: 26,
+                  child: item.imagePath != null && item.imagePath!.isNotEmpty
+                      ? (item.imagePath!.startsWith('http')
+                          ? Image.network(
+                              item.imagePath!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.medication_rounded,
+                                color: _darkGreen,
+                                size: 26,
+                              ),
+                            )
+                          : Image.asset(
+                              item.imagePath!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.medication_rounded,
+                                color: _darkGreen,
+                                size: 26,
+                              ),
+                            ))
+                      : const Icon(
+                          Icons.medication_rounded,
+                          color: _darkGreen,
+                          size: 26,
+                        ),
                 ),
               ),
               const SizedBox(width: 12),

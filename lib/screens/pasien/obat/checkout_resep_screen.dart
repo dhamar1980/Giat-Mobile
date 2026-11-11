@@ -10,6 +10,7 @@ import 'pembayaran_qris_screen.dart';
 import 'pembayaran_transfer_bank_screen.dart';
 import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/cart_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../utils/time_utils.dart';
 
@@ -1684,6 +1685,10 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
         if (widget.resepData != null) {
           final cleanRx = widget.resepData!.id ?? rxNumber.replaceAll('No.', '').trim();
           await PasienApiService().markResepDitebus(cleanRx);
+        }
+
+        if (widget.cartItems != null && widget.cartItems!.isNotEmpty) {
+          CartService.instance.clearSelected();
         }
 
         if (!mounted) return;

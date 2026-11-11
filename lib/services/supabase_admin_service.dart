@@ -2148,6 +2148,54 @@ class SupabaseAdminService {
     }
   }
 
+  /// Mengambil katalog obat real dari tabel `obat` Supabase
+  Future<List<Map<String, dynamic>>> fetchKatalogObat({String? search, String? kategori}) async {
+    try {
+      String whereClause = 'WHERE 1=1';
+      final Map<String, dynamic> params = {};
+      if (search != null && search.trim().isNotEmpty) {
+        whereClause += ' AND (LOWER(o.nama_obat) LIKE @search OR LOWER(o.kategori) LIKE @search)';
+        params['search'] = '%${search.trim().toLowerCase()}%';
+      }
+      if (kategori != null && kategori.trim().isNotEmpty && kategori.toLowerCase() != 'semua') {
+        whereClause += ' AND LOWER(o.kategori) = @kategori';
+        params['kategori'] = kategori.trim().toLowerCase();
+      }
+
+      final sql = '''
+        SELECT
+          TRIM(o.id_obat) AS id_obat,
+          TRIM(o.id_obat) AS id,
+          TRIM(o.id_apotek) AS id_apotek,
+          o.nama_obat,
+          o.nama_obat AS nama,
+          o.kategori,
+          o.bentuk_sediaan,
+          o.dosis,
+          o.satuan_kemasan,
+          o.satuan_kemasan AS kemasan,
+          o.stok_total,
+          o.harga_beli,
+          o.harga_jual,
+          o.harga_jual AS harga,
+          o.aturan_pakai_umum,
+          o.aturan_pakai_umum AS deskripsi,
+          o.foto_obat,
+          o.foto_obat AS gambar,
+          COALESCE(a.nama_apotek, 'Apotek Kimia Farma Mitra') AS nama_apotek
+        FROM obat o
+        LEFT JOIN apotek a ON TRIM(o.id_apotek) = TRIM(a.id_apotek)
+        $whereClause
+        ORDER BY o.nama_obat ASC;
+      ''';
+      final res = await _exec(sql, parameters: params);
+      return res.map((r) => _normalizeMap(r.toColumnMap())).toList();
+    } catch (e) {
+      debugPrint('Error fetchKatalogObat: $e');
+      return [];
+    }
+  }
+
   /// Mengambil daftar pesanan obat pasien beserta rincian itemnya dari Supabase
   Future<List<Map<String, dynamic>>> fetchPesananForPasien({String? pasienId}) async {
     final pid = await resolveCurrentPasienId(overridePasienId: pasienId);

@@ -30,20 +30,38 @@ class ObatModel {
   });
 
   factory ObatModel.fromJson(Map<String, dynamic> json) {
-    final rawHarga = int.tryParse(json['harga']?.toString() ?? '0') ?? 0;
+    final rawHarga = int.tryParse(json['harga_jual']?.toString() ?? json['harga']?.toString() ?? '0') ?? 0;
+    final cat = (json['kategori'] ?? json['category'] ?? 'Umum').toString();
+    final name = (json['nama_obat'] ?? json['nama'] ?? json['name'] ?? 'Obat').toString();
+    final catLower = cat.toLowerCase();
+    final nameLower = name.toLowerCase();
+    final bool isRx = json['perlu_resep'] == true ||
+        json['perlu_resep'] == 1 ||
+        json['is_resep'] == 1 ||
+        catLower.contains('keras') ||
+        catLower.contains('resep') ||
+        catLower.contains('ginjal') ||
+        catLower.contains('hipertensi') ||
+        catLower.contains('arb') ||
+        catLower.contains('diuretik') ||
+        nameLower.contains('ketosteril') ||
+        nameLower.contains('candesartan') ||
+        nameLower.contains('furosemide') ||
+        nameLower.contains('amlodipine');
+
     return ObatModel(
-      id: json['id'] ?? json['id_obat'] ?? 0,
-      nama: json['nama']?.toString() ?? json['name']?.toString() ?? 'Obat',
-      kategori: json['kategori']?.toString() ?? json['category']?.toString() ?? 'Umum',
+      id: json['id_obat'] ?? json['id'] ?? 0,
+      nama: name,
+      kategori: cat,
       harga: rawHarga,
       hargaFormatted: json['harga_formatted']?.toString() ?? 'Rp ${rawHarga.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-      deskripsi: json['deskripsi']?.toString() ?? json['description']?.toString() ?? '',
+      deskripsi: json['aturan_pakai_umum']?.toString() ?? json['deskripsi']?.toString() ?? json['description']?.toString() ?? '',
       peringatanGinjal: json['peringatan_ginjal']?.toString() ?? json['ginjal_warning']?.toString(),
-      gambar: json['gambar']?.toString() ?? json['foto']?.toString() ?? json['image']?.toString(),
-      perluResep: json['perlu_resep'] == true || json['perlu_resep'] == 1,
-      stok: int.tryParse(json['stok']?.toString() ?? '100') ?? 100,
-      kemasan: json['kemasan']?.toString() ?? json['package_info']?.toString(),
-      aturanPakai: json['aturan_pakai']?.toString(),
+      gambar: json['foto_obat']?.toString() ?? json['gambar']?.toString() ?? json['foto']?.toString() ?? json['image']?.toString(),
+      perluResep: isRx,
+      stok: int.tryParse(json['stok_total']?.toString() ?? json['stok']?.toString() ?? '100') ?? 100,
+      kemasan: json['satuan_kemasan']?.toString() ?? json['kemasan']?.toString() ?? json['package_info']?.toString(),
+      aturanPakai: json['aturan_pakai_umum']?.toString() ?? json['aturan_pakai']?.toString(),
     );
   }
 }

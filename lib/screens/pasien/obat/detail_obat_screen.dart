@@ -1,8 +1,10 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'keranjang_screen.dart';
+import 'resep_dokter_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../services/cart_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA KATALOG OBAT
@@ -77,12 +79,13 @@ class _DetailObatScreenState extends State<DetailObatScreen> {
 
   late final ObatCatalogItem _obat;
   int _quantity = 1;
-  late int _cartCount;
+
+  int get _cartCount => CartService.instance.totalCount;
 
   @override
   void initState() {
     super.initState();
-    _cartCount = widget.initialCartCount;
+    CartService.instance.addListener(_onCartChanged);
     _obat = widget.obatItem ??
         const ObatCatalogItem(
           id: 'paracetamol',
@@ -128,6 +131,16 @@ class _DetailObatScreenState extends State<DetailObatScreen> {
       }
     }
     return buffer.toString().split('').reversed.join('');
+  }
+
+  @override
+  void dispose() {
+    CartService.instance.removeListener(_onCartChanged);
+    super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -395,18 +408,31 @@ class _DetailObatScreenState extends State<DetailObatScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: Image.asset(
-          _obat.imagePath,
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-          errorBuilder: (context, error, stackTrace) => Center(
-            child: Icon(
-              Icons.medication_rounded,
-              size: 80,
-              color: _darkGreen.withValues(alpha: 0.4),
-            ),
-          ),
-        ),
+        child: _obat.imagePath.startsWith('http')
+            ? Image.network(
+                _obat.imagePath,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                errorBuilder: (context, error, stackTrace) => Center(
+                  child: Icon(
+                    Icons.medication_rounded,
+                    size: 80,
+                    color: _darkGreen.withValues(alpha: 0.4),
+                  ),
+                ),
+              )
+            : Image.asset(
+                _obat.imagePath,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                errorBuilder: (context, error, stackTrace) => Center(
+                  child: Icon(
+                    Icons.medication_rounded,
+                    size: 80,
+                    color: _darkGreen.withValues(alpha: 0.4),
+                  ),
+                ),
+              ),
       ),
     );
   }
@@ -888,13 +914,68 @@ class _DetailObatScreenState extends State<DetailObatScreen> {
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
-                  setState(() {
-                    _cartCount += _quantity;
-                  });
-                  widget.onCartCountChanged?.call(_cartCount);
+                  if (_obat.perluResep) {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        title: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, color: _redAlert, size: 24),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Obat Keras (K)',
+                              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                            ),
+                          ],
+                        ),
+                        content: Text(
+                          '${_obat.name} memerlukan resep dokter spesialis nefrologi GIAT. Silakan tebus resep Anda melalui menu "Resep Dokter" atau lakukan telekonsultasi.',
+                          style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569), height: 1.4),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: Text('Tutup', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ResepDokterScreen(userName: widget.userName),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _darkGreen,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: Text('Resep Dokter', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    );
+                    return;
+                  }
+
+                  CartService.instance.addItem(
+                    id: _obat.id,
+                    name: _obat.name,
+                    category: _obat.category,
+                    badgeText: _obat.badgeText,
+                    badgeColor: _obat.badgeColor,
+                    packageInfo: _obat.packageInfo,
+                    dosageInstruction: _obat.dosageRules.isNotEmpty ? (_obat.dosageRules.first['desc'] ?? _obat.packageInfo) : _obat.packageInfo,
+                    unitPrice: _obat.price,
+                    quantity: _quantity,
+                    imagePath: _obat.imagePath,
+                  );
+                  widget.onCartCountChanged?.call(CartService.instance.totalCount);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('$_quantity ${_obat.name} ditambahkan ke keranjang belanja! 🛒'),
+                      content: Text('$_quantity ${_obat.name} berhasil ditambahkan ke keranjang belanja! 🛒'),
                       backgroundColor: _darkGreen,
                       duration: const Duration(seconds: 2),
                     ),

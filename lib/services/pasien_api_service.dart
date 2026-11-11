@@ -931,6 +931,24 @@ class PasienApiService {
 
   /// GET /pasien/obat/katalog
   Future<ApiResponse<List<dynamic>>> getObatList({String? query, String? kategori, String? search}) async {
+    if (!_isTest) {
+      try {
+        final dbList = await SupabaseAdminService.instance.fetchKatalogObat(
+          search: search ?? query,
+          kategori: kategori,
+        );
+        if (dbList.isNotEmpty) {
+          return ApiResponse.success(
+            message: 'Berhasil memuat ${dbList.length} obat dari database.',
+            data: dbList,
+            statusCode: 200,
+          );
+        }
+      } catch (e) {
+        debugPrint('Supabase fetchKatalogObat fallback: $e');
+      }
+    }
+
     try {
       final Map<String, dynamic> qParams = {};
       final q = search ?? query;
