@@ -369,6 +369,8 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                   }),
                 ),
                 DokterPasienScreen(
+                  doctorName: widget.doctorName,
+                  dokterId: _currentDoctorId,
                   onProfileTap: () => setState(() {
                     _selectedIndex = 4;
                     _isTopBarVisible = true;

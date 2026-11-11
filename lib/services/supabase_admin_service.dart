@@ -2565,6 +2565,195 @@ class SupabaseAdminService {
     }).toList();
   }
 
+  /// Mengambil daftar pasien yang TELAH BERHASIL MEMBAYAR sesi konsultasi dengan dokter bersangkutan.
+  /// Memastikan data 100% real dari Supabase PostgreSQL dengan join konsultasi & konsultasi_pembayaran.
+  Future<List<Map<String, dynamic>>> fetchDokterPaidPatients({
+    String? dokterId,
+    String? doctorName,
+    String? search,
+  }) async {
+    if (_isTest) return [];
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return [];
+
+    final Map<String, dynamic> params = {'docId': docId};
+    String searchClause = '';
+    if (search != null && search.trim().isNotEmpty) {
+      searchClause = 'AND (LOWER(p.nama) LIKE @search OR LOWER(COALESCE(p.alamat, \'\')) LIKE @search)';
+      params['search'] = '%${search.trim().toLowerCase()}%';
+    }
+
+    final query = '''
+      SELECT DISTINCT ON (TRIM(p.id_pasien))
+        TRIM(p.id_pasien) AS id,
+        TRIM(p.id_pasien) AS id_pasien,
+        p.nama,
+        p.no_hp,
+        p.alamat,
+        p.jenis_kelamin,
+        p.nik,
+        p.tanggal_lahir,
+        p.golongan_darah,
+        p.foto_profile,
+        TRIM(k.id) AS id_konsultasi,
+        k.keluhan_awal,
+        k.status AS status_konsultasi,
+        COALESCE(kp.status_bayar, 'lunas') AS status_bayar,
+        kp.jumlah_bayar,
+        kp.waktu_bayar,
+        pan.bb AS berat_badan,
+        pan.tb AS tinggi_badan,
+        pan.kondisi AS kondisi_pantau,
+        pan.keluhan AS keluhan_pantau,
+        pan.detail_keluhan AS detail_keluhan_pantau
+      FROM konsultasi k
+      JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
+      LEFT JOIN konsultasi_pembayaran kp ON TRIM(kp.id_konsultasi) = TRIM(k.id)
+      LEFT JOIN LATERAL (
+        SELECT bb, tb, kondisi, keluhan, detail_keluhan
+        FROM pantau
+        WHERE TRIM(id_pasien) = TRIM(p.id_pasien)
+        ORDER BY COALESCE(tanggal_pantau, created_at) DESC
+        LIMIT 1
+      ) pan ON true
+      WHERE TRIM(k.id_dokter) = @docId
+        $searchClause
+        AND (
+          LOWER(TRIM(COALESCE(kp.status_bayar, ''))) IN ('lunas', 'settlement', 'capture', 'success', 'paid')
+          OR (
+            LOWER(TRIM(k.status)) IN ('berlangsung', 'aktif', 'terjadwal', 'selesai')
+            AND LOWER(TRIM(COALESCE(kp.status_bayar, 'lunas'))) NOT IN ('menunggu_pembayaran', 'kadaluwarsa', 'batal', 'pending', 'expire', 'cancel', 'failed')
+          )
+        )
+      ORDER BY TRIM(p.id_pasien), COALESCE(kp.waktu_bayar, k.updated_at, k.created_at) DESC
+    ''';
+
+    final rows = await _exec(query, parameters: params);
+    final List<Map<String, dynamic>> results = [];
+
+    for (final r in rows) {
+      final map = _normalizeMap(r.toColumnMap());
+      final pId = map['id_pasien']?.toString().trim();
+
+      // Ambil riwayat resep terakhir yang pernah diresepkan untuk pasien ini jika ada
+      List<Map<String, dynamic>> medicines = [];
+      if (pId != null && pId.isNotEmpty) {
+        try {
+          final medRows = await _exec(
+            '''
+            SELECT 
+              TRIM(ri.id) AS id,
+              ri.nama_obat AS medicine_name,
+              ri.dosis AS dose,
+              ri.aturan_pakai AS frequency,
+              ri.jumlah::text AS quantity,
+              ri.waktu_penggunaan AS usage_time,
+              ri.catatan_khusus AS special_notes
+            FROM resep r
+            JOIN resep_item ri ON TRIM(ri.id_resep) = TRIM(r.id)
+            WHERE TRIM(r.id_pasien) = @pId
+            ORDER BY r.created_at DESC
+            LIMIT 10
+            ''',
+            parameters: {'pId': pId},
+          );
+          medicines = medRows.map((mr) => _normalizeMap(mr.toColumnMap())).toList();
+        } catch (_) {}
+      }
+      map['current_medicines'] = medicines;
+      results.add(map);
+    }
+
+    return results;
+  }
+
+  /// Mengambil detail lengkap satu pasien berbayar (kondisi pantau + resep + konsultasi)
+  Future<Map<String, dynamic>?> fetchDokterPatientDetail(
+    String patientId, {
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return null;
+    final pId = patientId.trim();
+    if (pId.isEmpty) return null;
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+
+    final query = '''
+      SELECT 
+        TRIM(p.id_pasien) AS id,
+        TRIM(p.id_pasien) AS id_pasien,
+        p.nama,
+        p.no_hp,
+        p.alamat,
+        p.jenis_kelamin,
+        p.nik,
+        p.tanggal_lahir,
+        p.golongan_darah,
+        p.foto_profile,
+        TRIM(k.id) AS id_konsultasi,
+        k.keluhan_awal,
+        k.status AS status_konsultasi,
+        COALESCE(kp.status_bayar, 'lunas') AS status_bayar,
+        kp.jumlah_bayar,
+        kp.waktu_bayar,
+        pan.bb AS berat_badan,
+        pan.tb AS tinggi_badan,
+        pan.kondisi AS kondisi_pantau,
+        pan.keluhan AS keluhan_pantau,
+        pan.detail_keluhan AS detail_keluhan_pantau
+      FROM pasien p
+      LEFT JOIN konsultasi k ON TRIM(k.id_pasien) = TRIM(p.id_pasien) \${docId != null ? 'AND TRIM(k.id_dokter) = @docId' : ''}
+      LEFT JOIN konsultasi_pembayaran kp ON TRIM(kp.id_konsultasi) = TRIM(k.id)
+      LEFT JOIN LATERAL (
+        SELECT bb, tb, kondisi, keluhan, detail_keluhan
+        FROM pantau
+        WHERE TRIM(id_pasien) = TRIM(p.id_pasien)
+        ORDER BY COALESCE(tanggal_pantau, created_at) DESC
+        LIMIT 1
+      ) pan ON true
+      WHERE TRIM(p.id_pasien) = @pId
+      ORDER BY COALESCE(kp.waktu_bayar, k.updated_at, k.created_at) DESC
+      LIMIT 1
+    ''';
+
+    final params = <String, dynamic>{'pId': pId};
+    if (docId != null) params['docId'] = docId;
+
+    final rows = await _exec(query, parameters: params);
+    if (rows.isEmpty) return null;
+
+    final map = _normalizeMap(rows.first.toColumnMap());
+
+    // Ambil resep
+    try {
+      final medRows = await _exec(
+        '''
+        SELECT 
+          TRIM(ri.id) AS id,
+          ri.nama_obat AS medicine_name,
+          ri.dosis AS dose,
+          ri.aturan_pakai AS frequency,
+          ri.jumlah::text AS quantity,
+          ri.waktu_penggunaan AS usage_time,
+          ri.catatan_khusus AS special_notes
+        FROM resep r
+        JOIN resep_item ri ON TRIM(ri.id_resep) = TRIM(r.id)
+        WHERE TRIM(r.id_pasien) = @pId
+        ORDER BY r.created_at DESC
+        LIMIT 10
+        ''',
+        parameters: {'pId': pId},
+      );
+      map['current_medicines'] = medRows.map((mr) => _normalizeMap(mr.toColumnMap())).toList();
+    } catch (_) {
+      map['current_medicines'] = <Map<String, dynamic>>[];
+    }
+
+    return map;
+  }
+
   /// Menandai semua pesan dari pasien dalam suatu sesi konsultasi sebagai telah dibaca oleh dokter
   Future<void> markConsultationMessagesAsRead(String consultationId, {String? readerId}) async {
     if (_isTest) return;

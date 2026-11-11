@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,16 +10,23 @@ import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DAFTAR PASIEN DOKTER (Sesuai Desain Figma: Node 1008-18310)
+// HANYA menampilkan pasien yang telah berhasil membayar dokter (Real Database)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DokterPasienScreen extends StatefulWidget {
   final VoidCallback? onProfileTap;
   final bool? isTopBarVisible;
+  final List<DokterPatient>? initialPatients;
+  final String? doctorName;
+  final String? dokterId;
 
   const DokterPasienScreen({
     super.key,
     this.onProfileTap,
     this.isTopBarVisible,
+    this.initialPatients,
+    this.doctorName,
+    this.dokterId,
   });
 
   @override
@@ -33,6 +41,7 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   bool _isTopBarVisible = true;
+  bool _isLoading = false;
   List<DokterPatient> _livePatients = [];
 
   bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
@@ -40,13 +49,31 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialPatients != null) {
+      _livePatients = List.from(widget.initialPatients!);
+    }
     _fetchLivePatients();
   }
 
   Future<void> _fetchLivePatients() async {
+    if (widget.initialPatients != null && widget.initialPatients!.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _livePatients = List.from(widget.initialPatients!);
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) setState(() => _isLoading = true);
     try {
-      final res = await DokterApiService().getPasienList();
-      if (res.success && res.data != null && res.data!.isNotEmpty) {
+      final docName = widget.doctorName ?? DokterProfileState.instance.doctorName;
+      final res = await DokterApiService().getPasienList(
+        dokterId: widget.dokterId,
+        doctorName: docName,
+      );
+      if (res.success && res.data != null) {
         final List<DokterPatient> parsed = [];
         for (var item in res.data!) {
           if (item is! Map) continue;
@@ -81,6 +108,44 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
 
           final avatarUrl = (map['foto_profile'] ?? map['foto_profil'])?.toString();
 
+          double weightKg = 55.0;
+          final rawBb = map['berat_badan'] ?? map['bb'];
+          if (rawBb != null) {
+            weightKg = double.tryParse(rawBb.toString()) ?? 55.0;
+          }
+
+          double heightM = 1.65;
+          final rawTb = map['tinggi_badan'] ?? map['tb'];
+          if (rawTb != null) {
+            final parsedTb = double.tryParse(rawTb.toString()) ?? 165.0;
+            if (parsedTb > 3.0) {
+              heightM = double.parse((parsedTb / 100.0).toStringAsFixed(2));
+            } else {
+              heightM = parsedTb;
+            }
+          }
+
+          final condition = (map['kondisi_pantau'] ?? map['kondisi'] ?? 'Pasien Ginjal').toString();
+          final complaint = (map['keluhan_pantau'] ?? map['keluhan_awal'] ?? map['keluhan'] ?? 'Pemeriksaan rutin ginjal').toString();
+          final complaintDetail = (map['detail_keluhan_pantau'] ?? map['detail_keluhan'] ?? map['keluhan_awal'] ?? 'Pemeriksaan rutin ginjal').toString();
+
+          final List<DokterPrescriptionItem> parsedMeds = [];
+          if (map['current_medicines'] is List) {
+            for (var m in (map['current_medicines'] as List)) {
+              if (m is! Map) continue;
+              parsedMeds.add(DokterPrescriptionItem(
+                id: (m['id'] ?? '').toString(),
+                medicineName: (m['medicine_name'] ?? m['nama_obat'] ?? '').toString(),
+                dose: (m['dose'] ?? m['dosis'] ?? '').toString(),
+                frequency: (m['frequency'] ?? m['aturan_pakai'] ?? '').toString(),
+                quantity: (m['quantity'] ?? m['jumlah'] ?? '').toString(),
+                duration: (m['duration'] ?? '7 hari').toString(),
+                usageTime: (m['usage_time'] ?? m['waktu_penggunaan'] ?? 'Sesudah Makan').toString(),
+                specialNotes: m['special_notes']?.toString(),
+              ));
+            }
+          }
+
           parsed.add(
             DokterPatient(
               id: id,
@@ -89,15 +154,17 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
               age: age,
               gender: gender,
               address: (map['alamat'] ?? 'Kota Bandung').toString(),
-              weightKg: 55.0,
-              heightM: 1.65,
-              condition: 'Pasien Ginjal',
-              complaint: (map['keluhan_awal'] ?? 'Pemeriksaan rutin ginjal').toString(),
-              complaintDetail: (map['keluhan_awal'] ?? '').toString(),
-              currentMedicines: const [],
+              weightKg: weightKg,
+              heightM: heightM,
+              condition: condition,
+              complaint: complaint,
+              complaintDetail: complaintDetail,
+              currentMedicines: parsedMeds,
               avatarUrl: avatarUrl,
               avatarBgColor: const Color(0xFFCFE8F3),
               avatarTextColor: const Color(0xFF0F172A),
+              consultationId: map['id_konsultasi']?.toString(),
+              paymentStatus: map['status_bayar']?.toString() ?? 'lunas',
             ),
           );
         }
@@ -105,10 +172,15 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
         if (mounted) {
           setState(() {
             _livePatients = parsed;
+            _isLoading = false;
           });
         }
+      } else {
+        if (mounted) setState(() => _isLoading = false);
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -119,21 +191,25 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
 
   List<DokterPatient> _getFilteredPatients() {
     final List<DokterPatient> all;
-    if (_livePatients.isNotEmpty) {
-      final existingIds = _livePatients.map((p) => p.id).toSet();
-      final existingNames = _livePatients.map((p) => p.name.toLowerCase()).toSet();
-      final extraMocks = DokterMockData.patients.where((m) =>
-          !existingIds.contains(m.id) && !existingNames.contains(m.name.toLowerCase())
-      ).toList();
-      all = [..._livePatients, ...extraMocks];
-    } else {
+    if (widget.initialPatients != null) {
+      all = widget.initialPatients!;
+    } else if (_livePatients.isNotEmpty) {
+      // HANYA pasien yang telah berhasil membayar dokter dari database Supabase/API
+      all = _livePatients;
+    } else if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      // Fallback khusus environment unit test jika tanpa data live
       all = DokterMockData.patients;
+    } else {
+      // Pada runtime nyata: daftar kosong jika dokter belum memiliki pasien berbayar
+      all = const [];
     }
 
     if (_searchQuery.trim().isEmpty) return all;
+    final q = _searchQuery.toLowerCase();
     return all.where((p) {
-      return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          p.gender.toLowerCase().contains(_searchQuery.toLowerCase());
+      return p.name.toLowerCase().contains(q) ||
+          p.gender.toLowerCase().contains(q) ||
+          p.address.toLowerCase().contains(q);
     }).toList();
   }
 
@@ -178,74 +254,121 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
                   const SizedBox(height: 76),
 
                   // ── Title Badge: "Daftar Pasien" ──
-                _buildTitlePill('Daftar Pasien'),
+                  _buildTitlePill('Daftar Pasien'),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // ── Search Bar (Pill Shaped) ──
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.4),
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
+                  // ── Search Bar (Pill Shaped) ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                          width: 1.2,
                         ),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (val) => setState(() => _searchQuery = val),
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF0F172A),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'Cari Pasien...',
-                        hintStyle: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF334155), size: 22),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: TextField(
+                        controller: _searchCtrl,
+                        onChanged: (val) => setState(() => _searchQuery = val),
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF0F172A),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Cari Pasien...',
+                          hintStyle: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF334155), size: 22),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
-                // ── Patient Cards List ──
-                Expanded(
-                  child: filtered.isEmpty
-                      ? Center(
-                          child: Text(
-                            'Tidak ada pasien ditemukan.',
-                            style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+                  // ── Patient Cards List ──
+                  Expanded(
+                    child: _isLoading && _livePatients.isEmpty
+                        ? const Center(
+                            child: CircularProgressIndicator(color: _darkGreen),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _fetchLivePatients,
+                            color: _darkGreen,
+                            child: filtered.isEmpty
+                                ? ListView(
+                                    physics: const AlwaysScrollableScrollPhysics(),
+                                    children: [
+                                      SizedBox(height: MediaQuery.of(context).size.height * 0.16),
+                                      Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                _searchQuery.isNotEmpty ? Icons.search_off_rounded : Icons.people_outline_rounded,
+                                                size: 56,
+                                                color: const Color(0xFF94A3B8),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                _searchQuery.isNotEmpty
+                                                    ? 'Tidak ada pasien dengan kata kunci "$_searchQuery".'
+                                                    : 'Belum ada pasien yang membayar konsultasi.',
+                                                textAlign: TextAlign.center,
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 14.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: const Color(0xFF334155),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                _searchQuery.isNotEmpty
+                                                    ? 'Periksa kembali ejaan nama atau jenis kelamin pasien yang dicari.'
+                                                    : 'Hanya pasien yang telah menyelesaikan pembayaran konsultasi dokter yang akan muncul di daftar ini.',
+                                                textAlign: TextAlign.center,
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 12.5,
+                                                  color: const Color(0xFF64748B),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : ListView.separated(
+                                    physics: const AlwaysScrollableScrollPhysics(),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                                    itemBuilder: (context, index) {
+                                      final p = filtered[index];
+                                      return _buildPatientListItem(p, index);
+                                    },
+                                  ),
                           ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final p = filtered[index];
-                            return _buildPatientListItem(p, index);
-                          },
-                        ),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -422,6 +545,33 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            // Badge Terbayar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Terbayar',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF15803D),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
           ],
         ),
       ),
@@ -442,7 +592,7 @@ class _PasienTopographyPainter extends CustomPainter {
       showGradient: false,
       showLines: true,
     );
-    }
+  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;

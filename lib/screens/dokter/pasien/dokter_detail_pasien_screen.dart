@@ -720,7 +720,10 @@ class _DokterDetailPasienScreenState extends State<DokterDetailPasienScreen> {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => DokterRoomChatScreen(patient: p),
+                        builder: (_) => DokterRoomChatScreen(
+                          patient: p,
+                          consultationId: p.consultationId,
+                        ),
                       ),
                     );
                   },

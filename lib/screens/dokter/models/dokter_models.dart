@@ -23,6 +23,8 @@ class DokterPatient {
   final Color? avatarBgColor;
   final Color? avatarTextColor;
   final String? avatarUrl;
+  final String? consultationId;
+  final String? paymentStatus;
 
   const DokterPatient({
     required this.id,
@@ -40,7 +42,49 @@ class DokterPatient {
     this.avatarBgColor,
     this.avatarTextColor,
     this.avatarUrl,
+    this.consultationId,
+    this.paymentStatus,
   });
+
+  DokterPatient copyWith({
+    String? id,
+    String? name,
+    String? initials,
+    int? age,
+    String? gender,
+    String? address,
+    double? weightKg,
+    double? heightM,
+    String? condition,
+    String? complaint,
+    String? complaintDetail,
+    List<DokterPrescriptionItem>? currentMedicines,
+    Color? avatarBgColor,
+    Color? avatarTextColor,
+    String? avatarUrl,
+    String? consultationId,
+    String? paymentStatus,
+  }) {
+    return DokterPatient(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      initials: initials ?? this.initials,
+      age: age ?? this.age,
+      gender: gender ?? this.gender,
+      address: address ?? this.address,
+      weightKg: weightKg ?? this.weightKg,
+      heightM: heightM ?? this.heightM,
+      condition: condition ?? this.condition,
+      complaint: complaint ?? this.complaint,
+      complaintDetail: complaintDetail ?? this.complaintDetail,
+      currentMedicines: currentMedicines ?? this.currentMedicines,
+      avatarBgColor: avatarBgColor ?? this.avatarBgColor,
+      avatarTextColor: avatarTextColor ?? this.avatarTextColor,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      consultationId: consultationId ?? this.consultationId,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+    );
+  }
 }
 
 class DokterPrescriptionItem {

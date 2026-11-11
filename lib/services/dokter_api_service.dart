@@ -89,11 +89,32 @@ class DokterApiService {
   // 3. PASIEN & DETAIL PASIEN (Pantau harian + PRAGI screening)
   // =========================================================================
 
-  /// GET /dokter/pasien
-  Future<ApiResponse<List<dynamic>>> getPasienList({String? search}) async {
+  /// GET /dokter/pasien (Hanya menampilkan pasien yang SUDAH BERHASIL MEMBAYAR sesi dokter)
+  Future<ApiResponse<List<dynamic>>> getPasienList({
+    String? search,
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (!_isTest) {
+      try {
+        final supabaseData = await SupabaseAdminService.instance.fetchDokterPaidPatients(
+          dokterId: dokterId,
+          doctorName: doctorName,
+          search: search,
+        );
+        return ApiResponse.success(
+          message: 'Berhasil memuat daftar pasien berbayar dokter dari Supabase.',
+          data: supabaseData,
+        );
+      } catch (e) {
+        // Fallback to REST API if Supabase query fails
+      }
+    }
+
     try {
       final Map<String, dynamic> qParams = {};
       if (search != null && search.isNotEmpty) qParams['search'] = search;
+      if (dokterId != null && dokterId.isNotEmpty) qParams['id_dokter'] = dokterId;
       final response = await _client.dio.get('/dokter/pasien', queryParameters: qParams);
       final raw = response.data;
       final List<dynamic> list = ApiClient.extractList(raw);
@@ -108,7 +129,27 @@ class DokterApiService {
   }
 
   /// GET /dokter/pasien/{id}/detail
-  Future<ApiResponse<Map<String, dynamic>>> getPasienDetail(dynamic id) async {
+  Future<ApiResponse<Map<String, dynamic>>> getPasienDetail(
+    dynamic id, {
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (!_isTest) {
+      try {
+        final supabaseData = await SupabaseAdminService.instance.fetchDokterPatientDetail(
+          id.toString(),
+          dokterId: dokterId,
+          doctorName: doctorName,
+        );
+        if (supabaseData != null) {
+          return ApiResponse.success(
+            message: 'Berhasil memuat detail kondisi dan riwayat pasien dari Supabase.',
+            data: supabaseData,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/dokter/pasien/$id/detail');
       return ApiResponse.success(
