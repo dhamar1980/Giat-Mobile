@@ -166,12 +166,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
 
   List<DokterConsultation> get _allConsultations {
     if (_liveConsultations.isNotEmpty) {
-      final existingIds = _liveConsultations.map((c) => c.id).toSet();
-      final existingNames = _liveConsultations.map((c) => c.patientName.toLowerCase()).toSet();
-      final extraMocks = DokterMockData.consultations.where((m) =>
-          !existingIds.contains(m.id) && !existingNames.contains(m.patientName.toLowerCase())
-      ).toList();
-      return [..._liveConsultations, ...extraMocks];
+      return _liveConsultations;
     }
     return DokterMockData.consultations;
   }
@@ -230,10 +225,6 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
         // Prioritaskan status: berlangsung > terjadwal > selesai
         if (_consultationPriority(item.status) > _consultationPriority(existing.status)) {
           deduplicated[patientKey] = item;
-        } else if (item.status == existing.status) {
-          if (item.messageCount > existing.messageCount) {
-            deduplicated[patientKey] = item;
-          }
         }
       }
     }
@@ -253,6 +244,17 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
 
   void _openChat(DokterConsultation item) {
     final patient = item.patient ?? _findPatient(item.patientId);
+
+    // Langsung nol-kan unread count di UI lokal saat dokter membuka chat agar badge merah langsung hilang
+    setState(() {
+      final idx = _liveConsultations.indexWhere((c) =>
+          c.id == item.id ||
+          c.patientName.toLowerCase().trim() == item.patientName.toLowerCase().trim());
+      if (idx != -1) {
+        _liveConsultations[idx] = _liveConsultations[idx].copyWith(messageCount: 0);
+      }
+    });
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => DokterRoomChatScreen(

@@ -63,6 +63,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   bool get _shouldShowRealData => widget.initialDashboardData != null || !_isTest;
 
   bool _isLoading = false;
+  String? _currentDoctorId;
   List<Map<String, dynamic>> _liveRecentMessages = [];
   List<Map<String, dynamic>> _liveTodaySchedules = [];
   Map<String, dynamic>? _liveLatestConsultation;
@@ -116,6 +117,9 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     final docData = data['dokter'];
     if (docData is Map) {
       final docMap = Map<String, dynamic>.from(docData);
+      if (docMap['id_dokter'] != null) {
+        _currentDoctorId = docMap['id_dokter'].toString().trim();
+      }
       DokterProfileState.instance.syncFromUser(
         name: docMap['nama']?.toString(),
         spec: docMap['spesialisasi']?.toString(),
@@ -276,7 +280,11 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           consultationId: consultationId,
         ),
       ),
-    );
+    ).then((_) {
+      if (mounted) {
+        _fetchLiveDashboard();
+      }
+    });
   }
 
   @override
@@ -320,7 +328,11 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           consultationId: consultationId,
         ),
       ),
-    );
+    ).then((_) {
+      if (mounted) {
+        _fetchLiveDashboard();
+      }
+    });
   }
 
   void _navigateToTab(int tabIndex) {
@@ -1437,7 +1449,11 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     final patientName = (msg['nama_pasien'] ?? 'Pasien').toString();
     final patient = _resolvePatientFromMap(msg, fallbackName: patientName);
     final rawText = (msg['pesan'] ?? 'Konsultasi').toString();
-    final displayText = rawText.startsWith('“') ? rawText : '“$rawText”';
+    final isFromDoctor = msg['id_sender'] != null &&
+        _currentDoctorId != null &&
+        msg['id_sender'].toString().trim().toLowerCase() == _currentDoctorId!.toLowerCase();
+    final textPrefix = isFromDoctor ? 'Anda: ' : '';
+    final displayText = rawText.startsWith('“') ? rawText : '“$textPrefix$rawText”';
     final timeStr = TimeUtils.formatChatTime(msg['created_at']);
     final consultationId = msg['id_konsultasi']?.toString();
 

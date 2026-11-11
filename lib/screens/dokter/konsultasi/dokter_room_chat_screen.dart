@@ -164,6 +164,15 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
 
   Future<void> _loadMessages() async {
     try {
+      // 1. Tandai pesan dari pasien sebagai telah dibaca oleh dokter di Supabase
+      try {
+        final myId = _currentUser?.id?.toString();
+        await SupabaseAdminService.instance.markConsultationMessagesAsRead(
+          _consultationId,
+          readerId: myId,
+        );
+      } catch (_) {}
+
       final List<_ChatMessage> loaded = [];
       final Set<String> loadedIds = {};
 

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'api_response.dart';
 import 'storage_service.dart';
+import 'supabase_admin_service.dart';
 
 /// Service for all `/konsultasi` API endpoints
 class KonsultasiApiService {
@@ -641,8 +642,25 @@ class KonsultasiApiService {
     }
   }
 
-  /// GET /konsultasi/riwayat/dokter
-  Future<ApiResponse<List<dynamic>>> getRiwayatDokter() async {
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// GET /konsultasi/riwayat/dokter (Terintegrasi langsung dengan Supabase PostgreSQL & REST API)
+  Future<ApiResponse<List<dynamic>>> getRiwayatDokter({String? dokterId, String? doctorName}) async {
+    if (!_isTest) {
+      try {
+        final supabaseData = await SupabaseAdminService.instance.fetchDokterConsultations(
+          dokterId: dokterId,
+          doctorName: doctorName,
+        );
+        return ApiResponse.success(
+          message: 'Berhasil memuat riwayat konsultasi dokter dari Supabase.',
+          data: supabaseData,
+        );
+      } catch (e) {
+        // Fallback to REST API if Supabase query fails
+      }
+    }
+
     try {
       final response = await _client.dio.get('/konsultasi/riwayat/dokter');
       final raw = response.data;

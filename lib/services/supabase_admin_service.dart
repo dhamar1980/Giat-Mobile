@@ -1560,7 +1560,7 @@ class SupabaseAdminService {
         ? _normalizeMap(profileRows.first.toColumnMap())
         : {'id_dokter': docId, 'nama': doctorName ?? 'Dokter GIAT'};
 
-    // 2. Pesan terbaru (Pesan terakhir dari setiap pasien, unik per pasien)
+    // 2. Pesan terbaru (Pesan terakhir yang dikirim oleh pasien ke dokter, unik per pasien)
     final msgRows = await _exec(
       '''
       WITH latest_messages AS (
@@ -1573,7 +1573,16 @@ class SupabaseAdminService {
           ROW_NUMBER() OVER (PARTITION BY k.id_pasien ORDER BY kp.created_at DESC) as rn
         FROM konsultasi_pesan kp
         JOIN konsultasi k ON TRIM(k.id) = TRIM(kp.id_konsultasi)
+        LEFT JOIN konsultasi_pembayaran kp_pay ON TRIM(kp_pay.id_konsultasi) = TRIM(k.id)
         WHERE TRIM(k.id_dokter) = @id
+          AND TRIM(kp.id_sender) != @id
+          AND (
+            LOWER(TRIM(COALESCE(kp_pay.status_bayar, ''))) = 'lunas'
+            OR (
+              LOWER(TRIM(k.status)) IN ('berlangsung', 'aktif', 'terjadwal', 'selesai')
+              AND LOWER(TRIM(COALESCE(kp_pay.status_bayar, 'lunas'))) NOT IN ('menunggu_pembayaran', 'kadaluwarsa', 'batal')
+            )
+          )
       )
       SELECT 
         lm.id_konsultasi,
@@ -1632,7 +1641,15 @@ class SupabaseAdminService {
           ) as rn
         FROM konsultasi k
         LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
+        LEFT JOIN konsultasi_pembayaran kp_pay ON TRIM(kp_pay.id_konsultasi) = TRIM(k.id)
         WHERE TRIM(k.id_dokter) = @id
+          AND (
+            LOWER(TRIM(COALESCE(kp_pay.status_bayar, ''))) = 'lunas'
+            OR (
+              LOWER(TRIM(k.status)) IN ('berlangsung', 'aktif', 'terjadwal', 'selesai')
+              AND LOWER(TRIM(COALESCE(kp_pay.status_bayar, 'lunas'))) NOT IN ('menunggu_pembayaran', 'kadaluwarsa', 'batal')
+            )
+          )
       )
       SELECT * FROM ranked_schedules WHERE rn = 1
       ORDER BY 
@@ -2192,6 +2209,154 @@ class SupabaseAdminService {
       rxMap['items'] = <Map<String, dynamic>>[];
     }
     return rxMap;
+  }
+
+  /// Mengambil daftar konsultasi aktif/terjadwal/selesai untuk dokter dari Supabase
+  /// HANYA menampilkan konsultasi yang pasiennya SUDAH MELAKUKAN PEMBAYARAN (status_bayar = 'lunas')
+  Future<List<Map<String, dynamic>>> fetchDokterConsultations({String? dokterId, String? doctorName}) async {
+    if (_isTest) return [];
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return [];
+
+    final rows = await _exec(
+      '''
+      SELECT 
+        TRIM(k.id) AS id,
+        TRIM(k.id) AS id_konsultasi,
+        TRIM(k.id_pasien) AS id_pasien,
+        TRIM(k.id_dokter) AS id_dokter,
+        k.tanggal_konsultasi::text AS tanggal_konsultasi,
+        k.jam_mulai::text AS jam_mulai,
+        k.jam_selesai::text AS jam_selesai,
+        k.keluhan_awal,
+        k.jenis_layanan,
+        k.status AS status_konsultasi,
+        k.created_at,
+        k.updated_at,
+        COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien,
+        p.no_hp,
+        p.foto_profile,
+        p.jenis_kelamin,
+        p.alamat,
+        p.tanggal_lahir,
+        COALESCE(kp.status_bayar, 'lunas') AS status_bayar,
+        kp.waktu_bayar,
+        kp.jumlah_bayar,
+        (
+          SELECT COUNT(*) 
+          FROM konsultasi_pesan m 
+          WHERE TRIM(m.id_konsultasi) = TRIM(k.id)
+            AND m.is_read = false
+            AND TRIM(m.id_sender) != @docId
+        ) AS unread_count,
+        COALESCE(
+          (
+            SELECT m.pesan
+            FROM konsultasi_pesan m
+            WHERE TRIM(m.id_konsultasi) = TRIM(k.id)
+              AND TRIM(m.id_sender) != @docId
+            ORDER BY m.created_at DESC
+            LIMIT 1
+          ),
+          (
+            SELECT m.pesan
+            FROM konsultasi_pesan m
+            WHERE TRIM(m.id_konsultasi) = TRIM(k.id)
+            ORDER BY m.created_at DESC
+            LIMIT 1
+          )
+        ) AS last_message,
+        COALESCE(
+          (
+            SELECT m.created_at
+            FROM konsultasi_pesan m
+            WHERE TRIM(m.id_konsultasi) = TRIM(k.id)
+              AND TRIM(m.id_sender) != @docId
+            ORDER BY m.created_at DESC
+            LIMIT 1
+          ),
+          (
+            SELECT m.created_at
+            FROM konsultasi_pesan m
+            WHERE TRIM(m.id_konsultasi) = TRIM(k.id)
+            ORDER BY m.created_at DESC
+            LIMIT 1
+          )
+        ) AS last_message_time
+      FROM konsultasi k
+      JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
+      LEFT JOIN konsultasi_pembayaran kp ON TRIM(kp.id_konsultasi) = TRIM(k.id)
+      WHERE TRIM(k.id_dokter) = @docId
+        AND (
+          LOWER(TRIM(COALESCE(kp.status_bayar, ''))) = 'lunas'
+          OR (
+            LOWER(TRIM(k.status)) IN ('berlangsung', 'aktif', 'terjadwal', 'selesai')
+            AND LOWER(TRIM(COALESCE(kp.status_bayar, 'lunas'))) NOT IN ('menunggu_pembayaran', 'kadaluwarsa', 'batal')
+          )
+        )
+      ORDER BY 
+        CASE 
+          WHEN LOWER(TRIM(k.status)) IN ('berlangsung', 'aktif') THEN 1
+          WHEN LOWER(TRIM(k.status)) = 'terjadwal' THEN 2
+          ELSE 3
+        END,
+        COALESCE(k.updated_at, k.created_at) DESC
+      ''',
+      parameters: {'docId': docId},
+    );
+
+    return rows.map((r) {
+      final map = _normalizeMap(r.toColumnMap());
+      final unread = int.tryParse(map['unread_count']?.toString() ?? '0') ?? 0;
+      map['unread_count'] = unread;
+      map['pesan_count'] = unread;
+      map['pasien'] = {
+        'id': map['id_pasien'],
+        'id_pasien': map['id_pasien'],
+        'nama': map['nama_pasien'],
+        'foto_profile': map['foto_profile'],
+        'jenis_kelamin': map['jenis_kelamin'],
+        'alamat': map['alamat'],
+        'tanggal_lahir': map['tanggal_lahir'],
+        'no_hp': map['no_hp'],
+      };
+      return map;
+    }).toList();
+  }
+
+  /// Menandai semua pesan dari pasien dalam suatu sesi konsultasi sebagai telah dibaca oleh dokter
+  Future<void> markConsultationMessagesAsRead(String consultationId, {String? readerId}) async {
+    if (_isTest) return;
+    final consId = consultationId.trim();
+    if (consId.isEmpty) return;
+
+    final resolvedReaderId = readerId ?? await resolveCurrentDokterId();
+    if (resolvedReaderId != null && resolvedReaderId.isNotEmpty) {
+      await _exec(
+        '''
+        UPDATE konsultasi_pesan
+        SET is_read = true
+        WHERE TRIM(id_konsultasi) = @consId
+          AND is_read = false
+          AND TRIM(id_sender) != @readerId
+        ''',
+        parameters: {
+          'consId': consId,
+          'readerId': resolvedReaderId,
+        },
+      );
+    } else {
+      await _exec(
+        '''
+        UPDATE konsultasi_pesan
+        SET is_read = true
+        WHERE TRIM(id_konsultasi) = @consId
+          AND is_read = false
+        ''',
+        parameters: {'consId': consId},
+      );
+    }
   }
 }
 

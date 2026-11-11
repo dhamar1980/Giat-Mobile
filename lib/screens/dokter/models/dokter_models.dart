@@ -119,6 +119,34 @@ class DokterConsultation {
     this.avatarUrl,
     this.patient,
   });
+
+  DokterConsultation copyWith({
+    String? id,
+    String? patientName,
+    String? initials,
+    KonsultasiStatus? status,
+    String? scheduledTimeText,
+    int? messageCount,
+    String? lastMessage,
+    String? lastTime,
+    String? patientId,
+    String? avatarUrl,
+    DokterPatient? patient,
+  }) {
+    return DokterConsultation(
+      id: id ?? this.id,
+      patientName: patientName ?? this.patientName,
+      initials: initials ?? this.initials,
+      status: status ?? this.status,
+      scheduledTimeText: scheduledTimeText ?? this.scheduledTimeText,
+      messageCount: messageCount ?? this.messageCount,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastTime: lastTime ?? this.lastTime,
+      patientId: patientId ?? this.patientId,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      patient: patient ?? this.patient,
+    );
+  }
 }
 
 class DokterScheduleItem {
