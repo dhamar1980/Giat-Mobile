@@ -1,4 +1,4 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'checkout_resep_screen.dart';
@@ -9,22 +9,27 @@ import '../profile/profile_pasien_screen.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ResepObatItem {
+  final String? id;
   final String name;
   final String category;
   final String badgeText;
   final String aturanPakai;
   final String jumlahObat;
+  final int price;
 
   const ResepObatItem({
+    this.id,
     required this.name,
     required this.category,
     this.badgeText = 'Obat Keras',
     required this.aturanPakai,
     required this.jumlahObat,
+    this.price = 50000,
   });
 }
 
 class ResepDokterData {
+  final String? id;
   final String rxNumber;
   final String status; // 'Belum Ditebus', 'Sudah Ditebus', 'Kadaluwarsa'
   final String tanggalTerbit;
@@ -38,6 +43,7 @@ class ResepDokterData {
   final List<ResepObatItem> medications;
 
   const ResepDokterData({
+    this.id,
     required this.rxNumber,
     required this.status,
     required this.tanggalTerbit,
@@ -50,6 +56,36 @@ class ResepDokterData {
     this.warningMessage,
     required this.medications,
   });
+
+  ResepDokterData copyWith({
+    String? id,
+    String? rxNumber,
+    String? status,
+    String? tanggalTerbit,
+    String? masaBerlaku,
+    String? doctorName,
+    String? doctorSpecialty,
+    String? doctorSip,
+    String? doctorImage,
+    String? mitraPharmacy,
+    String? warningMessage,
+    List<ResepObatItem>? medications,
+  }) {
+    return ResepDokterData(
+      id: id ?? this.id,
+      rxNumber: rxNumber ?? this.rxNumber,
+      status: status ?? this.status,
+      tanggalTerbit: tanggalTerbit ?? this.tanggalTerbit,
+      masaBerlaku: masaBerlaku ?? this.masaBerlaku,
+      doctorName: doctorName ?? this.doctorName,
+      doctorSpecialty: doctorSpecialty ?? this.doctorSpecialty,
+      doctorSip: doctorSip ?? this.doctorSip,
+      doctorImage: doctorImage ?? this.doctorImage,
+      mitraPharmacy: mitraPharmacy ?? this.mitraPharmacy,
+      warningMessage: warningMessage ?? this.warningMessage,
+      medications: medications ?? this.medications,
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -342,25 +378,10 @@ class _DetailResepScreenState extends State<DetailResepScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row Badges: No RX & Status
+          // Status Badge
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _badgeDark,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  _data.rxNumber,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
@@ -868,39 +889,12 @@ class _DetailResepScreenState extends State<DetailResepScreen> {
               ),
             ),
           ),
-
-        if (_data.status == 'Belum Ditebus') const SizedBox(height: 10),
-
-        // Button: Bagikan Salinan Resep (PDF) (Outlined)
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: () => _handleSharePdf(context),
-            icon: const Icon(Icons.share_outlined, color: _darkGreen, size: 20),
-            label: Text(
-              'Bagikan Salinan Resep (PDF)',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: _darkGreen,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: _darkGreen, width: 1.3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
 
-  void _handleTebusResep(BuildContext context) {
-    Navigator.push(
+  Future<void> _handleTebusResep(BuildContext context) async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => CheckoutResepScreen(
@@ -909,15 +903,9 @@ class _DetailResepScreenState extends State<DetailResepScreen> {
         ),
       ),
     );
-  }
-
-  void _handleSharePdf(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Salinan resep elektronik (${_data.rxNumber}.pdf) berhasil disiapkan.'),
-        backgroundColor: _darkGreen,
-      ),
-    );
+    if (result == true && mounted) {
+      Navigator.pop(context, true);
+    }
   }
 }
 

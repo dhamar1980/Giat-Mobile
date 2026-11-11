@@ -40,9 +40,10 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
 
-  int _activeResepCount = 2;
+  int _activeResepCount = 0;
   String _latestDoctorName = 'dr. Spesialis GIAT';
   bool _hasLoadedResep = false;
+  Map<String, dynamic>? _activeOrder;
 
   @override
   void initState() {
@@ -69,12 +70,31 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
           }
         }
         setState(() {
-          _activeResepCount = activeCount > 0 ? activeCount : list.length;
+          _activeResepCount = activeCount;
           if (latestDoc != null) _latestDoctorName = latestDoc;
           _hasLoadedResep = true;
         });
       }
     } catch (_) {}
+
+    try {
+      final orderRes = await PasienApiService().getRiwayatPembelian();
+      if (orderRes.success && orderRes.data != null && orderRes.data!.isNotEmpty && mounted) {
+        setState(() {
+          _activeOrder = Map<String, dynamic>.from(orderRes.data!.first as Map);
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _formatStatusPesanan(String raw) {
+    final s = raw.toLowerCase().trim();
+    if (s == 'menunggu_konfirmasi') return 'Menunggu Konfirmasi';
+    if (s == 'diproses') return 'Sedang Diproses';
+    if (s == 'dikirim') return 'Dalam Pengiriman';
+    if (s == 'selesai') return 'Pesanan Selesai';
+    if (s == 'dibatalkan') return 'Dibatalkan';
+    return raw.isNotEmpty ? raw : 'Sedang Diproses';
   }
 
   @override
@@ -776,6 +796,25 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
   // 4. STATUS PENGIRIMAN
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildStatusPengirimanSection() {
+    final orderNo = _activeOrder?['no_pesanan']?.toString() ??
+        _activeOrder?['order_id']?.toString() ??
+        '#G-9021';
+    final statusRaw = (_activeOrder?['status_pesanan'] ?? _activeOrder?['status'] ?? 'Sedang Diproses').toString();
+    final statusLabel = _formatStatusPesanan(statusRaw);
+    final tglStr = _activeOrder?['created_at'] != null
+        ? TimeUtils.formatDate(_activeOrder!['created_at'].toString(), useIndonesianMonth: true)
+        : '01 September 2026';
+
+    String itemStr = 'Kalsium Karbonat, Asam Folat';
+    if (_activeOrder?['items'] is List && (_activeOrder!['items'] as List).isNotEmpty) {
+      itemStr = (_activeOrder!['items'] as List)
+          .map((i) => (i is Map ? (i['nama_obat'] ?? i['nama'] ?? 'Obat') : 'Obat').toString())
+          .join(', ');
+    }
+    final apotekStr = _activeOrder?['nama_apotek']?.toString() ??
+        (_activeOrder?['apotek'] is Map ? _activeOrder!['apotek']['nama']?.toString() : null) ??
+        'Apotek Mitra GIAT Pasteur';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -876,7 +915,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Text(
-                                      '#G-9021',
+                                      orderNo,
                                       style: GoogleFonts.inter(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w800,
@@ -890,7 +929,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        'Sedang Diproses',
+                                        statusLabel,
                                         style: GoogleFonts.inter(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w700,
@@ -911,7 +950,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                                     ),
                                     children: [
                                       TextSpan(
-                                        text: '01 September 2026',
+                                        text: tglStr,
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
@@ -932,7 +971,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                                     ),
                                     children: [
                                       TextSpan(
-                                        text: 'Kalsium Karbonat, Asam Folat',
+                                        text: itemStr,
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
@@ -953,7 +992,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                                     ),
                                     children: [
                                       TextSpan(
-                                        text: 'Apotek Mitra GIAT Pasteur',
+                                        text: apotekStr,
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
@@ -1077,14 +1116,23 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
   }
 
   void _openLacakObatScreen(BuildContext context) {
+    final orderId = _activeOrder?['no_pesanan']?.toString() ??
+        _activeOrder?['order_id']?.toString() ??
+        '#G-9021';
+    final pesananUuid = _activeOrder?['id']?.toString();
+    final status = _activeOrder != null
+        ? _formatStatusPesanan(_activeOrder!['status_pesanan']?.toString() ?? _activeOrder!['status']?.toString() ?? 'Sedang Diproses')
+        : 'Sedang Diproses';
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => LacakObatScreen(
           userName: widget.userName,
-          orderId: '#G-9021',
+          orderId: orderId,
+          pesananId: pesananUuid,
           estimasiTiba: 'Hari ini, 15:30 ${TimeUtils.getTimeZoneName()}',
-          status: 'Sedang Diproses',
+          status: status,
         ),
       ),
     );

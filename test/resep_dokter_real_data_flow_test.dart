@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:giat/screens/dokter/models/dokter_models.dart';
 import 'package:giat/screens/dokter/resep/dokter_review_resep_sheet.dart';
-import 'package:giat/screens/pasien/obat/detail_resep_screen.dart';
 import 'package:giat/screens/pasien/obat/resep_dokter_screen.dart';
 import 'package:giat/screens/pasien/obat/daftar_obat_screen.dart';
 
@@ -54,7 +53,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Resep Dokter'), findsWidgets);
-    expect(find.text('Lihat Detail Resep'), findsWidgets);
+    expect(find.text('Belum ada resep dokter aktif.'), findsOneWidget);
   });
 
   testWidgets('DaftarObatScreen renders Resep Saya section with active count', (tester) async {

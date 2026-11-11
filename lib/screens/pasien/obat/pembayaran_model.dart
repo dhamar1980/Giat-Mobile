@@ -21,6 +21,7 @@ class OrderCheckoutData {
   final String? redirectUrl;
   final String statusPembayaran;
   final String statusPesanan;
+  final List<Map<String, dynamic>>? items;
 
   const OrderCheckoutData({
     this.idPesanan,
@@ -33,14 +34,15 @@ class OrderCheckoutData {
     this.virtualAccountNumber = '8077 0812 3456 7890',
     this.transactionTime = '01 Sept 2026, 14:32 WIB',
     this.pickupMethod = 'Antar ke Alamat',
-    this.recipientName = 'Budi Santoso',
-    this.recipientPhone = '(+62 812-3456-7890)',
+    this.recipientName = 'Pasien',
+    this.recipientPhone = '0812-3456-7891',
     this.recipientAddress = 'Jl. Kalimantan No. 37, Sumbersari, Jember, Jawa Timur 68121',
     this.estimatedArrival = 'Hari ini, 16:30 - 17:00 WIB',
     this.snapToken,
     this.redirectUrl,
     this.statusPembayaran = 'menunggu_pembayaran',
     this.statusPesanan = 'menunggu_konfirmasi',
+    this.items,
   });
 
   OrderCheckoutData copyWith({
@@ -62,6 +64,7 @@ class OrderCheckoutData {
     String? redirectUrl,
     String? statusPembayaran,
     String? statusPesanan,
+    List<Map<String, dynamic>>? items,
   }) {
     return OrderCheckoutData(
       idPesanan: idPesanan ?? this.idPesanan,
@@ -82,6 +85,7 @@ class OrderCheckoutData {
       redirectUrl: redirectUrl ?? this.redirectUrl,
       statusPembayaran: statusPembayaran ?? this.statusPembayaran,
       statusPesanan: statusPesanan ?? this.statusPesanan,
+      items: items ?? this.items,
     );
   }
 }

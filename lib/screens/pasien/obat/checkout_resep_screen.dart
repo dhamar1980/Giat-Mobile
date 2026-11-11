@@ -10,6 +10,7 @@ import 'pembayaran_qris_screen.dart';
 import 'pembayaran_transfer_bank_screen.dart';
 import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/storage_service.dart';
 import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,12 +53,65 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
   String? _activeRedirectUrl;
 
   // Patient address state
-  String _recipientName = 'Budi Santoso';
-  String _recipientPhone = '(+62 812-3456-7890)';
+  String _recipientName = 'Pasien';
+  String _recipientPhone = '0812-3456-7891';
   String _recipientAddress = 'Jl. Kalimantan No. 37, Sumbersari, Jember, Jawa Timur 68121';
 
-  // Pricing constants
-  final int _subtotalObat = 770000;
+  @override
+  void initState() {
+    super.initState();
+    if (widget.userName.isNotEmpty && widget.userName != 'Pasien') {
+      _recipientName = widget.userName;
+    }
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final user = await StorageService().getUser();
+      if (user != null && mounted) {
+        setState(() {
+          if (user.nama.isNotEmpty) _recipientName = user.nama;
+          if (user.noHp != null && user.noHp!.isNotEmpty) _recipientPhone = user.noHp!;
+          if (user.alamat != null && user.alamat!.isNotEmpty) _recipientAddress = user.alamat!;
+        });
+      }
+      final profileRes = await PasienApiService().getProfile();
+      if (profileRes.success && profileRes.data != null && mounted) {
+        final d = profileRes.data!;
+        setState(() {
+          if (d['nama'] != null && d['nama'].toString().isNotEmpty) {
+            _recipientName = d['nama'].toString();
+          }
+          if (d['no_hp'] != null && d['no_hp'].toString().isNotEmpty) {
+            _recipientPhone = d['no_hp'].toString();
+          }
+          if (d['alamat'] != null && d['alamat'].toString().isNotEmpty) {
+            _recipientAddress = d['alamat'].toString();
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  // Pricing constants & dynamic calculation
+  int get _subtotalObat {
+    if (widget.resepData != null && widget.resepData!.medications.isNotEmpty) {
+      return widget.resepData!.medications.fold<int>(
+        0,
+        (sum, m) => sum + (m.price > 0 ? m.price : 50000),
+      );
+    }
+    if (widget.cartItems != null && widget.cartItems!.isNotEmpty) {
+      return widget.cartItems!.fold<int>(0, (sum, ci) {
+        final p = int.tryParse(ci['harga']?.toString() ?? '') ?? 50000;
+        final q = int.tryParse(ci['jumlah']?.toString() ?? '') ?? 1;
+        return sum + (p * q);
+      });
+    }
+    return 50000;
+  }
+
   final int _biayaLayanan = 2000;
   int get _biayaPengiriman => _metodePengambilan == 'antar' ? 15000 : 0;
   int get _totalPembayaran => _subtotalObat + _biayaPengiriman + _biayaLayanan;
@@ -522,6 +576,15 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
   // SECTION 5: PESANAN OBAT
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildPesananObatSection() {
+    final int jenisCount;
+    if (widget.resepData != null && widget.resepData!.medications.isNotEmpty) {
+      jenisCount = widget.resepData!.medications.length;
+    } else if (widget.cartItems != null && widget.cartItems!.isNotEmpty) {
+      jenisCount = widget.cartItems!.length;
+    } else {
+      jenisCount = 1;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -543,7 +606,7 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
-                '2 Jenis Obat',
+                '$jenisCount Jenis Obat',
                 style: GoogleFonts.inter(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -581,21 +644,32 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
 
         const SizedBox(height: 12),
 
-        // Medication Card 1: Ketosteril Tablet
-        _buildCheckoutMedicationCard(
-          name: 'Ketostreil Tablet',
-          dosageInstruction: '3x sehari sesudah makan • 100 tablet',
-          priceStr: 'Rp. 650.000,00',
-        ),
-
-        const SizedBox(height: 12),
-
-        // Medication Card 2: Candesartan 8mg
-        _buildCheckoutMedicationCard(
-          name: 'Candesartan 8mg',
-          dosageInstruction: '1x sehari pagi hari • 30 tablet',
-          priceStr: 'Rp. 120.000,00',
-        ),
+        if (widget.resepData != null && widget.resepData!.medications.isNotEmpty) ...[
+          for (final med in widget.resepData!.medications) ...[
+            _buildCheckoutMedicationCard(
+              name: med.name,
+              dosageInstruction: '${med.aturanPakai} • ${med.jumlahObat}',
+              priceStr: _formatCurrency(med.price > 0 ? med.price : 50000),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ] else if (widget.cartItems != null && widget.cartItems!.isNotEmpty) ...[
+          for (final ci in widget.cartItems!) ...[
+            _buildCheckoutMedicationCard(
+              name: (ci['nama'] ?? ci['nama_obat'] ?? 'Obat').toString(),
+              dosageInstruction: '${ci['aturan_pakai'] ?? 'Sesuai aturan'} • ${ci['jumlah'] ?? 1} unit',
+              priceStr: _formatCurrency(int.tryParse(ci['harga']?.toString() ?? '') ?? 50000),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ] else ...[
+          _buildCheckoutMedicationCard(
+            name: 'Obat Terapi Ginjal',
+            dosageInstruction: 'Sesuai petunjuk dokter • 30 tablet',
+            priceStr: _formatCurrency(50000),
+          ),
+          const SizedBox(height: 12),
+        ],
       ],
     );
   }
@@ -1349,12 +1423,38 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
 
         Map<String, dynamic>? createdData;
 
-        // A. Coba POST /api/pasien/obat/checkout dengan "mode": "snap"
-        if (resolvedItems.isNotEmpty) {
+        // A. Jika dari resep, dahulukan POST /api/pasien/obat/beli-resep dengan resep asli
+        if (widget.resepData != null) {
+          final cleanRx = widget.resepData!.id ?? rxNumber.replaceAll('No.', '').trim();
+          final resepRes = await PasienApiService().beliObatResep({
+            'id_resep': cleanRx,
+            'resep_id': cleanRx,
+            if (validApotekId != null && validApotekId.isNotEmpty)
+              'id_apotek': validApotekId,
+            'alamat_pengiriman': _recipientAddress,
+            'nama_penerima': _recipientName,
+            'no_hp_penerima': _recipientPhone,
+            'metode_pengambilan': _metodePengambilan,
+            'metode_pembayaran': 'midtrans_snap',
+            'mode': 'snap',
+            'subtotal': _subtotalObat,
+            'ongkos_kirim': _biayaPengiriman,
+            'total_bayar': _totalPembayaran,
+          });
+          if (resepRes.success && resepRes.data != null) {
+            createdData = resepRes.data;
+          }
+        }
+
+        // B. Coba POST /api/pasien/obat/checkout jika dari keranjang atau belum ada createdData
+        if (createdData == null && resolvedItems.isNotEmpty) {
           final checkoutPayload = <String, dynamic>{
             if (validApotekId != null && validApotekId.isNotEmpty)
               'id_apotek': validApotekId,
             'alamat_pengiriman': _recipientAddress,
+            'nama_penerima': _recipientName,
+            'no_hp_penerima': _recipientPhone,
+            'metode_pengambilan': _metodePengambilan,
             'metode_pembayaran': 'midtrans_snap',
             'mode': 'snap',
             'items': resolvedItems,
@@ -1363,23 +1463,6 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
               await PasienApiService().checkoutObat(checkoutPayload);
           if (checkoutRes.success && checkoutRes.data != null) {
             createdData = checkoutRes.data;
-          }
-        }
-
-        // B. Jika dari resep & checkout belum menghasilkan data, coba POST /api/pasien/obat/beli-resep
-        if (createdData == null && widget.resepData != null) {
-          final cleanRx = rxNumber.replaceAll('No.', '').trim();
-          final resepRes = await PasienApiService().beliObatResep({
-            'id_resep': cleanRx,
-            'resep_id': cleanRx,
-            if (validApotekId != null && validApotekId.isNotEmpty)
-              'id_apotek': validApotekId,
-            'alamat_pengiriman': _recipientAddress,
-            'metode_pembayaran': 'midtrans_snap',
-            'mode': 'snap',
-          });
-          if (resepRes.success && resepRes.data != null) {
-            createdData = resepRes.data;
           }
         }
 
@@ -1392,6 +1475,9 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
               'id_apotek': validApotekId,
             'jumlah': firstItem['jumlah'] ?? 1,
             'alamat_pengiriman': _recipientAddress,
+            'nama_penerima': _recipientName,
+            'no_hp_penerima': _recipientPhone,
+            'metode_pengambilan': _metodePengambilan,
             'metode_pembayaran': 'midtrans_snap',
             'mode': 'snap',
           });
@@ -1460,6 +1546,45 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
       vaBankId: _selectedVaBank,
     );
 
+    final List<Map<String, dynamic>> orderItemsList = [];
+    if (widget.resepData != null && widget.resepData!.medications.isNotEmpty) {
+      for (final m in widget.resepData!.medications) {
+        orderItemsList.add({
+          'nama_obat': m.name,
+          'aturan_pakai': '${m.aturanPakai} • ${m.jumlahObat}',
+          'dosage': m.aturanPakai,
+          'jumlah': m.jumlahObat,
+          'harga_satuan': m.price > 0 ? m.price : 50000,
+          'subtotal': m.price > 0 ? m.price : 50000,
+          'harga_formatted': _formatCurrency(m.price > 0 ? m.price : 50000),
+        });
+      }
+    } else if (widget.cartItems != null && widget.cartItems!.isNotEmpty) {
+      for (final ci in widget.cartItems!) {
+        final p = int.tryParse(ci['harga']?.toString() ?? '') ?? 50000;
+        final q = int.tryParse(ci['jumlah']?.toString() ?? '') ?? 1;
+        orderItemsList.add({
+          'nama_obat': (ci['nama'] ?? ci['nama_obat'] ?? 'Obat').toString(),
+          'aturan_pakai': (ci['aturan_pakai'] ?? 'Sesuai aturan').toString(),
+          'dosage': (ci['aturan_pakai'] ?? 'Sesuai aturan').toString(),
+          'jumlah': '$q unit',
+          'harga_satuan': p,
+          'subtotal': p * q,
+          'harga_formatted': _formatCurrency(p * q),
+        });
+      }
+    } else {
+      orderItemsList.add({
+        'nama_obat': 'Obat Terapi Ginjal',
+        'aturan_pakai': 'Sesuai petunjuk dokter • 30 tablet',
+        'dosage': 'Sesuai petunjuk dokter',
+        'jumlah': '30 tab',
+        'harga_satuan': 50000,
+        'subtotal': 50000,
+        'harga_formatted': _formatCurrency(50000),
+      });
+    }
+
     final orderData = OrderCheckoutData(
       idPesanan: idPesanan,
       orderNumber: noPesanan ??
@@ -1484,6 +1609,7 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
       snapToken: snapToken,
       redirectUrl: resolvedUrl,
       statusPembayaran: 'menunggu_pembayaran',
+      items: orderItemsList,
     );
 
     // 3. Jika redirect_url Midtrans Snap tersedia, buka MidtransPaymentWebViewPage
@@ -1553,8 +1679,15 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
             orderData.statusPesanan,
       );
 
-      // 5. Jika status_pembayaran == 'lunas', arahkan pasien ke halaman Detail / Lacak Pesanan Obat
+      // 5. Jika status_pembayaran == 'lunas', tandai resep dokter sudah ditebus & arahkan pasien ke Lacak Obat
       if (isLunas) {
+        if (widget.resepData != null) {
+          final cleanRx = widget.resepData!.id ?? rxNumber.replaceAll('No.', '').trim();
+          await PasienApiService().markResepDitebus(cleanRx);
+        }
+
+        if (!mounted) return;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -1575,6 +1708,7 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
             builder: (_) => LacakObatScreen(
               userName: widget.userName,
               orderData: updatedOrderData,
+              pesananId: idPesanan,
             ),
           ),
         );

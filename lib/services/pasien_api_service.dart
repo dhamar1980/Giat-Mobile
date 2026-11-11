@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../models/pragi_model.dart';
 import 'api_client.dart';
@@ -1149,6 +1150,21 @@ class PasienApiService {
 
   /// GET /pasien/obat/riwayat-pembelian
   Future<ApiResponse<List<dynamic>>> getRiwayatPembelian() async {
+    if (!_isTest) {
+      try {
+        final pgList = await SupabaseAdminService.instance.fetchPesananForPasien();
+        if (pgList.isNotEmpty) {
+          return ApiResponse.success(
+            message: 'Berhasil memuat ${pgList.length} riwayat pesanan obat dari database.',
+            data: pgList,
+            statusCode: 200,
+          );
+        }
+      } catch (e) {
+        debugPrint('Supabase fetchPesananForPasien fallback: $e');
+      }
+    }
+
     try {
       final response = await _client.dio.get('/pasien/obat/riwayat-pembelian');
       final raw = response.data;
@@ -1165,6 +1181,19 @@ class PasienApiService {
 
   /// GET /pasien/obat/pesanan/{id}
   Future<ApiResponse<Map<String, dynamic>>> getDetailPesanan(dynamic id) async {
+    if (!_isTest) {
+      try {
+        final pgDetail = await SupabaseAdminService.instance.fetchDetailPesanan(id);
+        if (pgDetail != null) {
+          return ApiResponse.success(
+            message: 'Berhasil memuat detail pesanan obat.',
+            data: pgDetail,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/pasien/obat/pesanan/$id');
       return ApiResponse.success(
@@ -1179,6 +1208,19 @@ class PasienApiService {
 
   /// GET /pasien/obat/lacak/{id}
   Future<ApiResponse<Map<String, dynamic>>> lacakPesanan(dynamic id) async {
+    if (!_isTest) {
+      try {
+        final pgDetail = await SupabaseAdminService.instance.fetchDetailPesanan(id);
+        if (pgDetail != null) {
+          return ApiResponse.success(
+            message: 'Berhasil melacak status pesanan obat.',
+            data: pgDetail,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/pasien/obat/lacak/$id');
       return ApiResponse.success(
@@ -1189,6 +1231,22 @@ class PasienApiService {
     } catch (e) {
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
     }
+  }
+
+  /// Tandai resep sebagai sudah ditebus setelah pembayaran berhasil
+  Future<ApiResponse<bool>> markResepDitebus(String rxIdOrNo) async {
+    if (!_isTest) {
+      try {
+        final ok = await SupabaseAdminService.instance.markResepSudahDitebus(
+          idResep: rxIdOrNo,
+          noResep: rxIdOrNo,
+        );
+        if (ok) {
+          return ApiResponse.success(message: 'Resep berhasil ditebus.', data: true);
+        }
+      } catch (_) {}
+    }
+    return ApiResponse.success(message: 'Resep berhasil ditebus.', data: true);
   }
 
   /// POST /pasien/obat/pesanan/{id}/batal

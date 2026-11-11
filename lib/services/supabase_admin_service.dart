@@ -2119,6 +2119,198 @@ class SupabaseAdminService {
     return result;
   }
 
+  /// Memperbarui status resep menjadi 'sudah_ditebus' setelah pembayaran berhasil
+  Future<bool> markResepSudahDitebus({String? idResep, String? noResep}) async {
+    final cleanId = (idResep ?? '').trim().replaceAll('No.', '').trim();
+    final cleanNo = (noResep ?? '').trim().replaceAll('No.', '').trim();
+    if (cleanId.isEmpty && cleanNo.isEmpty) return false;
+
+    try {
+      await _exec(
+        '''
+        UPDATE resep
+        SET status = 'sudah_ditebus',
+            updated_at = NOW()
+        WHERE TRIM(id) = @cleanId 
+           OR TRIM(no_resep) = @cleanNo 
+           OR TRIM(no_resep) = @cleanId
+           OR TRIM(id) = @cleanNo
+        ''',
+        parameters: {
+          'cleanId': cleanId,
+          'cleanNo': cleanNo,
+        },
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error markResepSudahDitebus: $e');
+      return false;
+    }
+  }
+
+  /// Mengambil daftar pesanan obat pasien beserta rincian itemnya dari Supabase
+  Future<List<Map<String, dynamic>>> fetchPesananForPasien({String? pasienId}) async {
+    final pid = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (pid == null) return [];
+
+    try {
+      final rows = await _exec(
+        '''
+        SELECT 
+          TRIM(p.id) AS id,
+          p.no_pesanan,
+          TRIM(p.id_pasien) AS id_pasien,
+          TRIM(p.id_apotek) AS id_apotek,
+          TRIM(p.id_resep) AS id_resep,
+          p.tipe_pesanan,
+          p.metode_pengambilan,
+          p.nama_penerima,
+          p.no_hp_penerima,
+          p.alamat_pengiriman,
+          p.subtotal,
+          p.ongkos_kirim,
+          p.total_bayar,
+          p.metode_pembayaran,
+          p.status_pembayaran,
+          p.progress_step,
+          p.status_pesanan,
+          p.created_at::text AS created_at,
+          p.updated_at::text AS updated_at,
+          p.snap_token,
+          p.redirect_url,
+          COALESCE(a.nama_apotek, 'Apotek Mitra GIAT') AS nama_apotek,
+          a.alamat AS alamat_apotek
+        FROM pesanan_obat p
+        LEFT JOIN apotek a ON TRIM(a.id_apotek) = TRIM(p.id_apotek)
+        WHERE TRIM(p.id_pasien) = @id
+        ORDER BY p.created_at DESC
+        ''',
+        parameters: {'id': pid},
+      );
+
+      final List<Map<String, dynamic>> result = [];
+      for (var row in rows) {
+        final map = _normalizeMap(row.toColumnMap());
+        final pId = map['id']?.toString().trim();
+        if (pId != null && pId.isNotEmpty) {
+          final itemRows = await _exec(
+            '''
+            SELECT 
+              TRIM(id) AS id,
+              TRIM(id_pesanan) AS id_pesanan,
+              TRIM(id_obat) AS id_obat,
+              nama_obat,
+              jumlah,
+              harga_satuan,
+              subtotal
+            FROM pesanan_obat_items
+            WHERE TRIM(id_pesanan) = @pId
+            ORDER BY created_at ASC
+            ''',
+            parameters: {'pId': pId},
+          );
+          map['items'] = itemRows.map((ir) => _normalizeMap(ir.toColumnMap())).toList();
+        } else {
+          map['items'] = <Map<String, dynamic>>[];
+        }
+        map['id_pembelian'] = map['id'];
+        map['total_harga'] = map['total_bayar'];
+        map['tipe_pembelian'] = map['tipe_pesanan'];
+        map['apotek'] = {
+          'id': map['id_apotek'],
+          'nama': map['nama_apotek'],
+          'nama_apotek': map['nama_apotek'],
+          'alamat': map['alamat_apotek'],
+        };
+        result.add(map);
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Error fetchPesananForPasien: $e');
+      return [];
+    }
+  }
+
+  /// Mengambil detail pesanan obat spesifik dari Supabase
+  Future<Map<String, dynamic>?> fetchDetailPesanan(dynamic idPesanan) async {
+    final searchId = idPesanan?.toString().trim() ?? '';
+    if (searchId.isEmpty) return null;
+
+    try {
+      final rows = await _exec(
+        '''
+        SELECT 
+          TRIM(p.id) AS id,
+          p.no_pesanan,
+          TRIM(p.id_pasien) AS id_pasien,
+          TRIM(p.id_apotek) AS id_apotek,
+          TRIM(p.id_resep) AS id_resep,
+          p.tipe_pesanan,
+          p.metode_pengambilan,
+          p.nama_penerima,
+          p.no_hp_penerima,
+          p.alamat_pengiriman,
+          p.subtotal,
+          p.ongkos_kirim,
+          p.total_bayar,
+          p.metode_pembayaran,
+          p.status_pembayaran,
+          p.progress_step,
+          p.status_pesanan,
+          p.created_at::text AS created_at,
+          p.updated_at::text AS updated_at,
+          p.snap_token,
+          p.redirect_url,
+          COALESCE(a.nama_apotek, 'Apotek Mitra GIAT') AS nama_apotek,
+          a.alamat AS alamat_apotek
+        FROM pesanan_obat p
+        LEFT JOIN apotek a ON TRIM(a.id_apotek) = TRIM(p.id_apotek)
+        WHERE TRIM(p.id) = @searchId OR TRIM(p.no_pesanan) = @searchId
+        LIMIT 1
+        ''',
+        parameters: {'searchId': searchId},
+      );
+
+      if (rows.isEmpty) return null;
+      final map = _normalizeMap(rows.first.toColumnMap());
+      final pId = map['id']?.toString().trim();
+      if (pId != null && pId.isNotEmpty) {
+        final itemRows = await _exec(
+          '''
+          SELECT 
+            TRIM(id) AS id,
+            TRIM(id_pesanan) AS id_pesanan,
+            TRIM(id_obat) AS id_obat,
+            nama_obat,
+            jumlah,
+            harga_satuan,
+            subtotal
+          FROM pesanan_obat_items
+          WHERE TRIM(id_pesanan) = @pId
+          ORDER BY created_at ASC
+          ''',
+          parameters: {'pId': pId},
+        );
+        map['items'] = itemRows.map((ir) => _normalizeMap(ir.toColumnMap())).toList();
+      } else {
+        map['items'] = <Map<String, dynamic>>[];
+      }
+      map['id_pembelian'] = map['id'];
+      map['total_harga'] = map['total_bayar'];
+      map['tipe_pembelian'] = map['tipe_pesanan'];
+      map['apotek'] = {
+        'id': map['id_apotek'],
+        'nama': map['nama_apotek'],
+        'nama_apotek': map['nama_apotek'],
+        'alamat': map['alamat_apotek'],
+      };
+      return map;
+    } catch (e) {
+      debugPrint('Error fetchDetailPesanan: $e');
+      return null;
+    }
+  }
+
   bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
 
   /// Mengambil data resep obat untuk konsultasi tertentu (beserta rincian item obat)

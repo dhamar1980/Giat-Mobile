@@ -6,6 +6,7 @@ import '../widgets/midtrans_payment_webview_page.dart';
 import 'pembayaran_model.dart';
 import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/storage_service.dart';
 import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,6 +49,12 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
   String? _redirectUrl;
   bool _isCheckingPayment = false;
 
+  String _recipientName = 'Pasien';
+  String _recipientPhone = '0812-3456-7891';
+  String _recipientAddress = 'Jl. Kalimantan No. 37, Sumbersari, Jember, Jawa Timur 68121';
+  String _namaApotek = 'Apotek Mitra GIAT';
+  List<Map<String, dynamic>> _orderItems = [];
+
   @override
   void initState() {
     super.initState();
@@ -61,9 +68,52 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
     _snapToken = widget.orderData?.snapToken;
     _redirectUrl = widget.orderData?.redirectUrl;
 
+    if (widget.orderData?.recipientName != null &&
+        widget.orderData!.recipientName.isNotEmpty &&
+        widget.orderData!.recipientName != 'Pasien') {
+      _recipientName = widget.orderData!.recipientName;
+    } else if (widget.userName.isNotEmpty && widget.userName != 'Pasien') {
+      _recipientName = widget.userName;
+    }
+
+    if (widget.orderData?.recipientPhone != null &&
+        widget.orderData!.recipientPhone.isNotEmpty) {
+      _recipientPhone = widget.orderData!.recipientPhone;
+    }
+
+    if (widget.orderData?.recipientAddress != null &&
+        widget.orderData!.recipientAddress.isNotEmpty) {
+      _recipientAddress = widget.orderData!.recipientAddress;
+    }
+
+    if (widget.orderData?.items != null && widget.orderData!.items!.isNotEmpty) {
+      _orderItems = List<Map<String, dynamic>>.from(widget.orderData!.items!);
+    }
+
+    _loadInitialUserData();
+
     if (_pesananUuid != null && _pesananUuid!.isNotEmpty) {
       _syncPaymentAndTrackingStatus(silent: true);
     }
+  }
+
+  Future<void> _loadInitialUserData() async {
+    try {
+      final user = await StorageService().getUser();
+      if (user != null && mounted) {
+        setState(() {
+          if (_recipientName == 'Pasien' && user.nama.isNotEmpty) {
+            _recipientName = user.nama;
+          }
+          if (user.noHp != null && user.noHp!.isNotEmpty) {
+            _recipientPhone = user.noHp!;
+          }
+          if (user.alamat != null && user.alamat!.isNotEmpty) {
+            _recipientAddress = user.alamat!;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   String _formatStatusPesanan(String raw) {
@@ -122,6 +172,32 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
             ),
           );
         }
+      }
+
+      final detailRes = await PasienApiService().getDetailPesanan(id);
+      if (detailRes.success && detailRes.data != null && mounted) {
+        final det = detailRes.data!;
+        setState(() {
+          if (det['nama_penerima'] != null && det['nama_penerima'].toString().isNotEmpty) {
+            _recipientName = det['nama_penerima'].toString();
+          }
+          if (det['no_hp_penerima'] != null && det['no_hp_penerima'].toString().isNotEmpty) {
+            _recipientPhone = det['no_hp_penerima'].toString();
+          }
+          if (det['alamat_pengiriman'] != null && det['alamat_pengiriman'].toString().isNotEmpty) {
+            _recipientAddress = det['alamat_pengiriman'].toString();
+          }
+          if (det['nama_apotek'] != null && det['nama_apotek'].toString().isNotEmpty) {
+            _namaApotek = det['nama_apotek'].toString();
+          } else if (det['apotek'] is Map && det['apotek']['nama'] != null) {
+            _namaApotek = det['apotek']['nama'].toString();
+          }
+          if (det['items'] is List && (det['items'] as List).isNotEmpty) {
+            _orderItems = List<Map<String, dynamic>>.from(
+              (det['items'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+            );
+          }
+        });
       }
     } catch (e) {
       debugPrint('Sync status bayar obat notice: $e');
@@ -915,7 +991,7 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
                       style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
                     ),
                     Text(
-                      'Kimia Farma - Veteran Surabaya',
+                      _namaApotek,
                       style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
                     ),
                   ],
@@ -994,12 +1070,12 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            '${widget.userName} • 0812-3456-7890',
+            '$_recipientName • $_recipientPhone',
             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
           ),
           const SizedBox(height: 3),
           Text(
-            'Jl. Dharmahusada Indah No. 42, RT 02 / RW 05, Kel. Mulyorejo, Kec. Mulyorejo, Surabaya, Jawa Timur 60115',
+            _recipientAddress,
             style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w400, color: const Color(0xFF475569), height: 1.35),
           ),
           const SizedBox(height: 8),
@@ -1032,6 +1108,8 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
   // 6. RINCIAN OBAT YANG DIKIRIM CARD
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildRincianObatCard() {
+    final count = _orderItems.isNotEmpty ? _orderItems.length : 1;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -1064,19 +1142,51 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '2 Obat',
+                  '$count Obat',
                   style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _darkGreen),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _buildItemRow('Kalsium Karbonat 500mg', '30 tablet • 3x sehari', 'Rp. 45.000,00'),
-          const SizedBox(height: 10),
-          _buildItemRow('Asam Folat 1mg', '30 tablet • 1x sehari', 'Rp. 80.000,00'),
+          if (_orderItems.isNotEmpty) ...[
+            for (int i = 0; i < _orderItems.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              _buildItemRow(
+                (_orderItems[i]['nama_obat'] ?? _orderItems[i]['nama'] ?? 'Obat').toString(),
+                (_orderItems[i]['aturan_pakai'] ??
+                    _orderItems[i]['dosage'] ??
+                    '${_orderItems[i]['jumlah'] ?? 1} unit')
+                    .toString(),
+                _orderItems[i]['harga_formatted']?.toString() ??
+                    _formatCurrency((double.tryParse((_orderItems[i]['subtotal'] ?? _orderItems[i]['harga_satuan'] ?? 50000).toString()) ?? 50000).toInt()),
+              ),
+            ],
+          ] else ...[
+            _buildItemRow(
+              'Obat Terapi Ginjal',
+              'Sesuai petunjuk dokter • 30 tablet',
+              _formatCurrency(50000),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _formatCurrency(int amount) {
+    final str = amount.toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i != 0) {
+        buffer.write('.');
+      }
+    }
+    final reversed = buffer.toString().split('').reversed.join('');
+    return 'Rp. $reversed,00';
   }
 
   Widget _buildItemRow(String name, String dosage, String price) {
