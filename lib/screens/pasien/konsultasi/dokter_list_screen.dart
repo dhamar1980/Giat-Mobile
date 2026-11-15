@@ -13,6 +13,7 @@ import '../../../widgets/giat_header_style.dart';
 import '../../../services/konsultasi_api_service.dart';
 import '../../../utils/time_utils.dart';
 import '../../../config/api_config.dart';
+import '../../../widgets/app_top_action_pill.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI: DAFTAR DOKTER & KONSULTASI SAYA (Sesuai Desain Figma)
@@ -461,79 +462,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const AppBrandTitle(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Stack(
-                              children: [
-                                IconButton(
-                                  constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.all(5),
-                                  icon: const Icon(
-                                    Icons.notifications_none_rounded,
-                                    size: 24,
-                                    color: Color(0xFF1F2937),
-                                  ),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const PasienNotifikasiScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                Positioned(
-                                  right: 6,
-                                  top: 6,
-                                  child: Container(
-                                    width: 8.5,
-                                    height: 8.5,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFEF4444),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProfilePasienScreen(userName: widget.userName),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF044E2F),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      PasienTopActionPill(userName: widget.userName),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -630,9 +559,30 @@ class _DokterListScreenState extends State<DokterListScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // FILTER CHIPS (Horizontal Scrollable with Figma Badge)
+  // FILTER CHIPS (Horizontal Scrollable with Dynamic Real Badge)
   // ───────────────────────────────────────────────────────────────────────────
+  int get _upcomingConsultationsCount {
+    final upcomingRaw = _myConsultations.where((c) {
+      if (!_isPaidConsultation(c)) return false;
+      final status = (c['status'] ?? c['status_konsultasi'] ?? '').toString().toLowerCase();
+      return status != 'selesai' && status != 'dibatalkan' && status != 'cancelled';
+    }).toList();
+
+    final Set<String> seenUpcomingDoctors = {};
+    int count = 0;
+    for (final c in upcomingRaw) {
+      final docKey = _getConsultationDoctorKey(c);
+      if (!seenUpcomingDoctors.contains(docKey)) {
+        seenUpcomingDoctors.add(docKey);
+        count++;
+      }
+    }
+    return count;
+  }
+
   Widget _buildFilterChips() {
+    final upcomingCount = _upcomingConsultationsCount;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
@@ -677,18 +627,18 @@ class _DokterListScreenState extends State<DokterListScreen> {
                         color: isSelected ? Colors.white : const Color(0xFF334155),
                       ),
                     ),
-                    if (isKonsultasiSaya) ...[
+                    if (isKonsultasiSaya && upcomingCount > 0) ...[
                       const SizedBox(width: 6),
                       Container(
-                        width: 18,
-                        height: 18,
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                         alignment: Alignment.center,
                         decoration: const BoxDecoration(
                           color: Color(0xFFDC2626),
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
                         ),
                         child: Text(
-                          '1',
+                          upcomingCount > 9 ? '9+' : '$upcomingCount',
                           style: GoogleFonts.inter(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,

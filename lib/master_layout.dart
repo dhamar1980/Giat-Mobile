@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -7,7 +6,6 @@ import 'screens/pasien/konsultasi/dokter_list_screen.dart';
 import 'screens/pasien/pragi/pragi_home_view.dart';
 import 'screens/pasien/pantau/pantau_dashboard_screen.dart';
 import 'screens/pasien/obat/daftar_obat_screen.dart';
-import 'screens/pasien/profile/profile_pasien_screen.dart';
 import 'screens/pasien/widgets/pasien_bottom_navbar.dart';
 import 'widgets/giat_background.dart';
 import 'widgets/app_brand_title.dart';
@@ -17,7 +15,7 @@ import 'services/storage_service.dart';
 import 'screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
 import 'utils/time_utils.dart';
 import 'models/pasien_profile_state.dart';
-import 'config/api_config.dart';
+import 'widgets/app_top_action_pill.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER LAYOUT GIAT (Persistent TopBar, Content Switcher, & Navbar)
@@ -220,7 +218,6 @@ class _MasterLayoutState extends State<MasterLayout> {
   // TOPBAR (Hanya di pojok kanan: Notifikasi di kiri, Profil di kanan, Transparan)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildTopBar() {
-    final hasUnread = _notifications.any((n) => n['isRead'] == false);
     final showBrandTitle = _currentIndex != 2; // Hide only on PRAGI (tab 2) which has light bg
 
     return Padding(
@@ -235,130 +232,19 @@ class _MasterLayoutState extends State<MasterLayout> {
           else
             const SizedBox.shrink(),
 
-          // 2. Kapsul Notifikasi & Profil (Ukuran asli yang proporsional & nyaman dilihat)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+          // 2. Kapsul Notifikasi & Profil (Konsisten)
+          PasienTopActionPill(
+            userName: widget.userName,
+            onNotificationTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PasienNotifikasiScreen(),
                 ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // 1. Notifikasi (Lonceng di sisi kiri)
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.all(5),
-                      icon: const Icon(
-                        Icons.notifications_none_rounded,
-                        size: 24,
-                        color: Color(0xFF1F2937),
-                      ),
-                      tooltip: 'Notifikasi',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PasienNotifikasiScreen(),
-                          ),
-                        ).then((_) {
-                          if (mounted) _fetchNotificationState();
-                        });
-                      },
-                    ),
-                    if (_unreadCount > 0 || hasUnread)
-                      Positioned(
-                        right: 2,
-                        top: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFEF4444),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              _unreadCount > 9 ? '9+' : (_unreadCount > 0 ? '$_unreadCount' : ''),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-
-                // 2. Profil Pasien (Avatar di sisi kanan)
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                       context,
-                       MaterialPageRoute(
-                         builder: (_) => ProfilePasienScreen(userName: widget.userName),
-                       ),
-                    );
-                  },
-                  child: ListenableBuilder(
-                    listenable: PasienProfileState.instance,
-                    builder: (context, _) {
-                      final rawAvatar = PasienProfileState.instance.avatarPath;
-                      final resolved = ApiConfig.resolveImageUrl(rawAvatar);
-                      final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
-                      return Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF044E2F),
-                          shape: BoxShape.circle,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: hasPhoto
-                            ? (resolved.startsWith('http')
-                                ? Image.network(
-                                    resolved,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.person_rounded,
-                                      size: 22,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : Image.file(
-                                    File(resolved),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.person_rounded,
-                                      size: 22,
-                                      color: Colors.white,
-                                    ),
-                                  ))
-                            : const Icon(
-                                Icons.person_rounded,
-                                size: 22,
-                                color: Colors.white,
-                              ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+              ).then((_) {
+                if (mounted) _fetchNotificationState();
+              });
+            },
           ),
         ],
       ),

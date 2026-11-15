@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../services/apotek_api_service.dart';
 import '../models/apotek_models.dart';
-import '../notifikasi/apotek_notifikasi_screen.dart';
-import '../profile/apotek_profile_screen.dart';
+import '../../../widgets/app_top_action_pill.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DETAIL OBAT & TAMBAH STOK APOTEK (Revisi Sesuai Screenshot 1 & 2)
@@ -172,7 +171,6 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
   @override
   Widget build(BuildContext context) {
     final med = widget.medicine;
-    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
       backgroundColor: _bgColor,
@@ -232,80 +230,8 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
                       ),
 
                       // Action Pill (Bell & Profile)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Stack(
-                              children: [
-                                IconButton(
-                                  constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.all(4),
-                                  icon: const Icon(
-                                    Icons.notifications_none_rounded,
-                                    size: 22,
-                                    color: Color(0xFF1F2937),
-                                  ),
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const ApotekNotifikasiScreen(),
-                                      ),
-                                    ).then((_) => setState(() {}));
-                                  },
-                                ),
-                                if (unreadNotifs > 0)
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFDC2626),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                if (widget.onOpenProfile != null) {
-                                  widget.onOpenProfile!();
-                                } else {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const ApotekProfileScreen(showBackButton: true),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF044E2F),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
+                      ApotekTopActionPill(
+                        onProfileTap: widget.onOpenProfile,
                       ),
                     ],
                   ),

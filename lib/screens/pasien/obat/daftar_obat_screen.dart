@@ -13,6 +13,7 @@ import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
 import '../../../utils/time_utils.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../widgets/app_top_action_pill.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN OBAT & RESEP PASIEN (Figma Screen: Tab Obat Pasien)
@@ -65,8 +66,12 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
             if (status == 'aktif' || status == 'belum ditebus' || status == 'belum_ditebus') {
               activeCount++;
             }
-            if (latestDoc == null && item['nama_dokter'] != null) {
-              latestDoc = item['nama_dokter'].toString();
+            if (latestDoc == null) {
+              if (item['nama_dokter'] != null && item['nama_dokter'].toString().isNotEmpty) {
+                latestDoc = item['nama_dokter'].toString();
+              } else if (item['dokter'] is Map && item['dokter']['nama'] != null) {
+                latestDoc = item['dokter']['nama'].toString();
+              }
             }
           }
         }
@@ -228,64 +233,7 @@ class _DaftarObatScreenState extends State<DaftarObatScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const AppBrandTitle(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(5),
-                              icon: const Icon(
-                                Icons.notifications_none_rounded,
-                                size: 24,
-                                color: Color(0xFF1F2937),
-                              ),
-                              tooltip: 'Notifikasi',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PasienNotifikasiScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const ProfilePasienScreen(),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF044E2F),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      PasienTopActionPill(userName: widget.userName),
                     ],
                   ),
                   const SizedBox(height: 12),

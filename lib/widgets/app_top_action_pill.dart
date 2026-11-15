@@ -1,0 +1,420 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import '../config/api_config.dart';
+import '../models/pasien_profile_state.dart';
+import '../screens/dokter/models/dokter_models.dart';
+import '../screens/apotek/models/apotek_models.dart';
+import '../screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
+import '../screens/pasien/profile/profile_pasien_screen.dart';
+import '../screens/dokter/notifikasi/dokter_notifikasi_screen.dart';
+import '../screens/dokter/profile/dokter_profile_screen.dart';
+import '../screens/apotek/notifikasi/apotek_notifikasi_screen.dart';
+import '../screens/apotek/profile/apotek_profile_screen.dart';
+import '../services/reminder_notification_service.dart';
+import '../services/storage_service.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KAPSUL AKSI ATAS KONSISTEN (Notifikasi & Profil untuk Pasien, Dokter, Apotek)
+// Sesuai Desain Figma GIAT: Kapsul Putih, Shadow Halus, Lonceng & Avatar Bulat
+// ─────────────────────────────────────────────────────────────────────────────
+
+class PasienTopActionPill extends StatelessWidget {
+  final String userName;
+  final VoidCallback? onNotificationTap;
+  final VoidCallback? onProfileTap;
+  final Widget? customLeading;
+
+  const PasienTopActionPill({
+    super.key,
+    this.userName = 'Pasien',
+    this.onNotificationTap,
+    this.onProfileTap,
+    this.customLeading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 1. Notifikasi / Custom Leading (Lonceng atau Keranjang di sisi kiri)
+          if (customLeading != null)
+            customLeading!
+          else
+            ValueListenableBuilder<int>(
+              valueListenable: ReminderNotificationService.instance.unreadCountNotifier,
+              builder: (context, unreadCount, _) {
+              final effectiveCount = unreadCount > 0
+                  ? unreadCount
+                  : StorageService().getUnreadNotificationCount();
+
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(5),
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      size: 24,
+                      color: Color(0xFF1F2937),
+                    ),
+                    tooltip: 'Notifikasi',
+                    onPressed: onNotificationTap ??
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PasienNotifikasiScreen(),
+                            ),
+                          );
+                        },
+                  ),
+                  if (effectiveCount > 0)
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            effectiveCount > 9 ? '9+' : '$effectiveCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+
+          // 2. Profil Pasien (Avatar di sisi kanan)
+          GestureDetector(
+            onTap: onProfileTap ??
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfilePasienScreen(userName: userName),
+                    ),
+                  );
+                },
+            child: ListenableBuilder(
+              listenable: PasienProfileState.instance,
+              builder: (context, _) {
+                final rawAvatar = PasienProfileState.instance.avatarPath;
+                final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                final hasPhoto = resolved.isNotEmpty &&
+                    (resolved.startsWith('http') ||
+                        (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+
+                return Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF044E2F),
+                    shape: BoxShape.circle,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasPhoto
+                      ? (resolved.startsWith('http')
+                          ? Image.network(
+                              resolved,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Image.file(
+                              File(resolved),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                            ))
+                      : const Icon(
+                          Icons.person_rounded,
+                          size: 22,
+                          color: Colors.white,
+                        ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DokterTopActionPill extends StatelessWidget {
+  final String? doctorName;
+  final VoidCallback? onNotificationTap;
+  final VoidCallback? onProfileTap;
+
+  const DokterTopActionPill({
+    super.key,
+    this.doctorName,
+    this.onNotificationTap,
+    this.onProfileTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(5),
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              size: 24,
+              color: Color(0xFF1F2937),
+            ),
+            tooltip: 'Notifikasi',
+            onPressed: onNotificationTap ??
+                () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
+                  );
+                },
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onProfileTap ??
+                () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DokterProfileScreen(
+                        doctorName: doctorName ?? DokterProfileState.instance.doctorName,
+                        onLogout: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  );
+                },
+            child: ListenableBuilder(
+              listenable: DokterProfileState.instance,
+              builder: (context, _) {
+                final rawAvatar = DokterProfileState.instance.avatarUrl;
+                final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                final hasPhoto = resolved.isNotEmpty &&
+                    (resolved.startsWith('http') ||
+                        (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+
+                return Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF044E2F),
+                    shape: BoxShape.circle,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasPhoto
+                      ? (resolved.startsWith('http')
+                          ? Image.network(
+                              resolved,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Image.file(
+                              File(resolved),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                            ))
+                      : const Icon(
+                          Icons.person_rounded,
+                          size: 22,
+                          color: Colors.white,
+                        ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ApotekTopActionPill extends StatelessWidget {
+  final String? apotekerName;
+  final VoidCallback? onNotificationTap;
+  final VoidCallback? onProfileTap;
+
+  const ApotekTopActionPill({
+    super.key,
+    this.apotekerName,
+    this.onNotificationTap,
+    this.onProfileTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Stack(
+            children: [
+              IconButton(
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(5),
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  size: 24,
+                  color: Color(0xFF1F2937),
+                ),
+                tooltip: 'Notifikasi',
+                onPressed: onNotificationTap ??
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ApotekNotifikasiScreen()),
+                      );
+                    },
+              ),
+              if (unreadNotifs > 0)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    width: 8.5,
+                    height: 8.5,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFDC2626),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onProfileTap ??
+                () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ApotekProfileScreen(
+                        apotekerName: apotekerName ?? ApotekProfileState.instance.apotekerName,
+                        onLogout: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  );
+                },
+            child: ListenableBuilder(
+              listenable: ApotekProfileState.instance,
+              builder: (context, _) {
+                final rawAvatar = ApotekProfileState.instance.avatarPath;
+                final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                final hasPhoto = resolved.isNotEmpty &&
+                    (resolved.startsWith('http') ||
+                        (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+
+                return Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF044E2F),
+                    shape: BoxShape.circle,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasPhoto
+                      ? (resolved.startsWith('http')
+                          ? Image.network(
+                              resolved,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Image.file(
+                              File(resolved),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                            ))
+                      : const Icon(
+                          Icons.person_rounded,
+                          size: 22,
+                          color: Colors.white,
+                        ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

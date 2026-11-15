@@ -15,6 +15,7 @@ import '../../onboarding_screen.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
+import '../../widgets/app_top_action_pill.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/dokter_api_service.dart';
 import '../../utils/time_utils.dart';
@@ -428,92 +429,15 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           else
             const SizedBox.shrink(),
 
-          // 2. Kapsul Notifikasi & Profil (Ukuran asli yang proporsional)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                IconButton(
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(5),
-                  icon: const Icon(
-                    Icons.notifications_none_rounded,
-                    size: 24,
-                    color: Color(0xFF1F2937),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedIndex = 4;
-                      _isTopBarVisible = true;
-                    });
-                  },
-                  child: ListenableBuilder(
-                    listenable: DokterProfileState.instance,
-                    builder: (context, _) {
-                      final rawAvatar = DokterProfileState.instance.avatarUrl;
-                      final resolved = ApiConfig.resolveImageUrl(rawAvatar);
-                      final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
-                      return Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF044E2F),
-                          shape: BoxShape.circle,
-                        ),
-                        child: ClipOval(
-                          child: hasPhoto
-                              ? (resolved.startsWith('http')
-                                  ? Image.network(
-                                      resolved,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.person_rounded,
-                                        size: 22,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : Image.file(
-                                      File(resolved),
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.person_rounded,
-                                        size: 22,
-                                        color: Colors.white,
-                                      ),
-                                    ))
-                              : const Icon(
-                                  Icons.person_rounded,
-                                  size: 22,
-                                  color: Colors.white,
-                                ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+          // 2. Kapsul Notifikasi & Profil (Konsisten)
+          DokterTopActionPill(
+            doctorName: widget.doctorName,
+            onProfileTap: () {
+              setState(() {
+                _selectedIndex = 4;
+                _isTopBarVisible = true;
+              });
+            },
           ),
         ],
       ),

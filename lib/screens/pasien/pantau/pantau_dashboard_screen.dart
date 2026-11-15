@@ -9,6 +9,7 @@ import 'riwayat_pemantauan_screen.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
+import '../../../widgets/app_top_action_pill.dart';
 import '../../../services/pasien_api_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../utils/time_utils.dart';
@@ -559,94 +560,8 @@ class _PantauDashboardScreenState extends State<PantauDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const AppBrandTitle(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                IconButton(
-                                  constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.all(5),
-                                  icon: const Icon(
-                                    Icons.notifications_none_rounded,
-                                    size: 24,
-                                    color: Color(0xFF1F2937),
-                                  ),
-                                  tooltip: 'Notifikasi',
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const PasienNotifikasiScreen(),
-                                      ),
-                                    ).then((_) {
-                                      if (mounted) _fetchLivePantauData();
-                                    });
-                                  },
-                                ),
-                                if (_unreadCount > 0)
-                                  Positioned(
-                                    right: 2,
-                                    top: 2,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(3),
-                                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFEF4444),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          _unreadCount > 9 ? '9+' : '$_unreadCount',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProfilePasienScreen(userName: widget.userName),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF044E2F),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      // Kapsul Notifikasi & Profil (Konsisten)
+                      PasienTopActionPill(userName: widget.userName),
                     ],
                   ),
                   const SizedBox(height: 12),

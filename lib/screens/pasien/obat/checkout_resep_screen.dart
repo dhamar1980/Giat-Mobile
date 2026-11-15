@@ -13,6 +13,7 @@ import '../../../services/pasien_api_service.dart';
 import '../../../services/cart_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../utils/time_utils.dart';
+import '../../../widgets/app_top_action_pill.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN CHECKOUT RESEP DOKTER (Sesuai Desain Figma / 3 Screenshot Checkout)
@@ -288,60 +289,8 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
           ),
         ),
 
-        // Action Pill (Bell & Profile Avatar)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                constraints: const BoxConstraints(),
-                padding: const EdgeInsets.all(4),
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  size: 22,
-                  color: Color(0xFF1F2937),
-                ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tidak ada notifikasi baru.')),
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfilePasienScreen(userName: widget.userName),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF044E2F),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        ),
+        // Action Pill (Bell & Profile Avatar Konsisten)
+        PasienTopActionPill(userName: widget.userName),
       ],
     );
   }

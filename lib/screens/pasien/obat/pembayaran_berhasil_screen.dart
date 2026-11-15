@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'pembayaran_model.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../widgets/app_top_action_pill.dart';
 import '../../../master_layout.dart';
 import '../../../utils/time_utils.dart';
 
@@ -170,59 +171,7 @@ class PembayaranBerhasilScreen extends StatelessWidget {
         ),
 
         // Action Pill (Bell & Profile Avatar)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                constraints: const BoxConstraints(),
-                padding: const EdgeInsets.all(4),
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  size: 22,
-                  color: Color(0xFF1F2937),
-                ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tidak ada notifikasi baru.')),
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfilePasienScreen(userName: userName),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF044E2F),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        ),
+        PasienTopActionPill(userName: userName),
       ],
     );
   }

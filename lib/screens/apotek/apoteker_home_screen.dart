@@ -1,10 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'models/apotek_models.dart';
-import 'notifikasi/apotek_notifikasi_screen.dart';
 import 'pesanan/apotek_pesanan_screen.dart';
 import 'resep/apotek_resep_screen.dart';
 import 'obat/apotek_obat_screen.dart';
@@ -13,9 +11,9 @@ import '../../onboarding_screen.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
+import '../../widgets/app_top_action_pill.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/apotek_api_service.dart';
-import '../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // APOTEKER HOME SCREEN (Figma Node: 1100-18253)
@@ -164,7 +162,6 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
   }
 
   Widget _buildTopBar() {
-    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
     final showBrandTitle = _selectedIndex != 4; // Tabs 0, 1, 2, 3 have green header
 
     return Padding(
@@ -185,103 +182,10 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
           else
             const SizedBox.shrink(),
 
-          // 2. Kapsul Notifikasi & Profil (Ukuran asli yang proporsional)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Stack(
-                  children: [
-                    IconButton(
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.all(5),
-                      icon: const Icon(
-                        Icons.notifications_none_rounded,
-                        size: 24,
-                        color: Color(0xFF1F2937),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ApotekNotifikasiScreen()),
-                        ).then((_) => setState(() {}));
-                      },
-                    ),
-                    if (unreadNotifs > 0)
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Container(
-                          width: 8.5,
-                          height: 8.5,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFDC2626),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _switchToTab(4),
-                  child: ListenableBuilder(
-                    listenable: ApotekProfileState.instance,
-                    builder: (context, _) {
-                      final rawAvatar = ApotekProfileState.instance.avatarPath;
-                      final resolved = ApiConfig.resolveImageUrl(rawAvatar);
-                      final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
-                      return Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF044E2F),
-                          shape: BoxShape.circle,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: hasPhoto
-                            ? (resolved.startsWith('http')
-                                ? Image.network(
-                                    resolved,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.person_rounded,
-                                      size: 22,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : Image.file(
-                                    File(resolved),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.person_rounded,
-                                      size: 22,
-                                      color: Colors.white,
-                                    ),
-                                  ))
-                            : const Icon(
-                                Icons.person_rounded,
-                                size: 22,
-                                color: Colors.white,
-                              ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+          // 2. Kapsul Notifikasi & Profil (Konsisten)
+          ApotekTopActionPill(
+            apotekerName: widget.apotekerName,
+            onProfileTap: () => _switchToTab(4),
           ),
         ],
       ),

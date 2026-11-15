@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'keranjang_screen.dart';
 import 'resep_dokter_screen.dart';
 import '../profile/profile_pasien_screen.dart';
+import '../../../widgets/app_top_action_pill.dart';
 import '../../../services/cart_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -290,101 +291,67 @@ class _DetailObatScreenState extends State<DetailObatScreen> {
           ),
         ),
 
-        // Action Pill (Cart with Badge & Avatar)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Cart Button with Yellow Badge
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => KeranjangScreen(userName: widget.userName),
-                    ),
-                  );
-                },
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.all(4),
-                      icon: const Icon(
-                        Icons.shopping_cart_outlined,
-                        size: 22,
-                        color: Color(0xFF1F2937),
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => KeranjangScreen(userName: widget.userName),
-                          ),
-                        );
-                      },
-                    ),
-                    if (_cartCount > 0)
-                      Positioned(
-                        top: -1,
-                        right: -1,
-                        child: Container(
-                          padding: const EdgeInsets.all(3.5),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFBBF24),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '$_cartCount',
-                            style: GoogleFonts.inter(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFF0F172A),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Profile Avatar
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfilePasienScreen(userName: widget.userName),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF044E2F),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
+        // Action Pill (Cart with Badge & Consistent Profile Avatar)
+        PasienTopActionPill(
+          userName: widget.userName,
+          customLeading: _buildCartPillButton(),
         ),
       ],
+    );
+  }
+
+  Widget _buildCartPillButton() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => KeranjangScreen(userName: widget.userName),
+          ),
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(5),
+            icon: const Icon(
+              Icons.shopping_cart_outlined,
+              size: 24,
+              color: Color(0xFF1F2937),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => KeranjangScreen(userName: widget.userName),
+                ),
+              );
+            },
+          ),
+          if (_cartCount > 0)
+            Positioned(
+              top: -1,
+              right: -1,
+              child: Container(
+                padding: const EdgeInsets.all(3.5),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFBBF24),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$_cartCount',
+                  style: GoogleFonts.inter(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

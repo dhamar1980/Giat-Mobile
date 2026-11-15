@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
+import '../../../widgets/app_top_action_pill.dart';
 import 'dokter_tambah_obat_dialog.dart';
 import '../../../services/dokter_api_service.dart';
 
@@ -337,48 +338,9 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
 
           // Right: Bell Notification & User Profile Avatar Capsule
           // Right: Bell Notification & User Profile Avatar Capsule
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(4),
-                  icon: const Icon(
-                    Icons.notifications_none_rounded,
-                    size: 22,
-                    color: Color(0xFF1F2937),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: _darkGreen,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
-                ),
-              ],
-            ),
+          // Right Action Pill
+          DokterTopActionPill(
+            doctorName: DokterProfileState.instance.doctorName,
           ),
         ],
       ),

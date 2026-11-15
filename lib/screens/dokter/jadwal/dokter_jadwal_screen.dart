@@ -7,6 +7,7 @@ import '../konsultasi/dokter_room_chat_screen.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../pasien/dokter_detail_pasien_screen.dart';
 import '../profile/dokter_profile_screen.dart';
+import '../../../widgets/app_top_action_pill.dart';
 import '../../../services/dokter_api_service.dart';
 import '../../../config/api_config.dart';
 
@@ -217,93 +218,9 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
   // TOP NOTIFICATION & PROFILE CAPSULE
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildNotificationProfileCapsule() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.all(4),
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              size: 22,
-              color: Color(0xFF1F2937),
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () {
-              if (widget.onProfileTap != null) {
-                widget.onProfileTap!();
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DokterProfileScreen(
-                      doctorName: DokterProfileState.instance.doctorName,
-                      onLogout: () => Navigator.of(context).pop(),
-                    ),
-                  ),
-                );
-              }
-            },
-            child: ListenableBuilder(
-              listenable: DokterProfileState.instance,
-              builder: (context, _) {
-                final rawAvatar = DokterProfileState.instance.avatarUrl;
-                final resolved = ApiConfig.resolveImageUrl(rawAvatar);
-                final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
-                return Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF044E2F),
-                    shape: BoxShape.circle,
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: hasPhoto
-                      ? (resolved.startsWith('http')
-                          ? Image.network(
-                              resolved,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person_rounded,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Image.file(
-                              File(resolved),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person_rounded,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                            ))
-                      : const Icon(Icons.person_rounded, size: 20, color: Colors.white),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+    return DokterTopActionPill(
+      doctorName: DokterProfileState.instance.doctorName,
+      onProfileTap: widget.onProfileTap,
     );
   }
 

@@ -49,6 +49,7 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     // Verify PasienBottomNavbar is present
     expect(find.byType(PasienBottomNavbar), findsOneWidget);

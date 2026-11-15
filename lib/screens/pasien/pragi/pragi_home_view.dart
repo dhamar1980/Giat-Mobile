@@ -4,9 +4,8 @@ import 'pragi_state_service.dart';
 import 'pragi_topography_background.dart';
 import 'pragi_screening_screen.dart';
 import 'pragi_result_screen.dart';
-import '../profile/profile_pasien_screen.dart';
-import '../notifikasi/pasien_notifikasi_screen.dart';
 import '../widgets/pasien_bottom_navbar.dart';
+import '../../../widgets/app_top_action_pill.dart';
 
 import '../../../services/pasien_api_service.dart';
 
@@ -103,60 +102,7 @@ class _PragiHomeViewState extends State<PragiHomeView> {
                   children: [
                     const Spacer(),
                     // Standard Bell & Profile Action Capsule
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(4),
-                            icon: const Icon(
-                              Icons.notifications_none_rounded,
-                              size: 22,
-                              color: Color(0xFF1F2937),
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const PasienNotifikasiScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const ProfilePasienScreen()),
-                              );
-                            },
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _darkGreen,
-                              ),
-                              child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    const PasienTopActionPill(),
                   ],
                 ),
               )
