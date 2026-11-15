@@ -116,6 +116,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
   }
 
   void _applyDashboardData(Map<String, dynamic> data) {
+    _patientCache.clear();
     final docData = data['dokter'];
     if (docData is Map) {
       final docMap = Map<String, dynamic>.from(docData);
@@ -195,8 +196,12 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     String fallbackName = 'Pasien',
   }) {
     final rawId = (map['id_pasien'] ?? map['id'] ?? fallbackId).toString();
+    final avatarUrl = ApiConfig.resolveImageUrl((map['foto_profile'] ?? map['foto_profil'])?.toString());
     if (_patientCache.containsKey(rawId)) {
-      return _patientCache[rawId]!;
+      final cached = _patientCache[rawId]!;
+      if (avatarUrl.isEmpty || (cached.avatarUrl != null && cached.avatarUrl!.isNotEmpty)) {
+        return cached;
+      }
     }
 
     final name = (map['nama_pasien'] ?? map['nama'] ?? fallbackName).toString();
@@ -226,12 +231,19 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     final rawGender = (map['jenis_kelamin'] ?? '').toString();
     final gender = (rawGender == 'L' || rawGender.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
     final address = (map['alamat'] ?? 'Indonesia').toString();
-    final complaint = (map['keluhan_awal'] ?? map['diagnosis'] ?? 'Konsultasi GIAT').toString();
-    final complaintDetail = (map['keluhan_awal'] ?? map['catatan_dokter'] ?? '').toString();
-    final avatarUrl = ApiConfig.resolveImageUrl((map['foto_profile'] ?? map['foto_profil'])?.toString());
+    final complaint = (map['keluhan_pantau'] ?? map['keluhan_awal'] ?? map['diagnosis'] ?? 'Konsultasi GIAT').toString();
+    final complaintDetail = (map['detail_keluhan_pantau'] ?? map['keluhan_awal'] ?? map['catatan_dokter'] ?? '').toString();
+
+    double weightKg = double.tryParse(map['berat_badan']?.toString() ?? '') ?? 0.0;
+    double rawHeight = double.tryParse(map['tinggi_badan']?.toString() ?? '') ?? 0.0;
+    double heightM = rawHeight > 3.0 ? rawHeight / 100.0 : rawHeight;
+    final rawCond = (map['kondisi_pantau'] ?? map['kondisi'] ?? '').toString().trim();
+    String condition = rawCond.isNotEmpty
+        ? '${rawCond[0].toUpperCase()}${rawCond.substring(1)}'
+        : 'Pasien Ginjal';
 
     final List<DokterPrescriptionItem> medicines = [];
-    final rawObat = map['obat'] ?? map['items'];
+    final rawObat = map['obat'] ?? map['items'] ?? map['current_medicines'];
     if (rawObat is List) {
       for (var it in rawObat) {
         if (it is Map) {
@@ -239,13 +251,13 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           medicines.add(
             DokterPrescriptionItem(
               id: (m['id'] ?? 'rx-${medicines.length + 1}').toString(),
-              medicineName: (m['nama_obat'] ?? 'Obat').toString(),
-              dose: (m['dosis'] ?? '-').toString(),
-              frequency: (m['aturan_pakai'] ?? '1x1').toString(),
-              quantity: '${m['jumlah'] ?? 1} Tablet',
+              medicineName: (m['nama_obat'] ?? m['medicine_name'] ?? 'Obat').toString(),
+              dose: (m['dosis'] ?? m['dose'] ?? '-').toString(),
+              frequency: (m['aturan_pakai'] ?? m['frequency'] ?? '1x1').toString(),
+              quantity: '${m['jumlah'] ?? m['quantity'] ?? 1} Tablet',
               duration: (m['durasi'] ?? '5 hari').toString(),
-              usageTime: (m['waktu_penggunaan'] ?? m['waktu_minum'] ?? 'Sesudah Makan').toString(),
-              specialNotes: m['catatan_khusus']?.toString() ?? m['catatan']?.toString(),
+              usageTime: (m['waktu_penggunaan'] ?? m['waktu_minum'] ?? m['usage_time'] ?? 'Sesudah Makan').toString(),
+              specialNotes: m['catatan_khusus']?.toString() ?? m['special_notes']?.toString() ?? m['catatan']?.toString(),
             ),
           );
         }
@@ -259,9 +271,9 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
       age: age,
       gender: gender,
       address: address,
-      weightKg: 58.0,
-      heightM: 1.65,
-      condition: 'Pasien Ginjal',
+      weightKg: weightKg,
+      heightM: heightM,
+      condition: condition,
       complaint: complaint,
       complaintDetail: complaintDetail,
       currentMedicines: medicines,
@@ -365,6 +377,8 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
               children: [
                 _buildHomeTab(),
                 DokterKonsultasiScreen(
+                  doctorName: widget.doctorName,
+                  dokterId: _currentDoctorId,
                   onProfileTap: () => setState(() {
                     _selectedIndex = 4;
                     _isTopBarVisible = true;
@@ -682,19 +696,91 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
           ),
           const SizedBox(height: 14),
 
-          // Card 1: Konsultasi (Real data jika ada, fallback ke Budi Santoso untuk test)
+          // Card 1: Konsultasi (Real data dari database)
           if (hasRealConsultation)
             _buildLiveConsultationActivityCard(_liveLatestConsultation!)
+          else if (_isTest)
+            _buildConsultationActivityCard()
           else
-            _buildConsultationActivityCard(),
+            _buildEmptyActivityCard(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Konsultasi',
+              subtitle: 'Belum ada aktivitas konsultasi terbaru hari ini.',
+            ),
 
           const SizedBox(height: 14),
 
-          // Card 2: Membuat resep (Real data jika ada, fallback ke Budi Santoso untuk test)
+          // Card 2: Membuat resep (Real data dari database)
           if (hasRealPrescription)
             _buildLivePrescriptionActivityCard(_liveLatestPrescription!)
+          else if (_isTest)
+            _buildPrescriptionActivityCard()
           else
-            _buildPrescriptionActivityCard(),
+            _buildEmptyActivityCard(
+              icon: Icons.assignment_outlined,
+              title: 'Membuat resep',
+              subtitle: 'Belum ada resep obat yang diterbitkan hari ini.',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyActivityCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Color(0xFFDCFCE7),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: _bubbleDarkGreen, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _bubbleDarkGreen,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1441,15 +1527,35 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                 color: const Color(0xFFE0F2FE),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Center(
-                child: Text(
-                  patient.initials,
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0369A1),
-                    fontSize: 16,
-                  ),
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: (patient.avatarUrl != null && patient.avatarUrl!.isNotEmpty)
+                    ? Image.network(
+                        patient.avatarUrl!,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            patient.initials,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0369A1),
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          patient.initials,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0369A1),
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 14),

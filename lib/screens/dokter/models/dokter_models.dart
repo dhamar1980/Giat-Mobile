@@ -224,6 +224,12 @@ class DokterNotificationItem {
   final String timeText;
   final String initials;
   final String type; // "konsultasi" | "jadwal" | "sistem"
+  final bool isRead;
+  final DateTime? rawDateTime;
+  final String? message;
+  final Map<String, dynamic>? extraData;
+  final DokterPatient? patient;
+  final String? consultationId;
 
   const DokterNotificationItem({
     required this.id,
@@ -232,7 +238,43 @@ class DokterNotificationItem {
     required this.timeText,
     required this.initials,
     required this.type,
+    this.isRead = false,
+    this.rawDateTime,
+    this.message,
+    this.extraData,
+    this.patient,
+    this.consultationId,
   });
+
+  DokterNotificationItem copyWith({
+    String? id,
+    String? title,
+    String? senderOrCategory,
+    String? timeText,
+    String? initials,
+    String? type,
+    bool? isRead,
+    DateTime? rawDateTime,
+    String? message,
+    Map<String, dynamic>? extraData,
+    DokterPatient? patient,
+    String? consultationId,
+  }) {
+    return DokterNotificationItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      senderOrCategory: senderOrCategory ?? this.senderOrCategory,
+      timeText: timeText ?? this.timeText,
+      initials: initials ?? this.initials,
+      type: type ?? this.type,
+      isRead: isRead ?? this.isRead,
+      rawDateTime: rawDateTime ?? this.rawDateTime,
+      message: message ?? this.message,
+      extraData: extraData ?? this.extraData,
+      patient: patient ?? this.patient,
+      consultationId: consultationId ?? this.consultationId,
+    );
+  }
 }
 
 class DokterDeviceSession {
@@ -683,7 +725,7 @@ class DokterProfileState extends ChangeNotifier {
     } catch (_) {}
 
     try {
-      final res = await DokterApiService().getProfile();
+      final res = await DokterApiService().getProfile(doctorName: fallbackName);
       if (res.success && res.data != null) {
         final data = res.data!;
         final userObj = data['user'] as Map<String, dynamic>?;
@@ -693,8 +735,8 @@ class DokterProfileState extends ChangeNotifier {
         final fetchedSpec = docObj['spesialisasi'] ?? docObj['specialty'];
         final fetchedStr = docObj['no_str'] ?? docObj['str'];
         final fetchedSip = docObj['no_sip'] ?? docObj['sip'];
-        final fetchedInst = docObj['instansi'] ?? docObj['institution'];
-        final fetchedAlamat = docObj['alamat_praktik'] ?? docObj['alamat'];
+        final fetchedInst = docObj['institusi'] ?? docObj['instansi'] ?? docObj['institution'];
+        final fetchedAlamat = docObj['alamat_praktik'] ?? docObj['alamat'] ?? fetchedInst;
         final fetchedJadwal = docObj['jadwal_praktik'] ?? docObj['jam_operasional'];
         final fetchedAvatar = userObj?['foto_profile'] ?? userObj?['foto_profil'] ?? docObj['foto_profile'] ?? docObj['foto_profil'];
 

@@ -576,7 +576,8 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
           MaterialPageRoute(
             builder: (_) => DokterVideoCallScreen(
               patientName: widget.patient.name,
-              specialty: 'Spesialis Ginjal & Hipertensi',
+              specialty: DokterProfileState.instance.specialty,
+              patientAvatarUrl: widget.patient.avatarUrl ?? '',
             ),
           ),
         );
@@ -632,7 +633,8 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                 MaterialPageRoute(
                   builder: (_) => DokterVideoCallScreen(
                     patientName: widget.patient.name,
-                    specialty: 'Spesialis Ginjal & Hipertensi',
+                    specialty: DokterProfileState.instance.specialty,
+                    patientAvatarUrl: widget.patient.avatarUrl ?? '',
                   ),
                 ),
               );

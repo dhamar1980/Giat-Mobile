@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
 import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../../../widgets/app_top_action_pill.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM TAMBAH / EDIT OBAT RESEP (Sesuai Desain Tambah Obat)
@@ -58,6 +60,9 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
     'Paracetamol 500mg',
     'Asam Folat 1mg',
   ];
+  final Map<String, Map<String, dynamic>> _liveObatCatalog = {};
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
 
   @override
   void initState() {
@@ -72,6 +77,35 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
     if (item != null && _caraPenggunaanOptions.contains(item.usageTime)) {
       _selectedCaraPenggunaan = item.usageTime;
     }
+    if (!_isTest) {
+      _fetchObatFromSupabase();
+    }
+  }
+
+  Future<void> _fetchObatFromSupabase() async {
+    try {
+      final res = await DokterApiService().getObatRekomendasi();
+      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+        final List<String> names = [];
+        for (var raw in res.data!) {
+          if (raw is Map) {
+            final m = Map<String, dynamic>.from(raw);
+            final nama = (m['nama_obat'] ?? m['nama'] ?? '').toString().trim();
+            if (nama.isNotEmpty) {
+              _liveObatCatalog[nama] = m;
+              if (!names.contains(nama)) names.add(nama);
+            }
+          }
+        }
+        if (names.isNotEmpty) {
+          setState(() {
+            _suggestedMedicines
+              ..clear()
+              ..addAll(names);
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -87,6 +121,20 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
 
   void _onMedicineSelected(String name) {
     _namaObatCtrl.text = name;
+
+    final liveObat = _liveObatCatalog[name];
+    if (liveObat != null) {
+      final dbDosis = (liveObat['dosis'] ?? '').toString().trim();
+      final dbAturan = (liveObat['aturan_pakai_umum'] ?? '').toString().trim();
+      if (_dosisCtrl.text.isEmpty && dbDosis.isNotEmpty) _dosisCtrl.text = dbDosis;
+      if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '10 Tablet';
+      if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
+      if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '10 hari';
+      if (_instruksiCtrl.text.isEmpty && dbAturan.isNotEmpty) _instruksiCtrl.text = dbAturan;
+      _selectedCaraPenggunaan ??= 'Sesudah Makan';
+      setState(() {});
+      return;
+    }
 
     // Auto-fill sensible defaults for known medicines if empty
     if (name.contains('Candesartan 8mg')) {

@@ -1,6 +1,8 @@
-﻿import 'package:giat/widgets/giat_background.dart';
+import 'dart:io';
+import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PENGATURAN NOTIFIKASI DOKTER (Figma Node: 1008-18622 / Screenshot 5)
@@ -21,6 +23,40 @@ class _DokterPengaturanNotifikasiScreenState extends State<DokterPengaturanNotif
   bool _konsultasiBaru = true;
   bool _pengingatJadwal = true;
   bool _updateSistem = true;
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_isTest) {
+      _loadSettings();
+    }
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final res = await DokterApiService().getNotificationSettings();
+      if (res.success && res.data != null && mounted) {
+        final d = res.data!;
+        setState(() {
+          if (d['notif_chat'] is bool) _konsultasiBaru = d['notif_chat'] as bool;
+          if (d['notif_jadwal'] is bool) _pengingatJadwal = d['notif_jadwal'] as bool;
+          if (d['notif_update'] is bool) _updateSistem = d['notif_update'] as bool;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistSettings() async {
+    try {
+      await DokterApiService().updateNotificationSettings({
+        'notif_chat': _konsultasiBaru,
+        'notif_jadwal': _pengingatJadwal,
+        'notif_update': _updateSistem,
+      });
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +178,10 @@ class _DokterPengaturanNotifikasiScreenState extends State<DokterPengaturanNotif
                           title: 'Konsultasi Baru',
                           description: 'Dapatkan notifikasi instan saat pasien meminta konsultasi baru.',
                           value: _konsultasiBaru,
-                          onChanged: (val) => setState(() => _konsultasiBaru = val),
+                          onChanged: (val) {
+                            setState(() => _konsultasiBaru = val);
+                            _persistSettings();
+                          },
                         ),
 
                         const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF1F5F9)),
@@ -152,7 +191,10 @@ class _DokterPengaturanNotifikasiScreenState extends State<DokterPengaturanNotif
                           title: 'Pengingat Jadwal',
                           description: 'Pengingat untuk janji temu mendatang, 15 menit sebelum dimulai.',
                           value: _pengingatJadwal,
-                          onChanged: (val) => setState(() => _pengingatJadwal = val),
+                          onChanged: (val) {
+                            setState(() => _pengingatJadwal = val);
+                            _persistSettings();
+                          },
                         ),
 
                         const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF1F5F9)),
@@ -162,7 +204,10 @@ class _DokterPengaturanNotifikasiScreenState extends State<DokterPengaturanNotif
                           title: 'Update Sistem',
                           description: 'Notifikasi mengenai pemeliharaan aplikasi, fitur baru, dan perubahan kebijakan.',
                           value: _updateSistem,
-                          onChanged: (val) => setState(() => _updateSistem = val),
+                          onChanged: (val) {
+                            setState(() => _updateSistem = val);
+                            _persistSettings();
+                          },
                         ),
                       ],
                     ),

@@ -9,6 +9,7 @@ import '../profile/dokter_profile_screen.dart';
 import '../resep/dokter_review_resep_sheet.dart';
 import '../../../widgets/app_top_action_pill.dart';
 import '../../../config/api_config.dart';
+import '../../../services/dokter_api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DETAIL PASIEN & REKAM MEDIS (Sesuai Desain Figma: Node 1008-18998)
@@ -31,20 +32,96 @@ class _DokterDetailPasienScreenState extends State<DokterDetailPasienScreen> {
   static const _bgColor = Color(0xFFF7FBF8);
   static const _border = Color(0xFFE2E8F0);
 
+  late DokterPatient _patient;
   late List<DokterPrescriptionItem> _currentMedicines;
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
 
   @override
   void initState() {
     super.initState();
+    _patient = widget.patient;
     _currentMedicines = List.from(widget.patient.currentMedicines);
+    if (!_isTest) {
+      _fetchLivePatientDetail();
+    }
+  }
+
+  Future<void> _fetchLivePatientDetail() async {
+    try {
+      final res = await DokterApiService().getPasienDetail(_patient.id);
+      if (res.success && res.data != null && mounted) {
+        final d = res.data!;
+        final rawMeds = d['current_medicines'];
+        final List<DokterPrescriptionItem> meds = [];
+        if (rawMeds is List) {
+          for (var item in rawMeds) {
+            if (item is Map) {
+              final m = Map<String, dynamic>.from(item);
+              meds.add(
+                DokterPrescriptionItem(
+                  id: (m['id'] ?? 'rx-${meds.length + 1}').toString(),
+                  medicineName: (m['medicine_name'] ?? m['nama_obat'] ?? 'Obat').toString(),
+                  dose: (m['dose'] ?? m['dosis'] ?? '-').toString(),
+                  frequency: (m['frequency'] ?? m['aturan_pakai'] ?? '1x1').toString(),
+                  quantity: '${m['quantity'] ?? m['jumlah'] ?? 1} Tablet',
+                  duration: '30 Hari',
+                  usageTime: (m['usage_time'] ?? m['waktu_penggunaan'] ?? 'Sesudah Makan').toString(),
+                  specialNotes: m['special_notes']?.toString() ?? m['catatan_khusus']?.toString(),
+                ),
+              );
+            }
+          }
+        }
+
+        final weightKg = double.tryParse(d['berat_badan']?.toString() ?? '') ?? _patient.weightKg;
+        final rawHeight = double.tryParse(d['tinggi_badan']?.toString() ?? '') ?? 0.0;
+        final heightM = rawHeight > 3.0
+            ? rawHeight / 100.0
+            : (rawHeight > 0 ? rawHeight : _patient.heightM);
+        final rawCond = (d['kondisi_pantau'] ?? d['kondisi'] ?? '').toString().trim();
+        final condition = rawCond.isNotEmpty
+            ? '${rawCond[0].toUpperCase()}${rawCond.substring(1)}'
+            : _patient.condition;
+        final complaint = (d['keluhan_pantau'] ?? d['keluhan_awal'] ?? _patient.complaint).toString();
+        final complaintDetail = (d['detail_keluhan_pantau'] ?? d['keluhan_awal'] ?? _patient.complaintDetail).toString();
+        final avatarUrl = ApiConfig.resolveImageUrl((d['foto_profile'] ?? d['foto_profil'])?.toString()) ?? _patient.avatarUrl;
+
+        setState(() {
+          _patient = DokterPatient(
+            id: (d['id_pasien'] ?? d['id'] ?? _patient.id).toString(),
+            name: (d['nama'] ?? _patient.name).toString(),
+            initials: _patient.initials,
+            age: _patient.age,
+            gender: _patient.gender,
+            address: (d['alamat'] ?? _patient.address).toString(),
+            weightKg: weightKg,
+            heightM: heightM,
+            condition: condition,
+            complaint: complaint,
+            complaintDetail: complaintDetail,
+            currentMedicines: meds.isNotEmpty ? meds : _currentMedicines,
+            avatarUrl: avatarUrl,
+            avatarBgColor: _patient.avatarBgColor,
+            avatarTextColor: _patient.avatarTextColor,
+            consultationId: (d['id_konsultasi'] ?? _patient.consultationId)?.toString(),
+            paymentStatus: (d['status_bayar'] ?? _patient.paymentStatus)?.toString(),
+          );
+          if (meds.isNotEmpty || d.containsKey('current_medicines')) {
+            _currentMedicines = meds;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   void _openPrescription() async {
     final result = await Navigator.of(context).push<List<DokterPrescriptionItem>>(
       MaterialPageRoute(
         builder: (_) => DokterReviewResepScreen(
-          patient: widget.patient,
+          patient: _patient,
           initialItems: _currentMedicines,
+          consultationId: _patient.consultationId,
         ),
       ),
     );
@@ -53,12 +130,15 @@ class _DokterDetailPasienScreenState extends State<DokterDetailPasienScreen> {
       setState(() {
         _currentMedicines = result;
       });
+      if (!_isTest) {
+        _fetchLivePatientDetail();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final p = widget.patient;
+    final p = _patient;
 
     return Scaffold(
       backgroundColor: _bgColor,

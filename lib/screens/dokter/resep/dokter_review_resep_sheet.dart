@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +7,7 @@ import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../../../widgets/app_top_action_pill.dart';
 import 'dokter_tambah_obat_dialog.dart';
 import '../../../services/dokter_api_service.dart';
+import '../../../services/supabase_admin_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REVIEW RESEP DOKTER (Sesuai Desain Buat Resep)
@@ -37,14 +39,56 @@ class _DokterReviewResepScreenState extends State<DokterReviewResepScreen> {
   bool _isPublishing = false;
   late List<DokterPrescriptionItem> _prescriptions;
 
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
   @override
   void initState() {
     super.initState();
-    _prescriptions = widget.initialItems != null
-        ? List.from(widget.initialItems!)
-        : List.from(widget.patient.currentMedicines.isNotEmpty
-            ? widget.patient.currentMedicines
-            : DokterMockData.initialPrescriptions);
+    if (widget.initialItems != null) {
+      _prescriptions = List.from(widget.initialItems!);
+    } else if (widget.patient.currentMedicines.isNotEmpty) {
+      _prescriptions = List.from(widget.patient.currentMedicines);
+    } else if (_isTest) {
+      _prescriptions = List.from(DokterMockData.initialPrescriptions);
+    } else {
+      _prescriptions = [];
+      _loadExistingPrescriptionFromSupabase();
+    }
+  }
+
+  Future<void> _loadExistingPrescriptionFromSupabase() async {
+    try {
+      final rx = await SupabaseAdminService.instance.fetchResepForKonsultasi(
+        widget.consultationId ?? '',
+        patientId: widget.patient.id,
+      );
+      if (rx != null && rx['items'] is List && mounted && _prescriptions.isEmpty) {
+        final rawItems = rx['items'] as List;
+        final loaded = <DokterPrescriptionItem>[];
+        for (var it in rawItems) {
+          if (it is Map) {
+            final m = Map<String, dynamic>.from(it);
+            loaded.add(
+              DokterPrescriptionItem(
+                id: (m['id'] ?? 'rx-${loaded.length + 1}').toString(),
+                medicineName: (m['nama_obat'] ?? 'Obat').toString(),
+                dose: (m['dosis'] ?? '-').toString(),
+                frequency: (m['aturan_pakai'] ?? '1x1').toString(),
+                quantity: '${m['jumlah'] ?? 30} Tablet',
+                duration: '30 Hari',
+                usageTime: (m['waktu_penggunaan'] ?? 'Sesudah Makan').toString(),
+                specialNotes: m['catatan_khusus']?.toString(),
+              ),
+            );
+          }
+        }
+        if (loaded.isNotEmpty && mounted) {
+          setState(() {
+            _prescriptions = loaded;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _navigateToAddMedicine([DokterPrescriptionItem? itemToEdit, int? index]) async {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
@@ -1593,11 +1594,23 @@ class SupabaseAdminService {
         p.jenis_kelamin,
         p.alamat,
         p.tanggal_lahir,
+        pan.bb AS berat_badan,
+        pan.tb AS tinggi_badan,
+        pan.kondisi AS kondisi_pantau,
+        pan.keluhan AS keluhan_pantau,
+        pan.detail_keluhan AS detail_keluhan_pantau,
         lm.pesan,
         TRIM(lm.id_sender) AS id_sender,
         lm.created_at
       FROM latest_messages lm
       LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(lm.id_pasien)
+      LEFT JOIN LATERAL (
+        SELECT bb, tb, kondisi, keluhan, detail_keluhan
+        FROM pantau
+        WHERE TRIM(id_pasien) = TRIM(lm.id_pasien)
+        ORDER BY COALESCE(tanggal_pantau, created_at) DESC
+        LIMIT 1
+      ) pan ON true
       WHERE lm.rn = 1
       ORDER BY lm.created_at DESC
       LIMIT 5
@@ -1627,6 +1640,11 @@ class SupabaseAdminService {
           p.jenis_kelamin,
           p.alamat,
           p.tanggal_lahir,
+          pan.bb AS berat_badan,
+          pan.tb AS tinggi_badan,
+          pan.kondisi AS kondisi_pantau,
+          pan.keluhan AS keluhan_pantau,
+          pan.detail_keluhan AS detail_keluhan_pantau,
           ROW_NUMBER() OVER (
             PARTITION BY k.id_pasien 
             ORDER BY 
@@ -1642,6 +1660,13 @@ class SupabaseAdminService {
         FROM konsultasi k
         LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
         LEFT JOIN konsultasi_pembayaran kp_pay ON TRIM(kp_pay.id_konsultasi) = TRIM(k.id)
+        LEFT JOIN LATERAL (
+          SELECT bb, tb, kondisi, keluhan, detail_keluhan
+          FROM pantau
+          WHERE TRIM(id_pasien) = TRIM(k.id_pasien)
+          ORDER BY COALESCE(tanggal_pantau, created_at) DESC
+          LIMIT 1
+        ) pan ON true
         WHERE TRIM(k.id_dokter) = @id
           AND (
             LOWER(TRIM(COALESCE(kp_pay.status_bayar, ''))) = 'lunas'
@@ -1683,9 +1708,21 @@ class SupabaseAdminService {
         p.foto_profile,
         p.jenis_kelamin,
         p.alamat,
-        p.tanggal_lahir
+        p.tanggal_lahir,
+        pan.bb AS berat_badan,
+        pan.tb AS tinggi_badan,
+        pan.kondisi AS kondisi_pantau,
+        pan.keluhan AS keluhan_pantau,
+        pan.detail_keluhan AS detail_keluhan_pantau
       FROM konsultasi k
       LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
+      LEFT JOIN LATERAL (
+        SELECT bb, tb, kondisi, keluhan, detail_keluhan
+        FROM pantau
+        WHERE TRIM(id_pasien) = TRIM(k.id_pasien)
+        ORDER BY COALESCE(tanggal_pantau, created_at) DESC
+        LIMIT 1
+      ) pan ON true
       WHERE TRIM(k.id_dokter) = @id
       ORDER BY k.created_at DESC
       LIMIT 1
@@ -1721,9 +1758,21 @@ class SupabaseAdminService {
         p.foto_profile,
         p.jenis_kelamin,
         p.alamat,
-        p.tanggal_lahir
+        p.tanggal_lahir,
+        pan.bb AS berat_badan,
+        pan.tb AS tinggi_badan,
+        pan.kondisi AS kondisi_pantau,
+        pan.keluhan AS keluhan_pantau,
+        pan.detail_keluhan AS detail_keluhan_pantau
       FROM resep r
       LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(r.id_pasien)
+      LEFT JOIN LATERAL (
+        SELECT bb, tb, kondisi, keluhan, detail_keluhan
+        FROM pantau
+        WHERE TRIM(id_pasien) = TRIM(r.id_pasien)
+        ORDER BY COALESCE(tanggal_pantau, created_at) DESC
+        LIMIT 1
+      ) pan ON true
       WHERE TRIM(r.id_dokter) = @id
       ORDER BY COALESCE(r.updated_at, r.created_at) DESC
       LIMIT 1
@@ -2483,6 +2532,11 @@ class SupabaseAdminService {
         COALESCE(kp.status_bayar, 'lunas') AS status_bayar,
         kp.waktu_bayar,
         kp.jumlah_bayar,
+        pan.bb AS berat_badan,
+        pan.tb AS tinggi_badan,
+        pan.kondisi AS kondisi_pantau,
+        pan.keluhan AS keluhan_pantau,
+        pan.detail_keluhan AS detail_keluhan_pantau,
         (
           SELECT COUNT(*) 
           FROM konsultasi_pesan m 
@@ -2527,6 +2581,13 @@ class SupabaseAdminService {
       FROM konsultasi k
       JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
       LEFT JOIN konsultasi_pembayaran kp ON TRIM(kp.id_konsultasi) = TRIM(k.id)
+      LEFT JOIN LATERAL (
+        SELECT bb, tb, kondisi, keluhan, detail_keluhan
+        FROM pantau
+        WHERE TRIM(id_pasien) = TRIM(k.id_pasien)
+        ORDER BY COALESCE(tanggal_pantau, created_at) DESC
+        LIMIT 1
+      ) pan ON true
       WHERE TRIM(k.id_dokter) = @docId
         AND (
           LOWER(TRIM(COALESCE(kp.status_bayar, ''))) = 'lunas'
@@ -2560,6 +2621,11 @@ class SupabaseAdminService {
         'alamat': map['alamat'],
         'tanggal_lahir': map['tanggal_lahir'],
         'no_hp': map['no_hp'],
+        'berat_badan': map['berat_badan'],
+        'tinggi_badan': map['tinggi_badan'],
+        'kondisi': map['kondisi_pantau'],
+        'keluhan': map['keluhan_pantau'] ?? map['keluhan_awal'],
+        'detail_keluhan': map['detail_keluhan_pantau'],
       };
       return map;
     }).toList();
@@ -2892,6 +2958,818 @@ class SupabaseAdminService {
         parameters: {'consId': consId},
       );
     }
+  }
+
+  /// Mengambil daftar notifikasi real untuk dokter dari tabel `notifikasi` di Supabase
+  Future<List<Map<String, dynamic>>> fetchDokterNotifications({
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return [];
+
+    var docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) {
+      final firstDoc = await _exec('SELECT TRIM(id_dokter) AS id FROM dokter ORDER BY created_at ASC LIMIT 1');
+      if (firstDoc.isNotEmpty) {
+        docId = firstDoc.first[0]?.toString().trim();
+      }
+    }
+    if (docId == null) return [];
+
+    final res = await _exec(
+      '''
+      SELECT
+        TRIM(n.id) AS id,
+        TRIM(n.id_user) AS id_user,
+        n.judul,
+        n.pesan,
+        COALESCE(n.kategori, 'sistem') AS kategori,
+        COALESCE(n.kategori, 'sistem') AS tipe,
+        n.is_read,
+        n.created_at
+      FROM notifikasi n
+      WHERE TRIM(n.id_user) = @docId
+      ORDER BY n.created_at DESC
+      LIMIT 50
+      ''',
+      parameters: {'docId': docId},
+    );
+
+    final notifs = res.map((r) => _normalizeMap(r.toColumnMap())).toList();
+
+    // Sertakan notifikasi broadcast update sistem bila belum ada
+    try {
+      final broadcastRes = await _exec(
+        '''
+        SELECT
+          TRIM(n.id) AS id,
+          TRIM(n.id_user) AS id_user,
+          n.judul,
+          n.pesan,
+          COALESCE(n.kategori, 'sistem') AS kategori,
+          COALESCE(n.kategori, 'sistem') AS tipe,
+          n.is_read,
+          n.created_at
+        FROM notifikasi n
+        WHERE LOWER(TRIM(COALESCE(n.kategori, ''))) = 'sistem'
+          AND (
+            LOWER(TRIM(n.judul)) LIKE '%[dokter]%'
+            OR LOWER(TRIM(n.judul)) LIKE '%[semua]%'
+            OR LOWER(TRIM(n.pesan)) LIKE '%dokter%'
+          )
+          AND TRIM(n.id) NOT IN (SELECT TRIM(id) FROM notifikasi WHERE TRIM(id_user) = @docId)
+        ORDER BY n.created_at DESC
+        LIMIT 10
+        ''',
+      );
+      for (final b in broadcastRes) {
+        notifs.add(_normalizeMap(b.toColumnMap()));
+      }
+    } catch (_) {}
+
+    // Urutkan berdasarkan waktu created_at DESC
+    notifs.sort((a, b) {
+      final tA = a['created_at']?.toString() ?? '';
+      final tB = b['created_at']?.toString() ?? '';
+      return tB.compareTo(tA);
+    });
+
+    return notifs;
+  }
+
+  /// Mengambil jumlah notifikasi belum dibaca (`is_read = false`) untuk dokter
+  Future<int> fetchDokterUnreadNotificationCount({
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return 0;
+    var docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) {
+      final firstDoc = await _exec('SELECT TRIM(id_dokter) AS id FROM dokter ORDER BY created_at ASC LIMIT 1');
+      if (firstDoc.isNotEmpty) {
+        docId = firstDoc.first[0]?.toString().trim();
+      }
+    }
+    if (docId == null) return 0;
+
+    final res = await _exec(
+      '''
+      SELECT COUNT(*)::int AS cnt
+      FROM notifikasi
+      WHERE TRIM(id_user) = @docId
+        AND is_read = false
+      ''',
+      parameters: {'docId': docId},
+    );
+    if (res.isEmpty) return 0;
+    return int.tryParse(res.first.toColumnMap()['cnt']?.toString() ?? '0') ?? 0;
+  }
+
+  /// Menandai semua notifikasi milik dokter sudah dibaca
+  Future<void> markDokterNotificationsAllRead({
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return;
+    await _exec(
+      'UPDATE notifikasi SET is_read = true WHERE TRIM(id_user) = @docId',
+      parameters: {'docId': docId},
+    );
+  }
+
+  /// Menghapus semua notifikasi milik dokter yang sudah dibaca
+  Future<void> clearDokterReadNotifications({
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return;
+    await _exec(
+      'DELETE FROM notifikasi WHERE TRIM(id_user) = @docId AND is_read = true',
+      parameters: {'docId': docId},
+    );
+  }
+
+  // ===========================================================================
+  // MODUL PROFIL DOKTER, KEAMANAN AKUN, NOTIFIKASI & SESI PERANGKAT REAL SUPABASE
+  // ===========================================================================
+
+  Map<String, dynamic> _parseDokterBioMeta(dynamic rawBio) {
+    if (rawBio == null) return <String, dynamic>{};
+    final str = rawBio.toString().trim();
+    if (str.isEmpty) return <String, dynamic>{};
+    if (str.startsWith('{') && str.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(str);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+    return <String, dynamic>{'bio_text': str};
+  }
+
+  /// Mengambil data profil dokter secara real dari tabel `dokter` & `"user"` di Supabase
+  Future<Map<String, dynamic>?> fetchDokterProfile({
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return null;
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return null;
+
+    final rows = await _exec(
+      '''
+      SELECT 
+        TRIM(d.id_dokter) AS id,
+        TRIM(d.id_dokter) AS id_dokter,
+        d.nama,
+        d.spesialisasi,
+        d.institusi,
+        d.no_str,
+        d.no_sip,
+        d.no_hp,
+        d.tarif_konsultasi,
+        d.foto_profile,
+        d.bio,
+        u.email,
+        u.keterangan
+      FROM dokter d
+      LEFT JOIN "user" u ON TRIM(u.id) = TRIM(d.id_dokter)
+      WHERE TRIM(d.id_dokter) = @id
+      LIMIT 1
+      ''',
+      parameters: {'id': docId},
+    );
+
+    if (rows.isEmpty) return null;
+    final map = _normalizeMap(rows.first.toColumnMap());
+    final bioMeta = _parseDokterBioMeta(map['bio']);
+    final institusi = (map['institusi']?.toString().trim().isNotEmpty == true)
+        ? map['institusi'].toString().trim()
+        : 'RS Mitra GIAT';
+    final alamatPraktik = (bioMeta['alamat_praktik']?.toString().trim().isNotEmpty == true)
+        ? bioMeta['alamat_praktik'].toString().trim()
+        : institusi;
+    final jadwalPraktik = (bioMeta['jadwal_praktik']?.toString().trim().isNotEmpty == true)
+        ? bioMeta['jadwal_praktik'].toString().trim()
+        : 'Senin - Jumat, 08:00 - 16:00 WIB';
+
+    map['institusi'] = institusi;
+    map['no_str'] = (map['no_str']?.toString().trim().isNotEmpty == true)
+        ? map['no_str'].toString().trim()
+        : '-';
+    map['no_sip'] = (map['no_sip']?.toString().trim().isNotEmpty == true)
+        ? map['no_sip'].toString().trim()
+        : '-';
+    map['alamat_praktik'] = alamatPraktik;
+    map['jadwal_praktik'] = jadwalPraktik;
+    map['notif_chat'] = bioMeta['notif_chat'] is bool ? bioMeta['notif_chat'] : true;
+    map['notif_jadwal'] = bioMeta['notif_jadwal'] is bool ? bioMeta['notif_jadwal'] : true;
+    map['notif_update'] = bioMeta['notif_update'] is bool ? bioMeta['notif_update'] : true;
+
+    return map;
+  }
+
+  /// Memperbarui profil dokter secara real ke tabel `dokter` & `"user"` di Supabase
+  Future<Map<String, dynamic>?> updateDokterProfile(
+    Map<String, dynamic> data, {
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return null;
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return null;
+
+    final current = await fetchDokterProfile(dokterId: docId) ?? <String, dynamic>{};
+    final currentBioMeta = _parseDokterBioMeta(current['bio']);
+
+    final nama = (data['nama'] ?? data['name'] ?? current['nama'] ?? 'Dokter GIAT').toString().trim();
+    final spesialisasi = (data['spesialisasi'] ?? data['specialty'] ?? current['spesialisasi'] ?? 'Spesialis Ginjal & Hipertensi').toString().trim();
+    final institusi = (data['institusi'] ?? data['institution'] ?? current['institusi'] ?? 'RS Mitra GIAT').toString().trim();
+    final noStr = (data['no_str'] ?? data['str_number'] ?? current['no_str'] ?? '-').toString().trim();
+    final noSip = (data['no_sip'] ?? data['sip_number'] ?? current['no_sip'] ?? '-').toString().trim();
+    final noHp = (data['no_hp'] ?? data['phone'] ?? current['no_hp'] ?? '').toString().trim();
+    final email = (data['email'] ?? current['email'] ?? '').toString().trim();
+    final fotoProfile = (data['foto_profile'] ?? data['foto_profil'] ?? data['photo_url'] ?? current['foto_profile'])?.toString().trim();
+
+    if (data.containsKey('alamat_praktik') || data.containsKey('practice_address')) {
+      currentBioMeta['alamat_praktik'] = (data['alamat_praktik'] ?? data['practice_address'] ?? '').toString().trim();
+    }
+    if (data.containsKey('jadwal_praktik') || data.containsKey('practice_schedule')) {
+      currentBioMeta['jadwal_praktik'] = (data['jadwal_praktik'] ?? data['practice_schedule'] ?? '').toString().trim();
+    }
+    final newBioJson = jsonEncode(currentBioMeta);
+
+    await _exec(
+      '''
+      UPDATE dokter
+      SET nama = @nama,
+          spesialisasi = @spesialisasi,
+          institusi = @institusi,
+          no_str = @noStr,
+          no_sip = @noSip,
+          no_hp = CASE WHEN @noHp = '' THEN no_hp ELSE @noHp END,
+          foto_profile = COALESCE(@fotoProfile, foto_profile),
+          bio = @bio,
+          updated_at = NOW()
+      WHERE TRIM(id_dokter) = @id
+      ''',
+      parameters: {
+        'id': docId,
+        'nama': nama,
+        'spesialisasi': spesialisasi,
+        'institusi': institusi,
+        'noStr': noStr,
+        'noSip': noSip,
+        'noHp': noHp,
+        'fotoProfile': (fotoProfile != null && fotoProfile.isNotEmpty) ? fotoProfile : null,
+        'bio': newBioJson,
+      },
+    );
+
+    if (email.isNotEmpty) {
+      await _exec(
+        '''
+        UPDATE "user"
+        SET email = @email,
+            updated_at = NOW()
+        WHERE TRIM(id) = @id
+        ''',
+        parameters: {
+          'id': docId,
+          'email': email.toLowerCase(),
+        },
+      );
+    }
+
+    // Sinkronkan juga ke StorageService user jika ada
+    try {
+      final savedUser = await StorageService().getUser();
+      if (savedUser != null && (savedUser.id.toString().trim() == docId || savedUser.role == 'dokter')) {
+        await StorageService().saveUser(
+          savedUser.copyWith(
+            nama: nama,
+            email: email.isNotEmpty ? email : savedUser.email,
+            noHp: noHp.isNotEmpty ? noHp : savedUser.noHp,
+            fotoProfile: (fotoProfile != null && fotoProfile.isNotEmpty) ? fotoProfile : savedUser.fotoProfile,
+            spesialisasi: spesialisasi,
+          ),
+        );
+      }
+    } catch (_) {}
+
+    return fetchDokterProfile(dokterId: docId);
+  }
+
+  /// Memperbarui foto profil dokter di tabel `dokter` Supabase
+  Future<Map<String, dynamic>?> updateDokterPhoto(
+    String fileOrUrl, {
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return null;
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return null;
+
+    final cleanVal = fileOrUrl.trim();
+    if (cleanVal.isEmpty) return null;
+
+    try {
+      await _exec('ALTER TABLE dokter ALTER COLUMN foto_profile TYPE TEXT');
+    } catch (_) {}
+
+    await _exec(
+      '''
+      UPDATE dokter
+      SET foto_profile = @foto,
+          updated_at = NOW()
+      WHERE TRIM(id_dokter) = @id
+      ''',
+      parameters: {
+        'id': docId,
+        'foto': cleanVal,
+      },
+    );
+
+    try {
+      final savedUser = await StorageService().getUser();
+      if (savedUser != null && (savedUser.id.toString().trim() == docId || savedUser.role == 'dokter')) {
+        await StorageService().saveUser(savedUser.copyWith(fotoProfile: cleanVal));
+      }
+    } catch (_) {}
+
+    return {
+      'id_dokter': docId,
+      'foto_profile': cleanVal,
+      'foto_profil': cleanVal,
+      'foto_url': cleanVal,
+    };
+  }
+
+  /// Memperbarui kata sandi dokter secara real di tabel `"user"` Supabase
+  /// Mengembalikan `null` jika berhasil, atau pesan error jika gagal
+  Future<String?> updateDokterPassword({
+    required String currentPassword,
+    required String newPassword,
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return null;
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return 'Akun dokter tidak ditemukan di database.';
+
+    final check = await _exec(
+      r'''
+      SELECT (
+        (extensions.crypt(@currentPass, replace(password, '$2y$', '$2a$')) = replace(password, '$2y$', '$2a$'))
+        OR password = @currentPass
+      ) AS is_valid
+      FROM "user"
+      WHERE TRIM(id) = @id
+      LIMIT 1
+      ''',
+      parameters: {
+        'id': docId,
+        'currentPass': currentPassword,
+      },
+    );
+
+    if (check.isEmpty || check.first.toColumnMap()['is_valid'] != true) {
+      return 'Kata sandi lama tidak sesuai dengan akun Anda.';
+    }
+
+    await _exec(
+      r'''
+      UPDATE "user"
+      SET password = replace(extensions.crypt(@newPass, extensions.gen_salt('bf', 12)), '$2a$', '$2y$'),
+          updated_at = NOW()
+      WHERE TRIM(id) = @id
+      ''',
+      parameters: {
+        'id': docId,
+        'newPass': newPassword,
+      },
+    );
+
+    return null;
+  }
+
+  /// Mengambil pengaturan notifikasi dokter dari Supabase (`dokter.bio`)
+  Future<Map<String, dynamic>> fetchDokterNotificationSettings({
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) {
+      return {
+        'notif_chat': true,
+        'notif_jadwal': true,
+        'notif_update': true,
+      };
+    }
+    final profile = await fetchDokterProfile(dokterId: dokterId, doctorName: doctorName);
+    return {
+      'notif_chat': profile?['notif_chat'] is bool ? profile!['notif_chat'] : true,
+      'notif_jadwal': profile?['notif_jadwal'] is bool ? profile!['notif_jadwal'] : true,
+      'notif_update': profile?['notif_update'] is bool ? profile!['notif_update'] : true,
+    };
+  }
+
+  /// Menyimpan pengaturan notifikasi dokter ke Supabase (`dokter.bio`)
+  Future<Map<String, dynamic>> updateDokterNotificationSettings(
+    Map<String, dynamic> settings, {
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return settings;
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return settings;
+
+    final current = await fetchDokterProfile(dokterId: docId) ?? <String, dynamic>{};
+    final bioMeta = _parseDokterBioMeta(current['bio']);
+
+    if (settings.containsKey('notif_chat')) {
+      bioMeta['notif_chat'] = settings['notif_chat'] == true;
+    }
+    if (settings.containsKey('notif_jadwal')) {
+      bioMeta['notif_jadwal'] = settings['notif_jadwal'] == true;
+    }
+    if (settings.containsKey('notif_update')) {
+      bioMeta['notif_update'] = settings['notif_update'] == true;
+    }
+
+    await _exec(
+      '''
+      UPDATE dokter
+      SET bio = @bio,
+          updated_at = NOW()
+      WHERE TRIM(id_dokter) = @id
+      ''',
+      parameters: {
+        'id': docId,
+        'bio': jsonEncode(bioMeta),
+      },
+    );
+
+    return {
+      'notif_chat': bioMeta['notif_chat'] ?? true,
+      'notif_jadwal': bioMeta['notif_jadwal'] ?? true,
+      'notif_update': bioMeta['notif_update'] ?? true,
+    };
+  }
+
+  /// Mengambil daftar perangkat login aktif untuk dokter dari `personal_access_tokens` & `sessions` Supabase
+  Future<List<Map<String, dynamic>>> fetchDokterLoginDevices({
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (_isTest) return [];
+
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    final List<Map<String, dynamic>> devices = [];
+
+    String currentDeviceName = 'Perangkat GIAT';
+    try {
+      final os = Platform.operatingSystem;
+      final host = Platform.localHostname;
+      if (os == 'android') {
+        currentDeviceName = 'Smartphone Android ($host)';
+      } else if (os == 'ios') {
+        currentDeviceName = 'iPhone / iOS ($host)';
+      } else if (os == 'windows') {
+        currentDeviceName = 'Windows Desktop ($host)';
+      } else if (os == 'macos') {
+        currentDeviceName = 'macOS Desktop ($host)';
+      } else {
+        currentDeviceName = '${os.toUpperCase()} ($host)';
+      }
+    } catch (_) {}
+
+    final now = DateTime.now();
+    final months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    final nowFormatted =
+        '${now.day.toString().padLeft(2, '0')} ${months[now.month]} ${now.year}, ${now.hour.toString().padLeft(2, '0')}.${now.minute.toString().padLeft(2, '0')} WIB';
+
+    devices.add({
+      'id': 'current-session',
+      'device_name': currentDeviceName,
+      'location': 'Indonesia (Sesi Saat Ini)',
+      'login_date': nowFormatted,
+      'is_current_device': true,
+    });
+
+    if (docId != null && docId.isNotEmpty) {
+      try {
+        final tokenRows = await _exec(
+          '''
+          SELECT 
+            id::text AS id,
+            name,
+            last_used_at,
+            created_at
+          FROM personal_access_tokens
+          WHERE TRIM(tokenable_id) = @docId
+          ORDER BY COALESCE(last_used_at, created_at) DESC
+          LIMIT 10
+          ''',
+          parameters: {'docId': docId},
+        );
+        for (final r in tokenRows) {
+          final m = _normalizeMap(r.toColumnMap());
+          final rawTime = (m['last_used_at'] ?? m['created_at'])?.toString() ?? '';
+          final parsed = DateTime.tryParse(rawTime)?.toLocal();
+          final dateStr = parsed != null
+              ? '${parsed.day.toString().padLeft(2, '0')} ${months[parsed.month]} ${parsed.year}, ${parsed.hour.toString().padLeft(2, '0')}.${parsed.minute.toString().padLeft(2, '0')} WIB'
+              : rawTime;
+          devices.add({
+            'id': 'pat-${m['id']}',
+            'device_name': m['name']?.toString().isNotEmpty == true ? m['name'].toString() : 'Sesi Token GIAT',
+            'location': 'Indonesia',
+            'login_date': dateStr,
+            'is_current_device': false,
+          });
+        }
+      } catch (_) {}
+
+      try {
+        final sessionRows = await _exec(
+          '''
+          SELECT 
+            id,
+            ip_address,
+            user_agent,
+            last_activity
+          FROM sessions
+          WHERE TRIM(user_id) = @docId
+          ORDER BY last_activity DESC
+          LIMIT 10
+          ''',
+          parameters: {'docId': docId},
+        );
+        for (final r in sessionRows) {
+          final m = _normalizeMap(r.toColumnMap());
+          final lastAct = int.tryParse(m['last_activity']?.toString() ?? '0') ?? 0;
+          final dt = lastAct > 0
+              ? DateTime.fromMillisecondsSinceEpoch(lastAct * 1000).toLocal()
+              : now;
+          final dateStr =
+              '${dt.day.toString().padLeft(2, '0')} ${months[dt.month]} ${dt.year}, ${dt.hour.toString().padLeft(2, '0')}.${dt.minute.toString().padLeft(2, '0')} WIB';
+          devices.add({
+            'id': 'sess-${m['id']}',
+            'device_name': m['user_agent']?.toString().isNotEmpty == true
+                ? m['user_agent'].toString().split(' ').take(3).join(' ')
+                : 'Sesi Web GIAT',
+            'location': m['ip_address']?.toString() ?? 'Indonesia',
+            'login_date': dateStr,
+            'is_current_device': false,
+          });
+        }
+      } catch (_) {}
+    }
+
+    return devices;
+  }
+
+  /// Menghapus/mencabut sesi perangkat login dari `personal_access_tokens` atau `sessions` di Supabase
+  Future<bool> revokeDokterDevice(dynamic idToken) async {
+    if (_isTest) return true;
+    final raw = idToken?.toString().trim() ?? '';
+    if (raw.isEmpty || raw == 'current-session') return false;
+
+    if (raw.startsWith('pat-')) {
+      final patId = raw.substring(4);
+      await _exec(
+        'DELETE FROM personal_access_tokens WHERE id::text = @id',
+        parameters: {'id': patId},
+      );
+      return true;
+    } else if (raw.startsWith('sess-')) {
+      final sessId = raw.substring(5);
+      await _exec(
+        'DELETE FROM sessions WHERE id = @id',
+        parameters: {'id': sessId},
+      );
+      return true;
+    } else {
+      await _exec(
+        'DELETE FROM personal_access_tokens WHERE id::text = @id',
+        parameters: {'id': raw},
+      );
+      await _exec(
+        'DELETE FROM sessions WHERE id = @id',
+        parameters: {'id': raw},
+      );
+      return true;
+    }
+  }
+
+  /// Mengambil daftar riwayat resep obat yang diterbitkan oleh dokter dari Supabase
+  Future<List<Map<String, dynamic>>> fetchDokterResepHistory({
+    String? dokterId,
+    String? doctorName,
+    String? patientId,
+  }) async {
+    if (_isTest) return [];
+    final docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) return [];
+
+    final params = <String, dynamic>{'docId': docId};
+    String patientClause = '';
+    if (patientId != null && patientId.trim().isNotEmpty) {
+      patientClause = 'AND TRIM(r.id_pasien) = @pId';
+      params['pId'] = patientId.trim();
+    }
+
+    final rows = await _exec(
+      '''
+      SELECT 
+        TRIM(r.id) AS id,
+        TRIM(r.id) AS id_resep,
+        r.no_resep,
+        TRIM(r.id_konsultasi) AS id_konsultasi,
+        TRIM(r.id_dokter) AS id_dokter,
+        TRIM(r.id_pasien) AS id_pasien,
+        r.tanggal_resep::text AS tanggal_resep,
+        r.diagnosis,
+        r.catatan_dokter,
+        r.status,
+        COALESCE(r.updated_at, r.created_at) AS created_at,
+        r.updated_at,
+        COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien
+      FROM resep r
+      LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(r.id_pasien)
+      WHERE TRIM(r.id_dokter) = @docId
+        $patientClause
+      ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+      LIMIT 30
+      ''',
+      parameters: params,
+    );
+
+    final List<Map<String, dynamic>> result = [];
+    for (final row in rows) {
+      final map = _normalizeMap(row.toColumnMap());
+      final rxId = map['id']?.toString().trim();
+      if (rxId != null && rxId.isNotEmpty) {
+        final itemRows = await _exec(
+          '''
+          SELECT 
+            TRIM(id) AS id,
+            TRIM(id_resep) AS id_resep,
+            nama_obat,
+            dosis,
+            aturan_pakai,
+            waktu_penggunaan,
+            jumlah,
+            catatan_khusus
+          FROM resep_item
+          WHERE TRIM(id_resep) = @rxId
+          ORDER BY created_at ASC
+          ''',
+          parameters: {'rxId': rxId},
+        );
+        map['items'] = itemRows.map((ir) => _normalizeMap(ir.toColumnMap())).toList();
+      } else {
+        map['items'] = <Map<String, dynamic>>[];
+      }
+      result.add(map);
+    }
+    return result;
+  }
+
+  /// Mengambil daftar pesan chat dari tabel `konsultasi_pesan` di Supabase untuk sesi konsultasi tertentu
+  Future<List<Map<String, dynamic>>> fetchConsultationMessages(String consultationId) async {
+    if (_isTest) return [];
+    final consId = consultationId.trim();
+    if (consId.isEmpty) return [];
+
+    final rows = await _exec(
+      '''
+      SELECT 
+        TRIM(m.id) AS id,
+        TRIM(m.id_konsultasi) AS id_konsultasi,
+        TRIM(m.id_sender) AS id_sender,
+        m.pesan,
+        m.attachment_url,
+        m.is_read,
+        m.created_at,
+        CASE 
+          WHEN TRIM(m.id_sender) = TRIM(k.id_dokter) THEN 'dokter'
+          WHEN TRIM(m.id_sender) = TRIM(k.id_pasien) THEN 'pasien'
+          ELSE COALESCE(u.role, 'pasien')
+        END AS sender_role
+      FROM konsultasi_pesan m
+      LEFT JOIN konsultasi k ON TRIM(k.id) = TRIM(m.id_konsultasi)
+      LEFT JOIN "user" u ON TRIM(u.id) = TRIM(m.id_sender)
+      WHERE TRIM(m.id_konsultasi) = @consId
+      ORDER BY m.created_at ASC
+      ''',
+      parameters: {'consId': consId},
+    );
+
+    return rows.map((r) => _normalizeMap(r.toColumnMap())).toList();
+  }
+
+  /// Menyimpan pesan chat baru ke tabel `konsultasi_pesan` di Supabase
+  Future<Map<String, dynamic>?> sendConsultationMessage({
+    required String consultationId,
+    required String pesan,
+    String? senderId,
+    String? senderRole,
+    String? attachmentUrl,
+  }) async {
+    if (_isTest) return null;
+    final consId = consultationId.trim();
+    final cleanMsg = pesan.trim();
+    if (consId.isEmpty || cleanMsg.isEmpty) return null;
+
+    String? resolvedSenderId = senderId?.trim();
+    if (resolvedSenderId == null || resolvedSenderId.length < 30) {
+      final user = await StorageService().getUser();
+      final role = (senderRole ?? user?.role ?? '').toLowerCase();
+      if (role == 'dokter') {
+        final konsRow = await _exec(
+          'SELECT TRIM(id_dokter) AS id_dokter FROM konsultasi WHERE TRIM(id) = @id LIMIT 1',
+          parameters: {'id': consId},
+        );
+        if (konsRow.isNotEmpty) {
+          resolvedSenderId = konsRow.first.toColumnMap()['id_dokter']?.toString().trim();
+        }
+        resolvedSenderId ??= await resolveCurrentDokterId();
+      } else {
+        final konsRow = await _exec(
+          'SELECT TRIM(id_pasien) AS id_pasien FROM konsultasi WHERE TRIM(id) = @id LIMIT 1',
+          parameters: {'id': consId},
+        );
+        if (konsRow.isNotEmpty) {
+          resolvedSenderId = konsRow.first.toColumnMap()['id_pasien']?.toString().trim();
+        }
+        resolvedSenderId ??= await resolveCurrentPasienId();
+      }
+    }
+
+    if (resolvedSenderId == null || resolvedSenderId.isEmpty) return null;
+
+    final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
+    final newId = uuidRes.first.toColumnMap()['id'].toString().trim();
+
+    await _exec(
+      '''
+      INSERT INTO konsultasi_pesan (id, id_konsultasi, id_sender, pesan, attachment_url, is_read, created_at)
+      VALUES (@id, @consId, @senderId, @pesan, @attachment, false, NOW())
+      ''',
+      parameters: {
+        'id': newId,
+        'consId': consId,
+        'senderId': resolvedSenderId,
+        'pesan': cleanMsg,
+        'attachment': attachmentUrl,
+      },
+    );
+
+    await _exec(
+      'UPDATE konsultasi SET updated_at = NOW() WHERE TRIM(id) = @consId',
+      parameters: {'consId': consId},
+    );
+
+    return {
+      'id': newId,
+      'id_konsultasi': consId,
+      'id_sender': resolvedSenderId,
+      'pesan': cleanMsg,
+      'attachment_url': attachmentUrl,
+      'is_read': false,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
+  /// Menyelesaikan sesi konsultasi di tabel `konsultasi` Supabase
+  Future<Map<String, dynamic>?> completeConsultation(String consultationId) async {
+    if (_isTest) return null;
+    final consId = consultationId.trim();
+    if (consId.isEmpty) return null;
+
+    await _exec(
+      '''
+      UPDATE konsultasi
+      SET status = 'selesai',
+          jam_selesai = COALESCE(jam_selesai, CURRENT_TIME),
+          updated_at = NOW()
+      WHERE TRIM(id) = @consId
+      ''',
+      parameters: {'consId': consId},
+    );
+
+    return {
+      'id': consId,
+      'status': 'selesai',
+    };
   }
 }
 

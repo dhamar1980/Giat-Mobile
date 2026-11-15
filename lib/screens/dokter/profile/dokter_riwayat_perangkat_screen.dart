@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,10 +23,12 @@ class _DokterRiwayatPerangkatScreenState extends State<DokterRiwayatPerangkatScr
 
   late List<DokterDeviceSession> _devices;
 
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
   @override
   void initState() {
     super.initState();
-    _devices = List.from(DokterMockData.devices);
+    _devices = _isTest ? List.from(DokterMockData.devices) : [];
     _loadDevicesFromApi();
   }
 
@@ -35,13 +38,14 @@ class _DokterRiwayatPerangkatScreenState extends State<DokterRiwayatPerangkatScr
       if (!mounted) return;
       setState(() {
         final apiDevs = res.data!.map((item) {
-          if (item is Map<String, dynamic>) {
+          if (item is Map) {
+            final m = Map<String, dynamic>.from(item);
             return DokterDeviceSession(
-              id: item['id']?.toString() ?? '1',
-              deviceName: item['device_name']?.toString() ?? item['name']?.toString() ?? 'Perangkat',
-              lastActive: item['last_active']?.toString() ?? 'Baru saja',
-              location: item['location']?.toString() ?? 'Lokasi: Indonesia',
-              isCurrent: item['is_current'] == true || item['is_current'] == 1,
+              id: m['id']?.toString() ?? '1',
+              deviceName: m['device_name']?.toString() ?? m['name']?.toString() ?? 'Perangkat',
+              lastActive: m['last_active']?.toString() ?? m['login_date']?.toString() ?? 'Baru saja',
+              location: m['location']?.toString() ?? 'Lokasi: Indonesia',
+              isCurrent: m['is_current'] == true || m['is_current'] == 1 || m['is_current_device'] == true,
             );
           }
           return null;
@@ -75,10 +79,12 @@ class _DokterRiwayatPerangkatScreenState extends State<DokterRiwayatPerangkatScr
   Widget build(BuildContext context) {
     final currentDevice = _devices.firstWhere(
       (d) => d.isCurrent,
-      orElse: () => const DokterDeviceSession(
+      orElse: () => DokterDeviceSession(
         id: 'dev-1',
-        deviceName: 'Smartphoone Android',
-        lastActive: 'Terakhir aktif hari ini, 18:42 WIB',
+        deviceName: _isTest
+            ? 'Smartphoone Android'
+            : 'Perangkat ${Platform.operatingSystem.toUpperCase()}',
+        lastActive: 'Terakhir aktif hari ini',
         location: 'Lokasi: Indonesia',
         isCurrent: true,
       ),

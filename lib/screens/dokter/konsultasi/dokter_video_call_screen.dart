@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/dokter_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RUANG VIDEO CALL DOKTER - PASIEN (Figma Node: 1008-19868)
@@ -32,16 +34,23 @@ class _DokterVideoCallScreenState extends State<DokterVideoCallScreen> {
   bool _isSwappedView = false; // Tap PiP to swap remote and local view
 
   // Live timer
-  int _secondsElapsed = 252; // Matching 04:12 on start
+  late int _secondsElapsed;
   Timer? _timer;
 
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
 
-  static const _defaultDoctorPhoto =
-      'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=800';
+  String get _doctorPhotoUrl {
+    final liveAvatar = DokterProfileState.instance.avatarUrl;
+    if (liveAvatar.isNotEmpty && liveAvatar.startsWith('http')) {
+      return liveAvatar;
+    }
+    return 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=800';
+  }
 
   @override
   void initState() {
     super.initState();
+    _secondsElapsed = _isTest ? 252 : 0;
     _startTimer();
   }
 
@@ -540,7 +549,7 @@ class _DokterVideoCallScreenState extends State<DokterVideoCallScreen> {
       fit: StackFit.expand,
       children: [
         Image.network(
-          _defaultDoctorPhoto,
+          _doctorPhotoUrl,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) => Container(
             decoration: const BoxDecoration(

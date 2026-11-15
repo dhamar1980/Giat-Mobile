@@ -43,6 +43,140 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
     DokterProfileState.instance.loadProfile(fallbackName: widget.doctorName);
   }
 
+  Future<void> _showEditProfileDialog(DokterProfileState profileState) async {
+    final namaCtrl = TextEditingController(text: profileState.doctorName);
+    final specCtrl = TextEditingController(text: profileState.specialty);
+    final strCtrl = TextEditingController(text: profileState.strNumber);
+    final sipCtrl = TextEditingController(text: profileState.sipNumber);
+    final instCtrl = TextEditingController(text: profileState.institution);
+    final addrCtrl = TextEditingController(text: profileState.practiceAddress);
+    final schedCtrl = TextEditingController(text: profileState.practiceSchedule);
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            'Edit Profil Dokter',
+            style: GoogleFonts.inter(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildEditField('Nama Lengkap', namaCtrl),
+                const SizedBox(height: 10),
+                _buildEditField('Spesialisasi', specCtrl),
+                const SizedBox(height: 10),
+                _buildEditField('No. STR', strCtrl),
+                const SizedBox(height: 10),
+                _buildEditField('No. SIP', sipCtrl),
+                const SizedBox(height: 10),
+                _buildEditField('Institusi', instCtrl),
+                const SizedBox(height: 10),
+                _buildEditField('Alamat Praktik', addrCtrl),
+                const SizedBox(height: 10),
+                _buildEditField('Jadwal Praktik', schedCtrl),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.of(ctx).pop(),
+              child: Text(
+                'Batal',
+                style: GoogleFonts.inter(color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _darkGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      setModalState(() => isSaving = true);
+                      final payload = {
+                        'nama': namaCtrl.text.trim(),
+                        'spesialisasi': specCtrl.text.trim(),
+                        'no_str': strCtrl.text.trim(),
+                        'no_sip': sipCtrl.text.trim(),
+                        'institusi': instCtrl.text.trim(),
+                        'alamat_praktik': addrCtrl.text.trim(),
+                        'jadwal_praktik': schedCtrl.text.trim(),
+                      };
+                      final res = await DokterApiService().updateProfile(
+                        payload,
+                        doctorName: widget.doctorName,
+                      );
+                      profileState.syncFromUser(
+                        name: payload['nama'],
+                        spec: payload['spesialisasi'],
+                        str: payload['no_str'],
+                        sip: payload['no_sip'],
+                        inst: payload['institusi'],
+                        address: payload['alamat_praktik'],
+                        schedule: payload['jadwal_praktik'],
+                      );
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              res.message.isNotEmpty
+                                  ? res.message
+                                  : 'Profil dokter berhasil diperbarui!',
+                            ),
+                            backgroundColor: _darkGreen,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+              child: isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      'Simpan',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditField(String label, TextEditingController controller) {
+    return TextField(
+      controller: controller,
+      style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF0F172A)),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+        isDense: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _darkGreen, width: 1.5),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickImage(BuildContext context, ImageSource source, DokterProfileState profileState) async {
     try {
       final picker = ImagePicker();
@@ -560,7 +694,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                                     ],
                                   ),
                                   child: Text(
-                                    'KLINIK SEHATI MENTENG',
+                                    profileState.institution.toUpperCase(),
                                     style: GoogleFonts.inter(
                                       fontSize: 10.5,
                                       fontWeight: FontWeight.w700,
@@ -692,6 +826,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
           ),
         ),
         child: Stack(
+          alignment: Alignment.topCenter,
           children: [
             Positioned.fill(
               child: CustomPaint(
@@ -700,103 +835,146 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
             ),
             SafeArea(
               bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
-                child: Column(
-                  children: [
-                    // Top Navigation Row: "Kembali" pill
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Tombol "<- Kembali"
-                        GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
+              child: SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Top Navigation Row: "Kembali" pill
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Tombol "<- Kembali"
+                          GestureDetector(
+                            onTap: () => Navigator.of(context).pop(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.arrow_back, size: 15, color: Color(0xFF0F172A)),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Kembali',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _showEditProfileDialog(profileState),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.edit_outlined, size: 15, color: Color(0xFF065A37)),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Edit',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF065A37),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // Avatar Circle with White Border
+                      Center(
+                        child: GestureDetector(
+                          onTap: () => _showChangeProfilePhotoModal(context),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                            width: 104,
+                            height: 104,
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3.5),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
                                 ),
                               ],
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.arrow_back, size: 15, color: Color(0xFF0F172A)),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Kembali',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
+                            child: ClipOval(
+                              child: profileState.buildAvatarWidget(size: 104, iconSize: 52),
                             ),
                           ),
                         ),
-                        const SizedBox.shrink(),
-                      ],
-                    ),
+                      ),
 
-                    const SizedBox(height: 14),
+                      const SizedBox(height: 12),
 
-                    // Avatar Circle with White Border
-                    GestureDetector(
-                      onTap: () => _showChangeProfilePhotoModal(context),
-                      child: Container(
-                        width: 104,
-                        height: 104,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.18),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: profileState.buildAvatarWidget(size: 104, iconSize: 52),
+                      // Doctor Name
+                      SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          name,
+                          style: GoogleFonts.inter(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: -0.2,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 4),
 
-                    // Doctor Name
-                    Text(
-                      name,
-                      style: GoogleFonts.inter(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.2,
+                      // Doctor Specialty
+                      SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          specialty,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    // Doctor Specialty
-                    Text(
-                      specialty,
-                      style: GoogleFonts.inter(
-                        fontSize: 13.5,
-                        color: Colors.white.withValues(alpha: 0.92),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

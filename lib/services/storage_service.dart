@@ -62,6 +62,8 @@ class StorageService {
              savedHost == '10.0.2.2' ||
              savedHost == '127.0.0.1' ||
              savedHost == 'localhost' ||
+             savedHost.startsWith('10.') ||
+             savedHost.startsWith('192.168.') ||
              savedHost.isEmpty)) {
           debugPrint('🔄 Sinkronisasi Base URL ($savedHost) -> URL baru ($currentHost)');
           await saveBaseUrl(ApiConstants.defaultBaseUrl);

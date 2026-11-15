@@ -256,6 +256,17 @@ class KonsultasiApiService {
 
   /// GET /konsultasi/{id}/pesan
   Future<ApiResponse<List<dynamic>>> getMessages(dynamic id) async {
+    if (!_isTest && id != null) {
+      try {
+        final msgs = await SupabaseAdminService.instance.fetchConsultationMessages(id.toString());
+        return ApiResponse.success(
+          message: 'Berhasil memuat pesan chat dari Supabase.',
+          data: msgs,
+          statusCode: 200,
+        );
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.get('/konsultasi/$id/pesan');
       final raw = response.data;
@@ -329,6 +340,23 @@ class KonsultasiApiService {
     String tipe = 'text',
     dynamic attachment,
   }) async {
+    if (!_isTest && id != null) {
+      try {
+        final saved = await SupabaseAdminService.instance.sendConsultationMessage(
+          consultationId: id.toString(),
+          pesan: pesan,
+          attachmentUrl: attachment is String ? attachment : (attachment is File ? attachment.path : null),
+        );
+        if (saved != null) {
+          return ApiResponse.success(
+            message: 'Pesan berhasil dikirim dan disimpan ke Supabase.',
+            data: saved,
+            statusCode: 201,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       dynamic payload;
       if (attachment != null && attachment is File) {
@@ -468,6 +496,19 @@ class KonsultasiApiService {
 
   /// POST /konsultasi/{id}/selesai
   Future<ApiResponse<Map<String, dynamic>>> selesaikanKonsultasi(dynamic id) async {
+    if (!_isTest && id != null) {
+      try {
+        final res = await SupabaseAdminService.instance.completeConsultation(id.toString());
+        if (res != null) {
+          return ApiResponse.success(
+            message: 'Sesi konsultasi telah diselesaikan di Supabase.',
+            data: res,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
+
     try {
       final response = await _client.dio.post('/konsultasi/$id/selesai');
       return ApiResponse.success(

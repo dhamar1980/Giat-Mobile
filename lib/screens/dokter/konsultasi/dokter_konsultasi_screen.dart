@@ -18,11 +18,17 @@ import '../../../config/api_config.dart';
 class DokterKonsultasiScreen extends StatefulWidget {
   final VoidCallback? onProfileTap;
   final bool? isTopBarVisible;
+  final String? doctorName;
+  final String? dokterId;
+  final List<Map<String, dynamic>>? initialConsultations;
 
   const DokterKonsultasiScreen({
     super.key,
     this.onProfileTap,
     this.isTopBarVisible,
+    this.doctorName,
+    this.dokterId,
+    this.initialConsultations,
   });
 
   @override
@@ -40,134 +46,181 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   bool _isTopBarVisible = true;
+  bool _isLoading = false;
   List<DokterConsultation> _liveConsultations = [];
   final Map<String, DokterPatient> _livePatientMap = {};
 
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
   bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
 
   @override
   void initState() {
     super.initState();
-    _fetchLiveConsultations();
+    if (widget.initialConsultations != null) {
+      _applyConsultationRawList(widget.initialConsultations!);
+    } else if (!_isTest) {
+      _fetchLiveConsultations();
+    } else {
+      _fetchLiveConsultations();
+    }
+  }
+
+  void _applyConsultationRawList(List<dynamic> rawList) {
+    final List<DokterConsultation> parsedList = [];
+    for (var item in rawList) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+
+      final id = (map['id'] ?? map['id_konsultasi'] ?? '').toString();
+      final pasienData = map['pasien'] is Map ? Map<String, dynamic>.from(map['pasien'] as Map) : null;
+      final patientId = (map['id_pasien'] ?? pasienData?['id_pasien'] ?? pasienData?['id'] ?? id).toString();
+      final patientName = (pasienData?['nama'] ?? map['nama_pasien'] ?? 'Pasien').toString();
+
+      // Initials
+      String initials = 'P';
+      final parts = patientName.trim().split(RegExp(r'\s+'));
+      if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        if (parts.length == 1) {
+          initials = parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+        } else {
+          initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+        }
+      }
+
+      // Status
+      final statusStr = (map['status'] ?? map['status_konsultasi'] ?? '').toString().toLowerCase();
+      KonsultasiStatus status;
+      if (statusStr == 'selesai' || statusStr == 'completed') {
+        status = KonsultasiStatus.selesai;
+      } else if (statusStr == 'terjadwal' || statusStr == 'scheduled' || statusStr == 'menunggu' || statusStr == 'pending') {
+        status = KonsultasiStatus.terjadwal;
+      } else {
+        status = KonsultasiStatus.berlangsung;
+      }
+
+      // Scheduled time text
+      String timeText = 'Hari ini';
+      final tgl = map['tanggal_konsultasi'];
+      final cleanTime = TimeUtils.cleanTimeString(map['jam_mulai']);
+      if (cleanTime != null && cleanTime.isNotEmpty) {
+        timeText = '$cleanTime WIB';
+      } else if (tgl != null) {
+        timeText = TimeUtils.formatDate(tgl, useIndonesianMonth: true);
+      }
+
+      // Message count & last message
+      final msgCount = int.tryParse((map['pesan_count'] ?? map['unread_count'] ?? 0).toString()) ?? 0;
+      final lastMsg = (map['last_message'] ?? map['keluhan_awal'] ?? map['isi_konsultasi'] ?? 'Konsultasi GIAT').toString();
+      final lastTime = TimeUtils.formatChatTime(map['last_message_time'] ?? map['updated_at'] ?? map['created_at']);
+
+      // Calculate Age
+      int age = 26;
+      final birthStr = (pasienData?['tanggal_lahir'] ?? map['tanggal_lahir'])?.toString();
+      if (birthStr != null && birthStr.isNotEmpty) {
+        final dt = DateTime.tryParse(birthStr);
+        if (dt != null) {
+          final now = DateTime.now();
+          age = now.year - dt.year;
+          if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
+            age--;
+          }
+        }
+      }
+
+      final rawGender = (pasienData?['jenis_kelamin'] ?? map['jenis_kelamin'] ?? '').toString();
+      final gender = (rawGender == 'L' || rawGender.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
+
+      final avatarUrl = ApiConfig.resolveImageUrl(
+        (pasienData?['foto_profile'] ?? pasienData?['foto_profil'] ?? map['foto_profile'])?.toString(),
+      );
+
+      final weightKg = double.tryParse(
+            (pasienData?['berat_badan'] ?? map['berat_badan'] ?? '').toString(),
+          ) ??
+          0.0;
+      final rawHeight = double.tryParse(
+            (pasienData?['tinggi_badan'] ?? map['tinggi_badan'] ?? '').toString(),
+          ) ??
+          0.0;
+      final heightM = rawHeight > 3.0 ? rawHeight / 100.0 : rawHeight;
+      final rawCond = (pasienData?['kondisi'] ?? map['kondisi_pantau'] ?? '').toString().trim();
+      final condition = rawCond.isNotEmpty
+          ? '${rawCond[0].toUpperCase()}${rawCond.substring(1)}'
+          : 'Pasien Ginjal';
+      final complaint = (pasienData?['keluhan'] ?? map['keluhan_pantau'] ?? map['keluhan_awal'] ?? map['isi_konsultasi'] ?? 'Konsultasi Ginjal').toString();
+      final complaintDetail = (pasienData?['detail_keluhan'] ?? map['detail_keluhan_pantau'] ?? map['keluhan_awal'] ?? map['isi_konsultasi'] ?? '').toString();
+
+      final patientObj = DokterPatient(
+        id: patientId,
+        name: patientName,
+        initials: initials,
+        age: age,
+        gender: gender,
+        address: (pasienData?['alamat'] ?? map['alamat'] ?? 'Indonesia').toString(),
+        weightKg: weightKg,
+        heightM: heightM,
+        condition: condition,
+        complaint: complaint,
+        complaintDetail: complaintDetail,
+        currentMedicines: const [],
+        avatarUrl: avatarUrl,
+        avatarBgColor: const Color(0xFFCFE8F3),
+        avatarTextColor: const Color(0xFF0F172A),
+      );
+      _livePatientMap[patientId] = patientObj;
+
+      parsedList.add(
+        DokterConsultation(
+          id: id,
+          patientName: patientName,
+          initials: initials,
+          status: status,
+          scheduledTimeText: timeText,
+          messageCount: msgCount,
+          lastMessage: lastMsg,
+          lastTime: lastTime,
+          patientId: patientId,
+          avatarUrl: avatarUrl,
+          patient: patientObj,
+        ),
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _liveConsultations = parsedList;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchLiveConsultations() async {
+    if (!_isTest && _liveConsultations.isEmpty && mounted) {
+      setState(() => _isLoading = true);
+    }
     try {
-      final res = await KonsultasiApiService().getRiwayatDokter();
-      if (res.success && res.data != null && res.data!.isNotEmpty) {
-        final List<DokterConsultation> parsedList = [];
-        for (var item in res.data!) {
-          if (item is! Map) continue;
-          final map = Map<String, dynamic>.from(item);
-
-          final id = (map['id'] ?? map['id_konsultasi'] ?? '').toString();
-          final pasienData = map['pasien'] is Map ? Map<String, dynamic>.from(map['pasien'] as Map) : null;
-          final patientId = (map['id_pasien'] ?? pasienData?['id_pasien'] ?? pasienData?['id'] ?? id).toString();
-          final patientName = (pasienData?['nama'] ?? map['nama_pasien'] ?? 'Pasien').toString();
-
-          // Initials
-          String initials = 'P';
-          final parts = patientName.trim().split(RegExp(r'\s+'));
-          if (parts.isNotEmpty && parts[0].isNotEmpty) {
-            if (parts.length == 1) {
-              initials = parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
-            } else {
-              initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-            }
-          }
-
-          // Status
-          final statusStr = (map['status'] ?? map['status_konsultasi'] ?? '').toString().toLowerCase();
-          KonsultasiStatus status;
-          if (statusStr == 'selesai' || statusStr == 'completed') {
-            status = KonsultasiStatus.selesai;
-          } else if (statusStr == 'terjadwal' || statusStr == 'scheduled' || statusStr == 'menunggu' || statusStr == 'pending') {
-            status = KonsultasiStatus.terjadwal;
-          } else {
-            status = KonsultasiStatus.berlangsung;
-          }
-
-          // Scheduled time text
-          String timeText = 'Hari ini';
-          final tgl = map['tanggal_konsultasi'];
-          final cleanTime = TimeUtils.cleanTimeString(map['jam_mulai']);
-          if (cleanTime != null && cleanTime.isNotEmpty) {
-            timeText = '$cleanTime WIB';
-          } else if (tgl != null) {
-            timeText = TimeUtils.formatDate(tgl, useIndonesianMonth: true);
-          }
-
-          // Message count & last message
-          final msgCount = int.tryParse((map['pesan_count'] ?? map['unread_count'] ?? 0).toString()) ?? 0;
-          final lastMsg = (map['last_message'] ?? map['keluhan_awal'] ?? map['isi_konsultasi'] ?? 'Konsultasi GIAT').toString();
-          final lastTime = TimeUtils.formatChatTime(map['updated_at'] ?? map['created_at']);
-
-          // Calculate Age
-          int age = 26;
-          if (pasienData?['tanggal_lahir'] != null) {
-            final dt = DateTime.tryParse(pasienData!['tanggal_lahir'].toString());
-            if (dt != null) {
-              final now = DateTime.now();
-              age = now.year - dt.year;
-              if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
-                age--;
-              }
-            }
-          }
-
-          final rawGender = (pasienData?['jenis_kelamin'] ?? '').toString();
-          final gender = (rawGender == 'L' || rawGender.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
-
-          final avatarUrl = ApiConfig.resolveImageUrl((pasienData?['foto_profile'] ?? pasienData?['foto_profil'])?.toString());
-
-          final patientObj = DokterPatient(
-            id: patientId,
-            name: patientName,
-            initials: initials,
-            age: age,
-            gender: gender,
-            address: (pasienData?['alamat'] ?? 'Kota Bandung').toString(),
-            weightKg: 55.0,
-            heightM: 1.65,
-            condition: 'Pasien Ginjal',
-            complaint: (map['keluhan_awal'] ?? map['isi_konsultasi'] ?? 'Konsultasi Ginjal').toString(),
-            complaintDetail: (map['keluhan_awal'] ?? map['isi_konsultasi'] ?? '').toString(),
-            currentMedicines: const [],
-            avatarUrl: avatarUrl,
-            avatarBgColor: const Color(0xFFCFE8F3),
-            avatarTextColor: const Color(0xFF0F172A),
-          );
-          _livePatientMap[patientId] = patientObj;
-
-          parsedList.add(
-            DokterConsultation(
-              id: id,
-              patientName: patientName,
-              initials: initials,
-              status: status,
-              scheduledTimeText: timeText,
-              messageCount: msgCount,
-              lastMessage: lastMsg,
-              lastTime: lastTime,
-              patientId: patientId,
-              avatarUrl: avatarUrl,
-              patient: patientObj,
-            ),
-          );
-        }
-
-        if (mounted) {
-          setState(() {
-            _liveConsultations = parsedList;
-          });
+      final res = await KonsultasiApiService().getRiwayatDokter(
+        dokterId: widget.dokterId,
+        doctorName: widget.doctorName,
+      );
+      if (res.success && res.data != null) {
+        if (!_isTest || res.data!.isNotEmpty) {
+          _applyConsultationRawList(res.data!);
+          return;
         }
       }
     } catch (e) {
       debugPrint('⚠️ Error fetching live consultations: $e');
     }
+    if (mounted && _isLoading) {
+      setState(() => _isLoading = false);
+    }
   }
 
   List<DokterConsultation> get _allConsultations {
+    if (!_isTest || widget.initialConsultations != null) {
+      return _liveConsultations;
+    }
     if (_liveConsultations.isNotEmpty) {
       return _liveConsultations;
     }
@@ -389,8 +442,12 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
                   child: RefreshIndicator(
                     onRefresh: _fetchLiveConsultations,
                     color: _darkGreen,
-                    child: filtered.isEmpty
-                        ? ListView(
+                    child: _isLoading && _liveConsultations.isEmpty
+                        ? const Center(
+                            child: CircularProgressIndicator(color: _darkGreen),
+                          )
+                        : filtered.isEmpty
+                            ? ListView(
                             physics: const AlwaysScrollableScrollPhysics(
                               parent: BouncingScrollPhysics(),
                             ),

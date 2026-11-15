@@ -117,6 +117,46 @@ class UserModel {
 
   factory UserModel.fromJsonString(String source) =>
       UserModel.fromJson(jsonDecode(source) as Map<String, dynamic>);
+
+  UserModel copyWith({
+    dynamic id,
+    String? nama,
+    String? email,
+    String? noHp,
+    String? alamat,
+    String? jenisKelamin,
+    String? nik,
+    String? fotoProfile,
+    String? firebaseUid,
+    String? authProvider,
+    String? role,
+    String? spesialisasi,
+    String? instansi,
+    String? noStr,
+    String? noSip,
+    String? tanggalLahir,
+    String? golonganDarah,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      nama: nama ?? this.nama,
+      email: email ?? this.email,
+      noHp: noHp ?? this.noHp,
+      alamat: alamat ?? this.alamat,
+      jenisKelamin: jenisKelamin ?? this.jenisKelamin,
+      nik: nik ?? this.nik,
+      fotoProfile: fotoProfile ?? this.fotoProfile,
+      firebaseUid: firebaseUid ?? this.firebaseUid,
+      authProvider: authProvider ?? this.authProvider,
+      role: role ?? this.role,
+      spesialisasi: spesialisasi ?? this.spesialisasi,
+      instansi: instansi ?? this.instansi,
+      noStr: noStr ?? this.noStr,
+      noSip: noSip ?? this.noSip,
+      tanggalLahir: tanggalLahir ?? this.tanggalLahir,
+      golonganDarah: golonganDarah ?? this.golonganDarah,
+    );
+  }
 }
 
 /// Standard Result wrapper for Authentication operations

@@ -12,6 +12,7 @@ import '../screens/apotek/notifikasi/apotek_notifikasi_screen.dart';
 import '../screens/apotek/profile/apotek_profile_screen.dart';
 import '../services/reminder_notification_service.dart';
 import '../services/storage_service.dart';
+import '../services/supabase_admin_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KAPSUL AKSI ATAS KONSISTEN (Notifikasi & Profil untuk Pasien, Dokter, Apotek)
@@ -176,7 +177,7 @@ class PasienTopActionPill extends StatelessWidget {
   }
 }
 
-class DokterTopActionPill extends StatelessWidget {
+class DokterTopActionPill extends StatefulWidget {
   final String? doctorName;
   final VoidCallback? onNotificationTap;
   final VoidCallback? onProfileTap;
@@ -187,6 +188,36 @@ class DokterTopActionPill extends StatelessWidget {
     this.onNotificationTap,
     this.onProfileTap,
   });
+
+  @override
+  State<DokterTopActionPill> createState() => _DokterTopActionPillState();
+}
+
+class _DokterTopActionPillState extends State<DokterTopActionPill> {
+  int _unreadCount = 0;
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_isTest) {
+      _refreshUnreadBadge();
+    }
+  }
+
+  Future<void> _refreshUnreadBadge() async {
+    try {
+      final count = await SupabaseAdminService.instance.fetchDokterUnreadNotificationCount(
+        doctorName: widget.doctorName ?? DokterProfileState.instance.doctorName,
+      );
+      if (mounted) {
+        setState(() {
+          _unreadCount = count;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -207,30 +238,69 @@ class DokterTopActionPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          IconButton(
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.all(5),
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              size: 24,
-              color: Color(0xFF1F2937),
-            ),
-            tooltip: 'Notifikasi',
-            onPressed: onNotificationTap ??
-                () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const DokterNotifikasiScreen()),
-                  );
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(5),
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  size: 24,
+                  color: Color(0xFF1F2937),
+                ),
+                tooltip: 'Notifikasi',
+                onPressed: () {
+                  if (widget.onNotificationTap != null) {
+                    widget.onNotificationTap!();
+                    return;
+                  }
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => DokterNotifikasiScreen(
+                            doctorName: widget.doctorName ?? DokterProfileState.instance.doctorName,
+                          ),
+                        ),
+                      )
+                      .then((_) => _refreshUnreadBadge());
                 },
+              ),
+              if (_unreadCount > 0)
+                Positioned(
+                  right: 1,
+                  top: 1,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Center(
+                      child: Text(
+                        _unreadCount > 99 ? '99+' : '$_unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          height: 1.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: onProfileTap ??
+            onTap: widget.onProfileTap ??
                 () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => DokterProfileScreen(
-                        doctorName: doctorName ?? DokterProfileState.instance.doctorName,
+                        doctorName: widget.doctorName ?? DokterProfileState.instance.doctorName,
                         onLogout: () => Navigator.of(context).pop(),
                       ),
                     ),

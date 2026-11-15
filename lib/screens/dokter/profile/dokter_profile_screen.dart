@@ -719,6 +719,7 @@ class _DokterProfileScreenState extends State<DokterProfileScreen> {
           ),
         ),
         child: Stack(
+          alignment: Alignment.topCenter,
           children: [
             Positioned.fill(
               child: CustomPaint(
@@ -727,94 +728,105 @@ class _DokterProfileScreenState extends State<DokterProfileScreen> {
             ),
             SafeArea(
               bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 16),
 
-                    const SizedBox(height: 12),
-
-                    // Circular Avatar with White Border & Camera Edit Badge
-                    GestureDetector(
-                      onTap: () => _showChangeProfilePhotoModal(context, profileState),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            width: 104,
-                            height: 104,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.18),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
+                      // Circular Avatar with White Border & Camera Edit Badge
+                      Center(
+                        child: GestureDetector(
+                          onTap: () => _showChangeProfilePhotoModal(context, profileState),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                width: 104,
+                                height: 104,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 3.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.18),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            child: ClipOval(
-                              child: profileState.buildAvatarWidget(size: 104, iconSize: 52),
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 2,
-                            right: 2,
-                            child: Container(
-                              padding: const EdgeInsets.all(6.5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFBBF24),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2.5),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.2),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
+                                child: ClipOval(
+                                  child: profileState.buildAvatarWidget(size: 104, iconSize: 52),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 2,
+                                right: 2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFBBF24),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2.5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.2),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                  child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    size: 16,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.camera_alt_rounded,
-                                size: 16,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 14),
+                      const SizedBox(height: 14),
 
-                    // Doctor Name
-                    Text(
-                      name,
-                      style: GoogleFonts.inter(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.2,
+                      // Doctor Name
+                      SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          name,
+                          style: GoogleFonts.inter(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: -0.2,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
 
-                    const SizedBox(height: 4),
+                      const SizedBox(height: 4),
 
-                    // Doctor Specialty
-                    Text(
-                      specialty,
-                      style: GoogleFonts.inter(
-                        fontSize: 13.5,
-                        color: Colors.white.withValues(alpha: 0.92),
-                        fontWeight: FontWeight.w500,
+                      // Doctor Specialty
+                      SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          specialty,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

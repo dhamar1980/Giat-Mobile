@@ -61,7 +61,10 @@ class ApiConstants {
     final activeBase = (baseUrlOverride != null && baseUrlOverride.isNotEmpty)
         ? baseUrlOverride
         : defaultBaseUrl;
-    final baseHost = activeBase.replaceAll(RegExp(r'/api/?$'), '');
+    String baseHost = activeBase.replaceAll(RegExp(r'/api/?$'), '');
+    if (baseHost.contains('trycloudflare.com') && baseHost.startsWith('http://')) {
+      baseHost = baseHost.replaceFirst('http://', 'https://');
+    }
 
     if (trimmed.startsWith('/storage/') || trimmed.startsWith('storage/')) {
       final cleanPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
@@ -74,6 +77,9 @@ class ApiConstants {
       if (uri.path.contains('/storage/')) {
         final storagePath = uri.path.substring(uri.path.indexOf('/storage/'));
         return '$baseHost$storagePath';
+      }
+      if (trimmed.contains('trycloudflare.com') && trimmed.startsWith('http://')) {
+        return trimmed.replaceFirst('http://', 'https://');
       }
       return trimmed;
     }
