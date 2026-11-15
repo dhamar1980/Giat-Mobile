@@ -197,9 +197,12 @@ class DokterScheduleItem {
   final String id;
   final String time;
   final String patientName;
-  final String status; // "Selesai" | "Aktif" | "Mendatang"
+  final String status; // "Selesai" | "Aktif" | "Mendatang" | "Terjadwal" | "Berlangsung"
   final String serviceType;
   final String patientId;
+  final String? date;
+  final DokterPatient? patient;
+  final String? consultationId;
 
   const DokterScheduleItem({
     required this.id,
@@ -208,6 +211,9 @@ class DokterScheduleItem {
     required this.status,
     this.serviceType = 'Chat Konsultasi',
     required this.patientId,
+    this.date,
+    this.patient,
+    this.consultationId,
   });
 }
 

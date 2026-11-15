@@ -2565,6 +2565,112 @@ class SupabaseAdminService {
     }).toList();
   }
 
+  /// Mengambil data jadwal konsultasi dokter secara real dari Supabase PostgreSQL
+  Future<List<Map<String, dynamic>>> fetchDokterJadwal({
+    String? dokterId,
+    String? doctorName,
+    String? date,
+  }) async {
+    if (_isTest) return [];
+
+    var docId = await resolveCurrentDokterId(overrideDokterId: dokterId, doctorName: doctorName);
+    if (docId == null) {
+      final firstDoc = await _exec('SELECT TRIM(id_dokter) AS id FROM dokter ORDER BY created_at ASC LIMIT 1');
+      if (firstDoc.isNotEmpty) {
+        docId = firstDoc.first[0]?.toString().trim();
+      }
+    }
+    if (docId == null) return [];
+
+    final Map<String, dynamic> params = {'docId': docId};
+    String dateClause = '';
+    if (date != null && date.trim().isNotEmpty) {
+      dateClause = 'AND DATE(k.tanggal_konsultasi) = @selectedDate::date';
+      params['selectedDate'] = date.trim();
+    }
+
+    final rows = await _exec(
+      '''
+      SELECT 
+        TRIM(k.id) AS id,
+        TRIM(k.id) AS id_konsultasi,
+        TRIM(k.id_pasien) AS id_pasien,
+        TRIM(k.id_dokter) AS id_dokter,
+        k.tanggal_konsultasi::text AS tanggal_konsultasi,
+        k.jam_mulai::text AS jam_mulai,
+        k.jam_selesai::text AS jam_selesai,
+        k.keluhan_awal,
+        k.jenis_layanan,
+        k.status AS status_konsultasi,
+        k.created_at,
+        k.updated_at,
+        COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien,
+        p.no_hp,
+        p.foto_profile,
+        p.jenis_kelamin,
+        p.alamat,
+        p.tanggal_lahir,
+        COALESCE(kp.status_bayar, 'lunas') AS status_bayar,
+        kp.waktu_bayar,
+        kp.jumlah_bayar,
+        pan.bb AS berat_badan,
+        pan.tb AS tinggi_badan,
+        pan.kondisi AS kondisi_pantau,
+        pan.keluhan AS keluhan_pantau,
+        pan.detail_keluhan AS detail_keluhan_pantau
+      FROM konsultasi k
+      JOIN pasien p ON TRIM(p.id_pasien) = TRIM(k.id_pasien)
+      LEFT JOIN konsultasi_pembayaran kp ON TRIM(kp.id_konsultasi) = TRIM(k.id)
+      LEFT JOIN LATERAL (
+        SELECT bb, tb, kondisi, keluhan, detail_keluhan
+        FROM pantau
+        WHERE TRIM(id_pasien) = TRIM(k.id_pasien)
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) pan ON true
+      WHERE TRIM(k.id_dokter) = @docId
+        AND (
+          LOWER(TRIM(COALESCE(kp.status_bayar, ''))) = 'lunas'
+          OR (
+            LOWER(TRIM(k.status)) IN ('berlangsung', 'aktif', 'terjadwal', 'selesai')
+            AND LOWER(TRIM(COALESCE(kp.status_bayar, 'lunas'))) NOT IN ('menunggu_pembayaran', 'kadaluwarsa', 'batal')
+          )
+        )
+        $dateClause
+      ORDER BY 
+        k.tanggal_konsultasi DESC,
+        k.jam_mulai ASC,
+        CASE 
+          WHEN LOWER(TRIM(k.status)) IN ('berlangsung', 'aktif') THEN 1
+          WHEN LOWER(TRIM(k.status)) = 'terjadwal' THEN 2
+          ELSE 3
+        END,
+        COALESCE(k.updated_at, k.created_at) DESC
+      ''',
+      parameters: params,
+    );
+
+    return rows.map((r) {
+      final map = _normalizeMap(r.toColumnMap());
+      map['pasien'] = {
+        'id': map['id_pasien'],
+        'id_pasien': map['id_pasien'],
+        'nama': map['nama_pasien'],
+        'foto_profile': map['foto_profile'],
+        'jenis_kelamin': map['jenis_kelamin'],
+        'alamat': map['alamat'],
+        'tanggal_lahir': map['tanggal_lahir'],
+        'no_hp': map['no_hp'],
+        'berat_badan': map['berat_badan'],
+        'tinggi_badan': map['tinggi_badan'],
+        'kondisi': map['kondisi_pantau'],
+        'keluhan': map['keluhan_pantau'] ?? map['keluhan_awal'],
+        'detail_keluhan': map['detail_keluhan_pantau'],
+      };
+      return map;
+    }).toList();
+  }
+
   /// Mengambil daftar pasien yang TELAH BERHASIL MEMBAYAR sesi konsultasi dengan dokter bersangkutan.
   /// Memastikan data 100% real dari Supabase PostgreSQL dengan join konsultasi & konsultasi_pembayaran.
   Future<List<Map<String, dynamic>>> fetchDokterPaidPatients({

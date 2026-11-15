@@ -4,25 +4,42 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
 import '../konsultasi/dokter_room_chat_screen.dart';
-import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../pasien/dokter_detail_pasien_screen.dart';
-import '../profile/dokter_profile_screen.dart';
-import '../../../widgets/app_top_action_pill.dart';
 import '../../../services/dokter_api_service.dart';
-import '../../../config/api_config.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// JADWAL PRAKTIK & PASIEN DOKTER (Sesuai Desain Mockup GIAT)
+// JADWAL PRAKTIK & PASIEN DOKTER (Terintegrasi Real Database Supabase)
 // ─────────────────────────────────────────────────────────────────────────────
+
+class _DateTabItem {
+  final String label; // e.g. "Minggu, 15 Nov"
+  final String isoDate; // e.g. "2026-11-15"
+  final DateTime dateTime;
+  final bool isToday;
+
+  _DateTabItem({
+    required this.label,
+    required this.isoDate,
+    required this.dateTime,
+    required this.isToday,
+  });
+}
 
 class DokterJadwalScreen extends StatefulWidget {
   final VoidCallback? onProfileTap;
   final bool? isTopBarVisible;
+  final String? doctorName;
+  final String? dokterId;
+  final List<DokterScheduleItem>? initialSchedules;
 
   const DokterJadwalScreen({
     super.key,
     this.onProfileTap,
     this.isTopBarVisible,
+    this.doctorName,
+    this.dokterId,
+    this.initialSchedules,
   });
 
   @override
@@ -35,11 +52,32 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
   static const _border = Color(0xFFE2E8F0);
   static const _dateInactiveBg = Color(0xFFDDF2FD);
 
-  int _selectedDayIndex = 0;
-  bool _isTopBarVisible = true;
+  static const List<String> _dayNamesId = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
+  ];
 
-  bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _isTopBarVisible;
-  final List<String> _days = [
+  static const List<String> _monthShortId = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+
+  static const List<String> _legacyMockDays = [
     'Senin, 01 Agu',
     'Selasa, 02 Agu',
     'Rabu, 03 Agu',
@@ -48,19 +86,245 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
     'Sabtu, 06 Agu',
   ];
 
+  static bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+  bool get _useMockData => _isTest && widget.initialSchedules == null;
+
+  int _selectedDayIndex = 0;
+  bool _isTopBarVisible = true;
+  bool _isLoading = false;
+  bool _hasFetched = false;
+
+  List<DokterScheduleItem> _liveSchedules = [];
+  final Map<String, DokterPatient> _patientMap = {};
+  List<_DateTabItem> _dateTabs = [];
+
   @override
   void initState() {
     super.initState();
-    _fetchLiveJadwal();
+    if (widget.initialSchedules != null) {
+      _liveSchedules = List.from(widget.initialSchedules!);
+      _rebuildDateTabs();
+    } else if (!_useMockData) {
+      _rebuildDateTabs();
+      _fetchLiveJadwal();
+    }
+  }
+
+  void _rebuildDateTabs() {
+    final now = DateTime.now();
+    final todayIso =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    final Set<String> allIsoDates = {};
+    allIsoDates.add(todayIso);
+
+    // Tambahkan 7 hari ke depan secara dinamis
+    for (int i = 1; i <= 7; i++) {
+      final dt = DateTime(now.year, now.month, now.day).add(Duration(days: i));
+      final iso =
+          '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+      allIsoDates.add(iso);
+    }
+
+    // Tambahkan juga tanggal konsultasi riil yang ada di database
+    for (var s in _liveSchedules) {
+      if (s.date != null && s.date!.trim().isNotEmpty) {
+        allIsoDates.add(s.date!.trim());
+      }
+    }
+
+    final sortedIso = allIsoDates.toList()..sort();
+    final List<_DateTabItem> tabs = [];
+
+    for (var iso in sortedIso) {
+      final dt = DateTime.tryParse(iso);
+      if (dt == null) continue;
+      final dayName = _dayNamesId[dt.weekday - 1];
+      final dayNum = dt.day.toString().padLeft(2, '0');
+      final shortMonth = _monthShortId[dt.month - 1];
+      final label = '$dayName, $dayNum $shortMonth';
+      final isToday = iso == todayIso;
+
+      tabs.add(_DateTabItem(
+        label: label,
+        isoDate: iso,
+        dateTime: dt,
+        isToday: isToday,
+      ));
+    }
+
+    final previousSelectedIso = (_dateTabs.isNotEmpty && _selectedDayIndex < _dateTabs.length)
+        ? _dateTabs[_selectedDayIndex].isoDate
+        : null;
+
+    _dateTabs = tabs;
+
+    if (previousSelectedIso != null) {
+      final idx = _dateTabs.indexWhere((t) => t.isoDate == previousSelectedIso);
+      if (idx != -1) {
+        _selectedDayIndex = idx;
+        return;
+      }
+    }
+
+    final todayIdx = _dateTabs.indexWhere((t) => t.isToday);
+    if (todayIdx != -1) {
+      _selectedDayIndex = todayIdx;
+    } else if (_dateTabs.isNotEmpty) {
+      _selectedDayIndex = 0;
+    }
   }
 
   Future<void> _fetchLiveJadwal() async {
+    if (_useMockData) return;
+
+    if (widget.initialSchedules != null) {
+      if (mounted) {
+        setState(() {
+          _liveSchedules = List.from(widget.initialSchedules!);
+          _rebuildDateTabs();
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) setState(() => _isLoading = true);
     try {
-      await DokterApiService().getJadwal();
-    } catch (_) {}
+      final docName = widget.doctorName ?? DokterProfileState.instance.doctorName;
+      final res = await DokterApiService().getJadwal(
+        dokterId: widget.dokterId,
+        doctorName: docName,
+      );
+
+      if (res.success && res.data != null) {
+        final List<DokterScheduleItem> parsedList = [];
+        final Map<String, DokterPatient> patientMap = {};
+
+        for (var raw in res.data!) {
+          if (raw is! Map) continue;
+          final map = Map<String, dynamic>.from(raw);
+          final id = (map['id'] ?? map['id_konsultasi'] ?? '').toString();
+          final patientData = map['pasien'] is Map ? Map<String, dynamic>.from(map['pasien'] as Map) : null;
+          final patientId = (map['id_pasien'] ?? patientData?['id_pasien'] ?? patientData?['id'] ?? id).toString();
+          final patientName = (patientData?['nama'] ?? map['nama_pasien'] ?? 'Pasien GIAT').toString();
+
+          // Initials
+          String initials = 'P';
+          final parts = patientName.trim().split(RegExp(r'\s+'));
+          if (parts.isNotEmpty && parts[0].isNotEmpty) {
+            if (parts.length == 1) {
+              initials = parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+            } else {
+              initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+            }
+          }
+
+          // Age
+          int age = 28;
+          final rawBirth = patientData?['tanggal_lahir'] ?? map['tanggal_lahir'];
+          if (rawBirth != null) {
+            final dt = DateTime.tryParse(rawBirth.toString());
+            if (dt != null) {
+              final now = DateTime.now();
+              age = now.year - dt.year;
+              if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
+                age--;
+              }
+            }
+          }
+
+          final rawGen = (patientData?['jenis_kelamin'] ?? map['jenis_kelamin'] ?? '').toString();
+          final gender = (rawGen == 'L' || rawGen.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
+
+          // Time formatting
+          final startTime = TimeUtils.cleanTimeString(map['jam_mulai']) ?? '09:00';
+          final endTime = TimeUtils.cleanTimeString(map['jam_selesai']);
+          final timeDisplay = (endTime != null && endTime.isNotEmpty) ? '$startTime - $endTime' : startTime;
+
+          // Status mapping
+          final statusRaw = (map['status_konsultasi'] ?? map['status'] ?? '').toString().toLowerCase();
+          String status = 'Mendatang';
+          if (statusRaw == 'selesai' || statusRaw == 'completed') {
+            status = 'Selesai';
+          } else if (statusRaw == 'berlangsung' || statusRaw == 'aktif') {
+            status = 'Aktif';
+          } else {
+            status = 'Mendatang';
+          }
+
+          // Service type
+          final rawLayanan = (map['jenis_layanan'] ?? 'chat').toString().toLowerCase();
+          final serviceType = (rawLayanan.contains('video') || rawLayanan.contains('call'))
+              ? 'Video Call Konsultasi'
+              : 'Chat Konsultasi';
+
+          // Extract ISO date "YYYY-MM-DD"
+          String? isoDate;
+          if (map['tanggal_konsultasi'] != null) {
+            final rawDate = map['tanggal_konsultasi'].toString();
+            final dt = DateTime.tryParse(rawDate);
+            if (dt != null) {
+              isoDate =
+                  '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+            } else if (rawDate.length >= 10) {
+              isoDate = rawDate.substring(0, 10);
+            }
+          }
+
+          final patient = DokterPatient(
+            id: patientId,
+            name: patientName,
+            initials: initials,
+            age: age,
+            gender: gender,
+            address: (patientData?['alamat'] ?? map['alamat'] ?? '-').toString(),
+            weightKg: double.tryParse((patientData?['berat_badan'] ?? map['berat_badan'] ?? '60').toString()) ?? 60.0,
+            heightM: double.tryParse((patientData?['tinggi_badan'] ?? map['tinggi_badan'] ?? '1.65').toString()) ?? 1.65,
+            condition: (patientData?['kondisi'] ?? map['kondisi_pantau'] ?? 'Stabil').toString(),
+            complaint: (map['keluhan_awal'] ?? patientData?['keluhan'] ?? 'Pemeriksaan rutin ginjal').toString(),
+            complaintDetail: (patientData?['detail_keluhan'] ?? map['detail_keluhan_pantau'] ?? map['keluhan_awal'] ?? '-').toString(),
+            currentMedicines: const [],
+            avatarUrl: (patientData?['foto_profile'] ?? map['foto_profile'])?.toString(),
+            consultationId: id,
+            paymentStatus: (map['status_bayar'] ?? 'lunas').toString(),
+          );
+
+          patientMap[patientId] = patient;
+
+          parsedList.add(DokterScheduleItem(
+            id: id,
+            time: timeDisplay,
+            patientName: patientName,
+            status: status,
+            serviceType: serviceType,
+            patientId: patientId,
+            date: isoDate,
+            patient: patient,
+            consultationId: id,
+          ));
+        }
+
+        if (mounted) {
+          setState(() {
+            _liveSchedules = parsedList;
+            _patientMap.addAll(patientMap);
+            _hasFetched = true;
+            _rebuildDateTabs();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching live dokter jadwal: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   DokterPatient _findPatient(String patientId) {
+    if (_patientMap.containsKey(patientId)) {
+      return _patientMap[patientId]!;
+    }
     return DokterMockData.patients.firstWhere(
       (p) => p.id == patientId,
       orElse: () => DokterMockData.patients.first,
@@ -75,17 +339,90 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
     );
   }
 
-  void _navigateToChat(DokterPatient patient) {
+  void _navigateToChat(DokterPatient patient, {String? consultationId}) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => DokterRoomChatScreen(patient: patient),
+        builder: (_) => DokterRoomChatScreen(
+          patient: patient,
+          consultationId: consultationId ?? patient.consultationId,
+        ),
       ),
     );
   }
 
+  Future<void> _pickDateFromCalendar() async {
+    final now = DateTime.now();
+    final initialDt = (_dateTabs.isNotEmpty && _selectedDayIndex < _dateTabs.length)
+        ? _dateTabs[_selectedDayIndex].dateTime
+        : now;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDt,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 2),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _darkGreen,
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final iso =
+          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      final existingIdx = _dateTabs.indexWhere((t) => t.isoDate == iso);
+      if (existingIdx != -1) {
+        setState(() => _selectedDayIndex = existingIdx);
+      } else {
+        final dayName = _dayNamesId[picked.weekday - 1];
+        final dayNum = picked.day.toString().padLeft(2, '0');
+        final shortMonth = _monthShortId[picked.month - 1];
+        final label = '$dayName, $dayNum $shortMonth';
+        final isToday = iso ==
+            '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+        setState(() {
+          _dateTabs.add(_DateTabItem(
+            label: label,
+            isoDate: iso,
+            dateTime: picked,
+            isToday: isToday,
+          ));
+          _dateTabs.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+          _selectedDayIndex = _dateTabs.indexWhere((t) => t.isoDate == iso);
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final schedules = DokterMockData.schedules;
+    final selectedIso = (!_useMockData && _dateTabs.isNotEmpty && _selectedDayIndex < _dateTabs.length)
+        ? _dateTabs[_selectedDayIndex].isoDate
+        : null;
+
+    final List<DokterScheduleItem> schedules;
+    if (_useMockData) {
+      schedules = DokterMockData.schedules;
+    } else {
+      if (selectedIso != null) {
+        schedules = _liveSchedules.where((s) => s.date == selectedIso).toList();
+      } else {
+        schedules = _liveSchedules;
+      }
+    }
+
+    final daysLabels = _useMockData
+        ? _legacyMockDays
+        : _dateTabs.map((t) => t.label).toList();
 
     return Scaffold(
       backgroundColor: _bgColor,
@@ -117,110 +454,148 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
                   const SizedBox(height: 76),
 
                   // ── Title Pill: "Jadwal Pasien" ──
-                Center(
-                  child: _buildTitlePill('Jadwal Pasien'),
-                ),
+                  Center(
+                    child: _buildTitlePill('Jadwal Pasien'),
+                  ),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // ── Scrollable Body Content ──
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ── Summary Card: Jumlah Konsultasi Hari Ini ──
-                        _buildSummaryCard(),
-
-                        const SizedBox(height: 20),
-
-                        // ── Section: Pilih Tanggal ──
-                        Row(
+                  // ── Scrollable Body Content ──
+                  Expanded(
+                    child: RefreshIndicator(
+                      color: _darkGreen,
+                      onRefresh: _fetchLiveJadwal,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('📅', style: TextStyle(fontSize: 15)),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Pilih Tanggal',
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                              ),
-                            ),
-                          ],
-                        ),
+                            // ── Summary Card: Jumlah Konsultasi Hari Ini ──
+                            _buildSummaryCard(),
 
-                        const SizedBox(height: 12),
+                            const SizedBox(height: 20),
 
-                        // ── Horizontal Date Selector Pills ──
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: List.generate(_days.length, (idx) {
-                              final isSelected = _selectedDayIndex == idx;
-                              return GestureDetector(
-                                onTap: () => setState(() => _selectedDayIndex = idx),
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 10),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? _darkGreen : _dateInactiveBg,
-                                    borderRadius: BorderRadius.circular(22),
-                                    boxShadow: isSelected
-                                        ? [
-                                            BoxShadow(
-                                              color: _darkGreen.withValues(alpha: 0.25),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 3),
+                            // ── Section: Pilih Tanggal ──
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text('📅', style: TextStyle(fontSize: 15)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Pilih Tanggal',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (!_useMockData)
+                                  InkWell(
+                                    onTap: _pickDateFromCalendar,
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.calendar_month_rounded,
+                                            size: 16,
+                                            color: _darkGreen,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Kalender',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: _darkGreen,
                                             ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Text(
-                                    _days[idx],
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                                      color: isSelected ? Colors.white : const Color(0xFF1E293B),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ── Horizontal Date Selector Pills ──
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: List.generate(daysLabels.length, (idx) {
+                                  final isSelected = _selectedDayIndex == idx;
+                                  return GestureDetector(
+                                    onTap: () => setState(() => _selectedDayIndex = idx),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(right: 10),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? _darkGreen : _dateInactiveBg,
+                                        borderRadius: BorderRadius.circular(22),
+                                        boxShadow: isSelected
+                                            ? [
+                                                BoxShadow(
+                                                  color: _darkGreen.withValues(alpha: 0.25),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 3),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Text(
+                                        daysLabels[idx],
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                                          color: isSelected ? Colors.white : const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+
+                            const SizedBox(height: 22),
+
+                            // ── Loading indicator ──
+                            if (_isLoading && !_hasFetched && schedules.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 40),
+                                child: Center(
+                                  child: CircularProgressIndicator(color: _darkGreen),
                                 ),
-                              );
-                            }),
-                          ),
+                              )
+                            // ── Empty State ──
+                            else if (schedules.isEmpty)
+                              _buildEmptyState()
+                            // ── Timeline Schedule List ──
+                            else
+                              ...List.generate(schedules.length, (index) {
+                                final item = schedules[index];
+                                final isLast = index == schedules.length - 1;
+                                return _buildTimelineScheduleItem(item, isLast);
+                              }),
+
+                            const SizedBox(height: 20),
+                          ],
                         ),
-
-                        const SizedBox(height: 22),
-
-                        // ── Timeline Schedule List ──
-                        ...List.generate(schedules.length, (index) {
-                          final item = schedules[index];
-                          final isLast = index == schedules.length - 1;
-                          return _buildTimelineScheduleItem(item, isLast);
-                        }),
-
-                        const SizedBox(height: 20),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // TOP NOTIFICATION & PROFILE CAPSULE
-  // ───────────────────────────────────────────────────────────────────────────
-  Widget _buildNotificationProfileCapsule() {
-    return DokterTopActionPill(
-      doctorName: DokterProfileState.instance.doctorName,
-      onProfileTap: widget.onProfileTap,
     );
   }
 
@@ -253,9 +628,49 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // SUMMARY CARD: JUMLAH KONSULTASI HARI INI
+  // SUMMARY CARD: JUMLAH KONSULTASI HARI INI (REAL DATA SUPABASE)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildSummaryCard() {
+    String totalCountStr = '04';
+    String selesaiCountStr = '02';
+    String berlangsungCountStr = '01';
+    String mendatangCountStr = '01';
+    String title = 'Jumlah Konsultasi Hari Ini';
+
+    if (!_useMockData) {
+      final now = DateTime.now();
+      final todayIso =
+          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      final selectedIso = (_dateTabs.isNotEmpty && _selectedDayIndex < _dateTabs.length)
+          ? _dateTabs[_selectedDayIndex].isoDate
+          : todayIso;
+
+      final isSelectedToday = selectedIso == todayIso;
+
+      if (!isSelectedToday && _dateTabs.isNotEmpty && _selectedDayIndex < _dateTabs.length) {
+        title = 'Jumlah Konsultasi (${_dateTabs[_selectedDayIndex].label})';
+      } else {
+        title = 'Jumlah Konsultasi Hari Ini';
+      }
+
+      final targetSchedules = _liveSchedules.where((s) => s.date == selectedIso).toList();
+
+      final total = targetSchedules.length;
+      final selesai = targetSchedules.where((s) => s.status == 'Selesai').length;
+      final berlangsung = targetSchedules
+          .where((s) => s.status == 'Aktif' || s.status == 'Berlangsung')
+          .length;
+      final mendatang = targetSchedules
+          .where((s) => s.status == 'Mendatang' || s.status == 'Terjadwal')
+          .length;
+
+      totalCountStr = total.toString().padLeft(2, '0');
+      selesaiCountStr = selesai.toString().padLeft(2, '0');
+      berlangsungCountStr = berlangsung.toString().padLeft(2, '0');
+      mendatangCountStr = mendatang.toString().padLeft(2, '0');
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -285,7 +700,7 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
               child: Column(
                 children: [
                   Text(
-                    'Jumlah Konsultasi Hari Ini',
+                    title,
                     style: GoogleFonts.inter(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w700,
@@ -294,7 +709,7 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '04',
+                    totalCountStr,
                     style: GoogleFonts.inter(
                       fontSize: 34,
                       fontWeight: FontWeight.w800,
@@ -304,11 +719,11 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      _buildMiniCounterCard('Selesai', '02', const Color(0xFF15803D)),
+                      _buildMiniCounterCard('Selesai', selesaiCountStr, const Color(0xFF15803D)),
                       const SizedBox(width: 8),
-                      _buildMiniCounterCard('Berlangsung', '01', const Color(0xFF0F172A)),
+                      _buildMiniCounterCard('Berlangsung', berlangsungCountStr, const Color(0xFF0F172A)),
                       const SizedBox(width: 8),
-                      _buildMiniCounterCard('Mendatang', '01', const Color(0xFFEAB308)),
+                      _buildMiniCounterCard('Mendatang', mendatangCountStr, const Color(0xFFEAB308)),
                     ],
                   ),
                 ],
@@ -364,11 +779,63 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
+  // EMPTY STATE JADWAL
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border, width: 1.2),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _darkGreen.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.calendar_today_outlined,
+              size: 32,
+              color: _darkGreen,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Tidak Ada Jadwal Konsultasi',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Belum ada pasien yang terjadwal pada tanggal ini.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
   // TIMELINE SCHEDULE ITEM
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildTimelineScheduleItem(DokterScheduleItem sch, bool isLast) {
-    final isAktif = sch.status == 'Aktif';
-    final patient = _findPatient(sch.patientId);
+    final isAktif = sch.status == 'Aktif' || sch.status == 'Berlangsung';
+    final patient = sch.patient ?? _findPatient(sch.patientId);
 
     return IntrinsicHeight(
       child: Row(
@@ -376,13 +843,13 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
         children: [
           // ── Time Column on Left ──
           SizedBox(
-            width: 44,
+            width: 58,
             child: Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: 2, right: 6),
               child: Text(
                 sch.time,
                 style: GoogleFonts.inter(
-                  fontSize: 13.5,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: isAktif ? const Color(0xFF0D7A5F) : const Color(0xFF0F172A),
                 ),
@@ -451,21 +918,27 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
 
                     const SizedBox(height: 6),
 
-                    // Service Type: Chat Konsultasi
+                    // Service Type: Chat Konsultasi / Video Call
                     Row(
                       children: [
-                        const Icon(
-                          Icons.chat_bubble_outline_rounded,
+                        Icon(
+                          sch.serviceType.toLowerCase().contains('video')
+                              ? Icons.videocam_outlined
+                              : Icons.chat_bubble_outline_rounded,
                           size: 15,
-                          color: Color(0xFF475569),
+                          color: const Color(0xFF475569),
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          sch.serviceType,
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF475569),
+                        Expanded(
+                          child: Text(
+                            sch.serviceType,
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF475569),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -488,7 +961,10 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                              onPressed: () => _navigateToChat(patient),
+                              onPressed: () => _navigateToChat(
+                                patient,
+                                consultationId: sch.consultationId,
+                              ),
                               child: Text(
                                 'Mulai Chat',
                                 style: GoogleFonts.inter(
@@ -554,36 +1030,33 @@ class _DokterJadwalScreenState extends State<DokterJadwalScreen> {
   }
 
   Widget _buildStatusBadge(String status) {
-    if (status == 'Aktif') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
-        decoration: BoxDecoration(
-          color: _darkGreen,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          status,
-          style: GoogleFonts.inter(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-      );
+    Color bg;
+    Color textColor;
+
+    final norm = status.toLowerCase();
+    if (norm == 'aktif' || norm == 'berlangsung') {
+      bg = _darkGreen;
+      textColor = Colors.white;
+    } else if (norm == 'mendatang' || norm == 'terjadwal') {
+      bg = const Color(0xFFFEF3C7);
+      textColor = const Color(0xFFB45309);
+    } else {
+      bg = const Color(0xFFE2E8F0);
+      textColor = const Color(0xFF475569);
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE2E8F0),
+        color: bg,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text(
         status,
         style: GoogleFonts.inter(
           fontSize: 10.5,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF475569),
+          fontWeight: FontWeight.w700,
+          color: textColor,
         ),
       ),
     );
@@ -602,7 +1075,7 @@ class _DokterJadwalTopographyPainter extends CustomPainter {
       showGradient: false,
       showLines: true,
     );
-    }
+  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;

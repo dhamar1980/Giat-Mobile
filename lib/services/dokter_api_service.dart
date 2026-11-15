@@ -67,11 +67,32 @@ class DokterApiService {
   // 2. JADWAL KONSULTASI
   // =========================================================================
 
-  /// GET /dokter/jadwal
-  Future<ApiResponse<List<dynamic>>> getJadwal({String? date}) async {
+  /// GET /dokter/jadwal (Terintegrasi langsung dengan Supabase PostgreSQL & REST API)
+  Future<ApiResponse<List<dynamic>>> getJadwal({
+    String? date,
+    String? dokterId,
+    String? doctorName,
+  }) async {
+    if (!_isTest) {
+      try {
+        final supabaseData = await SupabaseAdminService.instance.fetchDokterJadwal(
+          date: date,
+          dokterId: dokterId,
+          doctorName: doctorName,
+        );
+        return ApiResponse.success(
+          message: 'Berhasil memuat jadwal konsultasi dokter dari Supabase.',
+          data: supabaseData,
+        );
+      } catch (e) {
+        // Fallback to REST API if Supabase query fails
+      }
+    }
+
     try {
       final Map<String, dynamic> qParams = {};
       if (date != null && date.isNotEmpty) qParams['date'] = date;
+      if (dokterId != null && dokterId.isNotEmpty) qParams['id_dokter'] = dokterId;
       final response = await _client.dio.get('/dokter/jadwal', queryParameters: qParams);
       final raw = response.data;
       final List<dynamic> list = ApiClient.extractList(raw);
