@@ -7,6 +7,7 @@ import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../profile/dokter_profile_screen.dart';
 import 'dokter_detail_pasien_screen.dart';
 import '../../../services/dokter_api_service.dart';
+import '../../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DAFTAR PASIEN DOKTER (Sesuai Desain Figma: Node 1008-18310)
@@ -106,7 +107,7 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
           final rawGender = (map['jenis_kelamin'] ?? '').toString();
           final gender = (rawGender == 'L' || rawGender.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
 
-          final avatarUrl = (map['foto_profile'] ?? map['foto_profil'])?.toString();
+          final avatarUrl = ApiConfig.resolveImageUrl((map['foto_profile'] ?? map['foto_profil'])?.toString());
 
           double weightKg = 55.0;
           final rawBb = map['berat_badan'] ?? map['bb'];
@@ -420,14 +421,43 @@ class _DokterPasienScreenState extends State<DokterPasienScreen> {
                 );
               }
             },
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(
-                color: Color(0xFF044E2F),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+            child: ListenableBuilder(
+              listenable: DokterProfileState.instance,
+              builder: (context, _) {
+                final rawAvatar = DokterProfileState.instance.avatarUrl;
+                final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+                return Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF044E2F),
+                    shape: BoxShape.circle,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasPhoto
+                      ? (resolved.startsWith('http')
+                          ? Image.network(
+                              resolved,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person_rounded,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Image.file(
+                              File(resolved),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person_rounded,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                            ))
+                      : const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                );
+              },
             ),
           ),
         ],

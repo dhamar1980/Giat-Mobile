@@ -18,6 +18,7 @@ import '../../widgets/app_brand_title.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/dokter_api_service.dart';
 import '../../utils/time_utils.dart';
+import '../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOKTER HOME SCREEN (Figma Node: 1008-17556)
@@ -226,7 +227,7 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
     final address = (map['alamat'] ?? 'Indonesia').toString();
     final complaint = (map['keluhan_awal'] ?? map['diagnosis'] ?? 'Konsultasi GIAT').toString();
     final complaintDetail = (map['keluhan_awal'] ?? map['catatan_dokter'] ?? '').toString();
-    final avatarUrl = (map['foto_profile'] ?? map['foto_profil'])?.toString();
+    final avatarUrl = ApiConfig.resolveImageUrl((map['foto_profile'] ?? map['foto_profil'])?.toString());
 
     final List<DokterPrescriptionItem> medicines = [];
     final rawObat = map['obat'] ?? map['items'];
@@ -467,18 +468,48 @@ class _DokterHomeScreenState extends State<DokterHomeScreen>
                       _isTopBarVisible = true;
                     });
                   },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF044E2F),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 22,
-                      color: Colors.white,
-                    ),
+                  child: ListenableBuilder(
+                    listenable: DokterProfileState.instance,
+                    builder: (context, _) {
+                      final rawAvatar = DokterProfileState.instance.avatarUrl;
+                      final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                      final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+                      return Container(
+                        width: 36,
+                        height: 36,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF044E2F),
+                          shape: BoxShape.circle,
+                        ),
+                        child: ClipOval(
+                          child: hasPhoto
+                              ? (resolved.startsWith('http')
+                                  ? Image.network(
+                                      resolved,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.person_rounded,
+                                        size: 22,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Image.file(
+                                      File(resolved),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.person_rounded,
+                                        size: 22,
+                                        color: Colors.white,
+                                      ),
+                                    ))
+                              : const Icon(
+                                  Icons.person_rounded,
+                                  size: 22,
+                                  color: Colors.white,
+                                ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],

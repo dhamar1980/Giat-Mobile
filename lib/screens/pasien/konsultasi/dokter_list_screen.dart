@@ -12,6 +12,7 @@ import '../../../widgets/app_brand_title.dart';
 import '../../../widgets/giat_header_style.dart';
 import '../../../services/konsultasi_api_service.dart';
 import '../../../utils/time_utils.dart';
+import '../../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI: DAFTAR DOKTER & KONSULTASI SAYA (Sesuai Desain Figma)
@@ -57,7 +58,8 @@ class _DokterListScreenState extends State<DokterListScreen> {
     final id = (raw['id_dokter'] ?? raw['id'] ?? '').toString();
     final nama = (raw['nama'] ?? raw['name'] ?? 'Dokter GIAT').toString();
     final spesialisasi = (raw['spesialisasi'] ?? raw['specialty'] ?? 'Dokter Umum').toString();
-    final foto = (raw['foto_profile'] ?? raw['foto_profil'] ?? raw['avatarUrl'] ?? '').toString();
+    final rawFoto = (raw['foto_profile'] ?? raw['foto_profil'] ?? raw['avatarUrl'] ?? '').toString();
+    final foto = ApiConfig.resolveImageUrl(rawFoto);
     final tarif = raw['tarif_konsultasi'] ?? raw['biaya_konsultasi'] ?? raw['price'];
     final institusi = (raw['institusi'] ?? raw['instansi'] ?? raw['hospital'] ?? 'Klinik Layanan GIAT').toString();
 
@@ -1078,7 +1080,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
       doctorName = 'dr. Budi Santoso, Sp.PD';
       specialty = 'Dokter Spesialis Penyakit Dalam';
     }
-    final avatarUrl = (dokter['foto_profile'] ?? c['foto_profile'] ?? '').toString();
+    final avatarUrl = ApiConfig.resolveImageUrl((dokter['foto_profile'] ?? dokter['foto_profil'] ?? c['foto_profile'] ?? '').toString());
     final rawTanggal = (c['tanggal_konsultasi'] ?? c['tanggal'] ?? c['created_at'] ?? '').toString();
     final tanggal = rawTanggal.isNotEmpty
         ? TimeUtils.formatDate(rawTanggal, useIndonesianMonth: true, withDayName: true)
@@ -1343,7 +1345,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
   }
 
   Widget _buildDokterOnlineCard(Map<String, dynamic> doc, {bool isOngoing = false}) {
-    final avatarUrl = (doc['avatarUrl'] ?? doc['foto_profile'] ?? doc['foto_profil'] ?? '').toString();
+    final avatarUrl = ApiConfig.resolveImageUrl((doc['avatarUrl'] ?? doc['foto_profile'] ?? doc['foto_profil'] ?? '').toString());
     final doctorName = (doc['name'] ?? doc['nama'] ?? 'Dokter GIAT').toString();
     final specialty = (doc['specialty'] ?? doc['spesialisasi'] ?? 'Dokter Umum').toString();
     final schedule = TimeUtils.replaceTimezoneSuffix((doc['schedule'] ?? 'Tersedia Hari Ini, 14:00 WIB').toString());

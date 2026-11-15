@@ -1,7 +1,7 @@
 /// Centralized API Constants for GIAT Backend
 class ApiConstants {
   /// URL Server / Cloudflare tunnel
-  static const String serverUrl = 'https://michel-first-molecular-investigate.trycloudflare.com/api';
+  static const String serverUrl = 'https://reporting-begun-long-moved.trycloudflare.com/api';
 
   /// URL LAN Wi-Fi (untuk HP di jaringan Wi-Fi lokal)
   static const String lanUrl = 'http://10.80.131.1:8000/api';
@@ -52,5 +52,32 @@ class ApiConstants {
       return '$midtransRedirectionBaseUrl${snapToken.trim()}';
     }
     return null;
+  }
+
+  /// Helper untuk meresolusi URL foto profil / storage backend ke server aktif
+  static String resolveImageUrl(String? rawUrl, [String? baseUrlOverride]) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return '';
+    final trimmed = rawUrl.trim();
+    final activeBase = (baseUrlOverride != null && baseUrlOverride.isNotEmpty)
+        ? baseUrlOverride
+        : defaultBaseUrl;
+    final baseHost = activeBase.replaceAll(RegExp(r'/api/?$'), '');
+
+    if (trimmed.startsWith('/storage/') || trimmed.startsWith('storage/')) {
+      final cleanPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+      return '$baseHost$cleanPath';
+    }
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      final uri = Uri.tryParse(trimmed);
+      if (uri == null) return trimmed;
+      if (uri.path.contains('/storage/')) {
+        final storagePath = uri.path.substring(uri.path.indexOf('/storage/'));
+        return '$baseHost$storagePath';
+      }
+      return trimmed;
+    }
+
+    return trimmed;
   }
 }

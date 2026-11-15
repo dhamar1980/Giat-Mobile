@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'jadwalkan_konsultasi_screen.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/konsultasi_api_service.dart';
+import '../../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DETAIL PROFIL DOKTER (Sesuai Referensi UI Figma GIAT)
@@ -88,7 +89,8 @@ class _DokterDetailScreenState extends State<DokterDetailScreen> {
   }
 
   String get _avatarUrl {
-    final url = widget.doctor['avatarUrl']?.toString() ?? '';
+    final raw = widget.doctor['avatarUrl'] ?? widget.doctor['foto_profile'] ?? widget.doctor['foto_profil'] ?? '';
+    final url = ApiConfig.resolveImageUrl(raw.toString());
     if (url.isNotEmpty && url.startsWith('http')) {
       return url;
     }

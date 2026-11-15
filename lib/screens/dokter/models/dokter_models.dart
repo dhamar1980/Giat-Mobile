@@ -544,8 +544,9 @@ class DokterProfileState extends ChangeNotifier {
   String _practiceAddress = 'Jl. Sehat No. 12, Jember';
   String _practiceSchedule = 'Senin - Jumat, 09:00 - 17:00';
 
-  String avatarType = 'asset'; // 'asset', 'network', 'default'
-  String avatarPath = 'assets/images/dokter_apoteker.jpg';
+  String avatarType = 'default'; // 'asset', 'network', 'default'
+  String avatarPath = '';
+  String get avatarUrl => avatarPath;
 
   String get doctorName => _doctorName.isNotEmpty ? _doctorName : 'Dr. Andi Pratama';
   set doctorName(String val) {
@@ -689,7 +690,7 @@ class DokterProfileState extends ChangeNotifier {
         final fetchedInst = docObj['instansi'] ?? docObj['institution'];
         final fetchedAlamat = docObj['alamat_praktik'] ?? docObj['alamat'];
         final fetchedJadwal = docObj['jadwal_praktik'] ?? docObj['jam_operasional'];
-        final fetchedAvatar = userObj?['foto_profile'] ?? docObj['foto_profile'];
+        final fetchedAvatar = userObj?['foto_profile'] ?? userObj?['foto_profil'] ?? docObj['foto_profile'] ?? docObj['foto_profil'];
 
         syncFromUser(
           name: fetchedName?.toString(),

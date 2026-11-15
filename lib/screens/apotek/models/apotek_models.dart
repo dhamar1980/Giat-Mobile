@@ -1,3 +1,8 @@
+import 'package:flutter/material.dart';
+import '../../../services/storage_service.dart';
+import '../../../services/apotek_api_service.dart';
+import '../../../config/api_config.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MODEL DATA APOTEK & FARMASI (Berdasarkan Desain & Alur Figma GIAT)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -905,5 +910,145 @@ class ApotekMockData {
       timeText: 'Baru saja',
       type: 'stok',
     ));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE PROFIL APOTEK (Reaktif untuk Foto Profil & Informasi Apoteker)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class ApotekProfileState extends ChangeNotifier {
+  static final ApotekProfileState instance = ApotekProfileState._internal();
+  factory ApotekProfileState() => instance;
+  ApotekProfileState._internal();
+
+  String _apotekerName = '';
+  String _apotekName = '';
+  String _sipaNumber = '19950812/SIPA_35.09/2022/2048';
+  String _siaNumber = '503/A.1/042/35.09/2021';
+  String _avatarType = 'default'; // 'asset', 'network', 'file', 'default'
+  String _avatarPath = '';
+
+  String get apotekerName => _apotekerName.isNotEmpty ? _apotekerName : 'Apt. Aminah, S.Farm';
+  set apotekerName(String val) {
+    if (_apotekerName != val) {
+      _apotekerName = val;
+      notifyListeners();
+    }
+  }
+
+  String get apotekName => _apotekName.isNotEmpty ? _apotekName : 'Apotek Kimia Farma - Jember';
+  set apotekName(String val) {
+    if (_apotekName != val) {
+      _apotekName = val;
+      notifyListeners();
+    }
+  }
+
+  String get sipaNumber => _sipaNumber;
+  set sipaNumber(String val) {
+    if (_sipaNumber != val) {
+      _sipaNumber = val;
+      notifyListeners();
+    }
+  }
+
+  String get siaNumber => _siaNumber;
+  set siaNumber(String val) {
+    if (_siaNumber != val) {
+      _siaNumber = val;
+      notifyListeners();
+    }
+  }
+
+  String get avatarPath => _avatarPath;
+  String get avatarType => _avatarType;
+
+  void updateAvatar(String pathOrUrl, {String? type}) {
+    _avatarPath = pathOrUrl;
+    if (type != null) {
+      _avatarType = type;
+    } else if (pathOrUrl.startsWith('http')) {
+      _avatarType = 'network';
+    } else if (pathOrUrl.startsWith('assets/')) {
+      _avatarType = 'asset';
+    } else {
+      _avatarType = 'file';
+    }
+    notifyListeners();
+  }
+
+  void syncFromUser({
+    String? name,
+    String? farmasiName,
+    String? sipa,
+    String? sia,
+    String? avatar,
+  }) {
+    bool changed = false;
+    if (name != null && name.trim().isNotEmpty && _apotekerName != name.trim()) {
+      _apotekerName = name.trim();
+      changed = true;
+    }
+    if (farmasiName != null && farmasiName.trim().isNotEmpty && _apotekName != farmasiName.trim()) {
+      _apotekName = farmasiName.trim();
+      changed = true;
+    }
+    if (sipa != null && sipa.trim().isNotEmpty && _sipaNumber != sipa.trim()) {
+      _sipaNumber = sipa.trim();
+      changed = true;
+    }
+    if (sia != null && sia.trim().isNotEmpty && _siaNumber != sia.trim()) {
+      _siaNumber = sia.trim();
+      changed = true;
+    }
+    if (avatar != null && avatar.trim().isNotEmpty) {
+      final resolved = ApiConfig.resolveImageUrl(avatar.trim());
+      _avatarPath = resolved;
+      if (resolved.startsWith('http')) {
+        _avatarType = 'network';
+      } else if (resolved.startsWith('assets/')) {
+        _avatarType = 'asset';
+      } else {
+        _avatarType = 'file';
+      }
+      changed = true;
+    }
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadProfile({String? fallbackName}) async {
+    try {
+      final user = await StorageService().getUser();
+      if (user != null) {
+        syncFromUser(
+          name: user.nama,
+          avatar: user.fotoProfile,
+        );
+      } else if (fallbackName != null && fallbackName.isNotEmpty) {
+        syncFromUser(name: fallbackName);
+      }
+    } catch (_) {}
+
+    try {
+      final res = await ApotekApiService().getProfile();
+      if (res.success && res.data != null) {
+        final d = res.data!;
+        final apotekObj = d['apotek'] is Map ? d['apotek'] as Map : d;
+        final fetchedName = apotekObj['nama_apotek'] ?? apotekObj['nama'] ?? apotekObj['name'] ?? fallbackName;
+        final fetchedFoto = apotekObj['foto_profile'] ?? apotekObj['foto_profil'];
+        final fetchedSipa = apotekObj['no_sipa'] ?? apotekObj['sipa'];
+        final fetchedSia = apotekObj['no_sia'] ?? apotekObj['sia'];
+
+        syncFromUser(
+          name: fetchedName?.toString(),
+          sipa: fetchedSipa?.toString(),
+          sia: fetchedSia?.toString(),
+          avatar: fetchedFoto?.toString(),
+        );
+      }
+    } catch (_) {}
   }
 }

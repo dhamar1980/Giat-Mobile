@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +8,7 @@ import '../profile/dokter_profile_screen.dart';
 import 'dokter_room_chat_screen.dart';
 import '../../../utils/time_utils.dart';
 import '../../../services/konsultasi_api_service.dart';
+import '../../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DAFTAR KONSULTASI DOKTER (Sesuai Desain Figma / Image 1, 2, 3)
@@ -115,7 +117,7 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
           final rawGender = (pasienData?['jenis_kelamin'] ?? '').toString();
           final gender = (rawGender == 'L' || rawGender.toLowerCase().startsWith('laki')) ? 'Laki-laki' : 'Perempuan';
 
-          final avatarUrl = (pasienData?['foto_profile'] ?? pasienData?['foto_profil'])?.toString();
+          final avatarUrl = ApiConfig.resolveImageUrl((pasienData?['foto_profile'] ?? pasienData?['foto_profil'])?.toString());
 
           final patientObj = DokterPatient(
             id: patientId,
@@ -736,14 +738,43 @@ class _DokterKonsultasiScreenState extends State<DokterKonsultasiScreen> {
                 );
               }
             },
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(
-                color: Color(0xFF044E2F),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+            child: ListenableBuilder(
+              listenable: DokterProfileState.instance,
+              builder: (context, _) {
+                final rawAvatar = DokterProfileState.instance.avatarUrl;
+                final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+                return Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF044E2F),
+                    shape: BoxShape.circle,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasPhoto
+                      ? (resolved.startsWith('http')
+                          ? Image.network(
+                              resolved,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person_rounded,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Image.file(
+                              File(resolved),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person_rounded,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                            ))
+                      : const Icon(Icons.person_rounded, size: 20, color: Colors.white),
+                );
+              },
             ),
           ),
         ],

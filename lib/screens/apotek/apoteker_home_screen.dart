@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,6 +15,7 @@ import '../../widgets/giat_background.dart';
 import '../../widgets/app_brand_title.dart';
 import '../../widgets/giat_header_style.dart';
 import '../../services/apotek_api_service.dart';
+import '../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // APOTEKER HOME SCREEN (Figma Node: 1100-18253)
@@ -65,6 +67,8 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
 
     _animCtrl.forward();
+    ApotekProfileState.instance.syncFromUser(name: widget.apotekerName);
+    ApotekProfileState.instance.loadProfile(fallbackName: widget.apotekerName);
     _fetchLiveDashboard();
   }
 
@@ -233,18 +237,47 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _switchToTab(4),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF044E2F),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 22,
-                      color: Colors.white,
-                    ),
+                  child: ListenableBuilder(
+                    listenable: ApotekProfileState.instance,
+                    builder: (context, _) {
+                      final rawAvatar = ApotekProfileState.instance.avatarPath;
+                      final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                      final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+                      return Container(
+                        width: 36,
+                        height: 36,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF044E2F),
+                          shape: BoxShape.circle,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: hasPhoto
+                            ? (resolved.startsWith('http')
+                                ? Image.network(
+                                    resolved,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.person_rounded,
+                                      size: 22,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Image.file(
+                                    File(resolved),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.person_rounded,
+                                      size: 22,
+                                      color: Colors.white,
+                                    ),
+                                  ))
+                            : const Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                      );
+                    },
                   ),
                 ),
               ],

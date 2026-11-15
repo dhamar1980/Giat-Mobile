@@ -16,6 +16,8 @@ import '../../widgets/giat_header_style.dart';
 import '../../services/pasien_api_service.dart';
 import '../../services/reminder_notification_service.dart';
 import '../../utils/time_utils.dart';
+import '../../models/pasien_profile_state.dart';
+import '../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PASIEN HOME SCREEN (Figma Node: 771-5845)
@@ -337,14 +339,43 @@ class _PasienHomeScreenState extends State<PasienHomeScreen>
                                   ),
                                 );
                               },
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF044E2F),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
+                              child: ListenableBuilder(
+                                listenable: PasienProfileState.instance,
+                                builder: (context, _) {
+                                  final rawAvatar = PasienProfileState.instance.avatarPath;
+                                  final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                                  final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+                                  return Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF044E2F),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: hasPhoto
+                                        ? (resolved.startsWith('http')
+                                            ? Image.network(
+                                                resolved,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => const Icon(
+                                                  Icons.person_rounded,
+                                                  size: 22,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : Image.file(
+                                                File(resolved),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => const Icon(
+                                                  Icons.person_rounded,
+                                                  size: 22,
+                                                  color: Colors.white,
+                                                ),
+                                              ))
+                                        : const Icon(Icons.person_rounded, size: 22, color: Colors.white),
+                                  );
+                                },
                               ),
                             ),
                           ],

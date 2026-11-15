@@ -9,6 +9,8 @@ import '../../../onboarding_screen.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/apotek_api_service.dart';
+import '../../../config/api_config.dart';
+import '../models/apotek_models.dart';
 import 'apotek_status_layanan_screen.dart';
 import 'apotek_jam_operasional_screen.dart';
 import 'apotek_area_layanan_screen.dart';
@@ -79,9 +81,22 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
       final res = await ApotekApiService().getProfile();
       if (res.success && res.data != null && mounted) {
         final d = res.data!;
-        final fetchedName = d['nama'] ?? d['nama_apotek'] ?? d['name'];
+        final apotekObj = d['apotek'] is Map ? d['apotek'] as Map : d;
+        final fetchedName = apotekObj['nama_apotek'] ?? apotekObj['nama'] ?? apotekObj['name'];
+        final fetchedFoto = apotekObj['foto_profile'] ?? apotekObj['foto_profil'];
         if (fetchedName != null && fetchedName.toString().isNotEmpty) {
           setState(() => _nama = fetchedName.toString());
+        }
+        if (fetchedFoto != null && fetchedFoto.toString().isNotEmpty) {
+          final resolved = ApiConfig.resolveImageUrl(fetchedFoto.toString());
+          setState(() {
+            _avatarType = 'network';
+            _avatarPath = resolved;
+          });
+          ApotekProfileState.instance.syncFromUser(
+            name: _nama,
+            avatar: resolved,
+          );
         }
       }
     } catch (_) {}
@@ -175,6 +190,22 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         _avatarPath = file.path;
       });
 
+      // Unggah ke backend server GIAT
+      final res = await ApotekApiService().updateFotoProfile(file);
+      final newUrl = res.data?['foto_profile'] ?? res.data?['foto_profil'] ?? res.data?['foto'] ?? res.data?['url'];
+      String finalPhotoPath = file.path;
+      if (newUrl != null && newUrl.toString().isNotEmpty) {
+        final resolved = ApiConfig.resolveImageUrl(newUrl.toString());
+        finalPhotoPath = resolved;
+        if (mounted) {
+          setState(() {
+            _avatarType = 'network';
+            _avatarPath = resolved;
+          });
+        }
+      }
+      ApotekProfileState.instance.updateAvatar(finalPhotoPath);
+
       // Update local storage
       final user = await StorageService().getUser();
       if (user != null) {
@@ -186,7 +217,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
           alamat: user.alamat,
           jenisKelamin: user.jenisKelamin,
           nik: user.nik,
-          fotoProfile: file.path,
+          fotoProfile: finalPhotoPath,
           firebaseUid: user.firebaseUid,
           authProvider: user.authProvider,
           role: user.role,

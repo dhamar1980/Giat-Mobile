@@ -16,6 +16,7 @@ import '../../../widgets/typing_indicator_widget.dart';
 import '../../../utils/time_utils.dart';
 import '../obat/resep_dokter_screen.dart';
 import '../../../services/supabase_admin_service.dart';
+import '../../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KONSULTASI CHAT SCREEN (Realtime Chat & Video Call GIAT Telemedicine)
@@ -156,7 +157,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
 
     _doctorName = widget.doctorName;
     _specialty = widget.specialty;
-    _avatarUrl = widget.avatarUrl;
+    _avatarUrl = ApiConfig.resolveImageUrl(widget.avatarUrl);
     if (_doctorName.toLowerCase().contains('realtime')) {
       _doctorName = 'dr. Budi Santoso, Sp.PD';
       _specialty = 'Dokter Spesialis Penyakit Dalam';
@@ -212,7 +213,8 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
             if (doc is Map) {
               String docNama = (doc['nama'] ?? doc['name'] ?? '').toString();
               String docSpec = (doc['spesialisasi'] ?? doc['specialty'] ?? '').toString();
-              String docAvatar = (doc['foto_profile'] ?? '').toString();
+              String rawDocAvatar = (doc['foto_profile'] ?? doc['foto_profil'] ?? '').toString();
+              String docAvatar = ApiConfig.resolveImageUrl(rawDocAvatar);
               if (docNama.toLowerCase().contains('realtime')) {
                 docNama = 'dr. Budi Santoso, Sp.PD';
                 docSpec = 'Dokter Spesialis Penyakit Dalam';
@@ -427,7 +429,8 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
             final doc = konsultasi['dokter'] as Map;
             String docNama = (doc['nama'] ?? doc['name'] ?? '').toString();
             String docSpec = (doc['spesialisasi'] ?? doc['specialty'] ?? '').toString();
-            String docAvatar = (doc['foto_profile'] ?? '').toString();
+            String rawDocAvatar = (doc['foto_profile'] ?? doc['foto_profil'] ?? '').toString();
+            String docAvatar = ApiConfig.resolveImageUrl(rawDocAvatar);
 
             if (docNama.toLowerCase().contains('realtime')) {
               docNama = 'dr. Budi Santoso, Sp.PD';
@@ -1343,7 +1346,7 @@ class _KonsultasiChatScreenState extends State<KonsultasiChatScreen> {
         ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: Image.network(
-            widget.avatarUrl,
+            _avatarUrl,
             width: 34,
             height: 34,
             fit: BoxFit.cover,

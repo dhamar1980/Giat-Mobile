@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -15,6 +16,8 @@ import 'services/reminder_notification_service.dart';
 import 'services/storage_service.dart';
 import 'screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
 import 'utils/time_utils.dart';
+import 'models/pasien_profile_state.dart';
+import 'config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER LAYOUT GIAT (Persistent TopBar, Content Switcher, & Navbar)
@@ -51,6 +54,8 @@ class _MasterLayoutState extends State<MasterLayout> {
     _currentIndex = widget.initialIndex;
     _activatedTabs = {_currentIndex};
     _unreadCount = StorageService().getUnreadNotificationCount();
+    PasienProfileState.instance.syncFromUser(name: widget.userName);
+    PasienProfileState.instance.loadProfile(fallbackName: widget.userName);
     ReminderNotificationService.instance.startMonitoring();
     ReminderNotificationService.instance.unreadCountNotifier
         .addListener(_onUnreadChanged);
@@ -303,20 +308,53 @@ class _MasterLayoutState extends State<MasterLayout> {
                 GestureDetector(
                   onTap: () {
                     Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ProfilePasienScreen(userName: widget.userName),
-                      ),
+                       context,
+                       MaterialPageRoute(
+                         builder: (_) => ProfilePasienScreen(userName: widget.userName),
+                       ),
                     );
                   },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF044E2F),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.person_rounded, size: 22, color: Colors.white),
+                  child: ListenableBuilder(
+                    listenable: PasienProfileState.instance,
+                    builder: (context, _) {
+                      final rawAvatar = PasienProfileState.instance.avatarPath;
+                      final resolved = ApiConfig.resolveImageUrl(rawAvatar);
+                      final hasPhoto = resolved.isNotEmpty && (resolved.startsWith('http') || (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+                      return Container(
+                        width: 36,
+                        height: 36,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF044E2F),
+                          shape: BoxShape.circle,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: hasPhoto
+                            ? (resolved.startsWith('http')
+                                ? Image.network(
+                                    resolved,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.person_rounded,
+                                      size: 22,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Image.file(
+                                    File(resolved),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.person_rounded,
+                                      size: 22,
+                                      color: Colors.white,
+                                    ),
+                                  ))
+                            : const Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                      );
+                    },
                   ),
                 ),
               ],

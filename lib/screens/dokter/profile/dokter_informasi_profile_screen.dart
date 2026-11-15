@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../models/user_model.dart';
 import '../../../services/dokter_api_service.dart';
 import '../../../services/storage_service.dart';
+import '../../../config/api_config.dart';
 import '../models/dokter_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,9 +82,33 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
       }
 
       final res = await DokterApiService().updateFotoProfil(file);
-      final newUrl = res.data?['foto_profile'] ?? res.data?['foto'] ?? res.data?['url'];
-      if (newUrl != null && newUrl.toString().startsWith('http')) {
-        profileState.updateAvatar(type: 'network', path: newUrl.toString());
+      final newUrl = res.data?['foto_profile'] ?? res.data?['foto_profil'] ?? res.data?['foto'] ?? res.data?['url'];
+      if (newUrl != null && newUrl.toString().isNotEmpty) {
+        final resolvedUrl = ApiConfig.resolveImageUrl(newUrl.toString());
+        profileState.updateAvatar(type: 'network', path: resolvedUrl);
+        final user = await StorageService().getUser();
+        if (user != null) {
+          final updated = UserModel(
+            id: user.id,
+            nama: user.nama,
+            email: user.email,
+            noHp: user.noHp,
+            alamat: user.alamat,
+            jenisKelamin: user.jenisKelamin,
+            nik: user.nik,
+            fotoProfile: resolvedUrl,
+            firebaseUid: user.firebaseUid,
+            authProvider: user.authProvider,
+            role: user.role,
+            spesialisasi: user.spesialisasi,
+            instansi: user.instansi,
+            noStr: user.noStr,
+            noSip: user.noSip,
+            tanggalLahir: user.tanggalLahir,
+            golonganDarah: user.golonganDarah,
+          );
+          await StorageService().saveUser(updated);
+        }
       }
 
       if (context.mounted) {

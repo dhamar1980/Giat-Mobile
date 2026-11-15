@@ -13,6 +13,8 @@ import 'kata_sandi_keamanan_screen.dart';
 import 'edit_informasi_pribadi_screen.dart';
 import '../../../widgets/giat_background.dart';
 import '../../../utils/time_utils.dart';
+import '../../../config/api_config.dart';
+import '../../../models/pasien_profile_state.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFIL PASIEN - GIAT HEALTHCARE
@@ -101,9 +103,10 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
       _avatarFile = null;
       return;
     }
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    final resolved = ApiConfig.resolveImageUrl(trimmed);
+    if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
       _avatarType = 'network';
-      _avatarPath = trimmed;
+      _avatarPath = resolved;
       _avatarFile = null;
     } else if (File(trimmed).existsSync()) {
       _avatarType = 'file';
@@ -159,6 +162,10 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
             _setAvatarFromPath(d['foto_profile'].toString());
           }
         });
+        PasienProfileState.instance.syncFromUser(
+          name: _nama,
+          avatar: d['foto_profile']?.toString(),
+        );
       }
     } catch (_) {}
 
@@ -410,12 +417,14 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
         _isUploadingPhoto = false;
       });
 
-      final newUrl = res.data?['foto_profile'] ?? res.data?['foto'] ?? res.data?['image_url'] ?? res.data?['url'];
-      if (newUrl != null && newUrl.toString().startsWith('http')) {
+      final newUrl = res.data?['foto_profile'] ?? res.data?['foto_profil'] ?? res.data?['foto'] ?? res.data?['image_url'] ?? res.data?['url'];
+      if (newUrl != null && newUrl.toString().isNotEmpty) {
+        final resolvedUrl = ApiConfig.resolveImageUrl(newUrl.toString());
         setState(() {
           _avatarType = 'network';
-          _avatarPath = newUrl.toString();
+          _avatarPath = resolvedUrl;
         });
+        PasienProfileState.instance.updateAvatar(resolvedUrl);
         if (currentUser != null) {
           final netUser = UserModel(
             id: currentUser.id,
@@ -425,7 +434,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
             alamat: currentUser.alamat,
             jenisKelamin: currentUser.jenisKelamin,
             nik: currentUser.nik,
-            fotoProfile: newUrl.toString(),
+            fotoProfile: resolvedUrl,
             firebaseUid: currentUser.firebaseUid,
             authProvider: currentUser.authProvider,
             role: currentUser.role,
@@ -602,6 +611,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                         _avatarPath = item['path']!;
                         _avatarFile = null;
                       });
+                      PasienProfileState.instance.updateAvatar(item['path']!, type: item['type']!);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(

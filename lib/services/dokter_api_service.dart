@@ -281,26 +281,40 @@ class DokterApiService {
     try {
       dynamic uploadData;
       if (fileOrPath is File) {
+        final fileName = fileOrPath.path.split(Platform.pathSeparator).last;
         uploadData = FormData.fromMap({
-          'foto': await MultipartFile.fromFile(
+          'image': await MultipartFile.fromFile(
             fileOrPath.path,
-            filename: fileOrPath.path.split(Platform.pathSeparator).last,
+            filename: fileName,
           ),
         });
       } else if (fileOrPath is String && fileOrPath.isNotEmpty) {
         if (File(fileOrPath).existsSync()) {
+          final fileName = fileOrPath.split(Platform.pathSeparator).last;
           uploadData = FormData.fromMap({
-            'foto': await MultipartFile.fromFile(fileOrPath),
+            'image': await MultipartFile.fromFile(fileOrPath, filename: fileName),
           });
         } else {
-          uploadData = {'foto_url': fileOrPath};
+          uploadData = {
+            'foto_profile': fileOrPath,
+            'foto_profil': fileOrPath,
+            'foto_url': fileOrPath,
+          };
         }
       }
 
       final response = await _client.dio.post('/dokter/profile/foto', data: uploadData);
+      final raw = response.data;
+      Map<String, dynamic>? resData;
+      if (raw is Map && raw['data'] is Map) {
+        resData = Map<String, dynamic>.from(raw['data'] as Map);
+      } else if (raw is Map) {
+        resData = Map<String, dynamic>.from(raw);
+      }
+
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Foto profil dokter berhasil diperbarui.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Foto profil dokter berhasil diperbarui.',
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {

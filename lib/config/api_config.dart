@@ -46,4 +46,9 @@ class ApiConfig {
   static void resetToDefault() {
     _customBaseUrl = null;
   }
+
+  /// Helper untuk meresolusi URL foto profil / storage ke host baseUrl yang aktif
+  static String resolveImageUrl(String? rawUrl) {
+    return ApiConstants.resolveImageUrl(rawUrl, baseUrl);
+  }
 }

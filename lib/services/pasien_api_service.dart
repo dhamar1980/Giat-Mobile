@@ -509,35 +509,46 @@ class PasienApiService {
     }
   }
 
-  /// POST /pasien/profile/foto (Key: 'image' & 'foto')
+  /// POST /pasien/profile/foto (Key: 'image')
   Future<ApiResponse<Map<String, dynamic>>> updateFotoProfile(dynamic fileOrPath) async {
     try {
       dynamic uploadData;
       if (fileOrPath is File) {
-        final bytes = await MultipartFile.fromFile(
-          fileOrPath.path,
-          filename: fileOrPath.path.split(Platform.pathSeparator).last,
-        );
+        final fileName = fileOrPath.path.split(Platform.pathSeparator).last;
         uploadData = FormData.fromMap({
-          'image': bytes,
-          'foto': bytes,
+          'image': await MultipartFile.fromFile(
+            fileOrPath.path,
+            filename: fileName,
+          ),
         });
       } else if (fileOrPath is String && fileOrPath.isNotEmpty) {
         if (File(fileOrPath).existsSync()) {
-          final bytes = await MultipartFile.fromFile(fileOrPath);
+          final fileName = fileOrPath.split(Platform.pathSeparator).last;
           uploadData = FormData.fromMap({
-            'image': bytes,
-            'foto': bytes,
+            'image': await MultipartFile.fromFile(fileOrPath, filename: fileName),
           });
         } else {
-          uploadData = {'foto_url': fileOrPath, 'image_url': fileOrPath};
+          uploadData = {
+            'foto_profile': fileOrPath,
+            'foto_profil': fileOrPath,
+            'foto_url': fileOrPath,
+            'image_url': fileOrPath,
+          };
         }
       }
 
       final response = await _client.dio.post('/pasien/profile/foto', data: uploadData);
+      final raw = response.data;
+      Map<String, dynamic>? resData;
+      if (raw is Map && raw['data'] is Map) {
+        resData = Map<String, dynamic>.from(raw['data'] as Map);
+      } else if (raw is Map) {
+        resData = Map<String, dynamic>.from(raw);
+      }
+
       return ApiResponse.success(
-        message: response.data?['message'] ?? 'Foto profil berhasil diperbarui.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        message: raw?['message'] ?? 'Foto profil berhasil diperbarui.',
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {

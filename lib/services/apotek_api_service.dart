@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'api_response.dart';
 
@@ -387,6 +389,52 @@ class ApotekApiService {
       return ApiResponse.success(
         message: raw?['message'] ?? 'Berhasil memuat riwayat aktivitas.',
         data: list,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// POST /apotek/profile/foto
+  Future<ApiResponse<Map<String, dynamic>>> updateFotoProfile(dynamic fileOrPath) async {
+    try {
+      dynamic uploadData;
+      if (fileOrPath is File) {
+        final fileName = fileOrPath.path.split(Platform.pathSeparator).last;
+        uploadData = FormData.fromMap({
+          'image': await MultipartFile.fromFile(
+            fileOrPath.path,
+            filename: fileName,
+          ),
+        });
+      } else if (fileOrPath is String && fileOrPath.isNotEmpty) {
+        if (File(fileOrPath).existsSync()) {
+          final fileName = fileOrPath.split(Platform.pathSeparator).last;
+          uploadData = FormData.fromMap({
+            'image': await MultipartFile.fromFile(fileOrPath, filename: fileName),
+          });
+        } else {
+          uploadData = {
+            'foto_profile': fileOrPath,
+            'foto_profil': fileOrPath,
+            'foto_url': fileOrPath,
+          };
+        }
+      }
+
+      final response = await _client.dio.post('/apotek/profile/foto', data: uploadData);
+      final raw = response.data;
+      Map<String, dynamic>? resData;
+      if (raw is Map && raw['data'] is Map) {
+        resData = Map<String, dynamic>.from(raw['data'] as Map);
+      } else if (raw is Map) {
+        resData = Map<String, dynamic>.from(raw);
+      }
+
+      return ApiResponse.success(
+        message: raw?['message'] ?? 'Foto profil apotek berhasil diperbarui.',
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {

@@ -17,6 +17,7 @@ import '../../../widgets/incoming_call_dialog.dart';
 import '../../../widgets/typing_indicator_widget.dart';
 import '../../../utils/time_utils.dart';
 import '../../../services/supabase_admin_service.dart';
+import '../../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RUANG CHAT DOKTER-PASIEN (Realtime Chat & Video Call GIAT Telemedicine)
@@ -879,7 +880,7 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
                     borderRadius: BorderRadius.circular(12),
                     child: p.avatarUrl != null && p.avatarUrl!.isNotEmpty
                         ? Image.network(
-                            p.avatarUrl!,
+                            ApiConfig.resolveImageUrl(p.avatarUrl!),
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => Center(
                               child: Text(
@@ -1235,25 +1236,54 @@ class _DokterRoomChatScreenState extends State<DokterRoomChatScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Mini Patient Avatar Inisial
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF86EFAC), width: 1),
-            ),
-            child: Center(
-              child: Text(
-                patientInitials,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _darkGreen,
-                ),
-              ),
-            ),
+          // Mini Patient Avatar Photo or Inisial
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: (widget.patient.avatarUrl != null && widget.patient.avatarUrl!.isNotEmpty)
+                ? Image.network(
+                    ApiConfig.resolveImageUrl(widget.patient.avatarUrl!),
+                    width: 34,
+                    height: 34,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF86EFAC), width: 1),
+                      ),
+                      child: Center(
+                        child: Text(
+                          patientInitials,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _darkGreen,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF86EFAC), width: 1),
+                    ),
+                    child: Center(
+                      child: Text(
+                        patientInitials,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: _darkGreen,
+                        ),
+                      ),
+                    ),
+                  ),
           ),
           const SizedBox(width: 8),
 

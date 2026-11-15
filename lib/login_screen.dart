@@ -6,10 +6,12 @@ import 'config/api_config.dart';
 import 'constants/api_constants.dart';
 import 'master_layout.dart';
 import 'models/user_model.dart';
+import 'models/pasien_profile_state.dart';
 import 'register_screen.dart';
 import 'screens/dokter/dokter_home_screen.dart';
 import 'screens/dokter/models/dokter_models.dart';
 import 'screens/apotek/apoteker_home_screen.dart';
+import 'screens/apotek/models/apotek_models.dart';
 import 'screens/admin/admin_home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'services/auth_service.dart';
@@ -225,6 +227,16 @@ class _LoginScreenState extends State<LoginScreen>
             inst: result.user?.instansi,
             avatar: result.user?.fotoProfile,
           );
+        } else if (role == 'apotek' || role == 'apoteker') {
+          ApotekProfileState.instance.syncFromUser(
+            name: name,
+            avatar: result.user?.fotoProfile,
+          );
+        } else {
+          PasienProfileState.instance.syncFromUser(
+            name: name,
+            avatar: result.user?.fotoProfile,
+          );
         }
 
         Widget targetScreen;
@@ -281,6 +293,16 @@ class _LoginScreenState extends State<LoginScreen>
             spec: user['specialty'],
             inst: user['institution'],
           );
+        } else if (role == 'apotek' || role == 'apoteker') {
+          ApotekProfileState.instance.syncFromUser(
+            name: name,
+            avatar: demoUser.fotoProfile,
+          );
+        } else {
+          PasienProfileState.instance.syncFromUser(
+            name: name,
+            avatar: demoUser.fotoProfile,
+          );
         }
 
         _showSnack('Server offline / fallback demo: $role');
@@ -331,6 +353,16 @@ class _LoginScreenState extends State<LoginScreen>
             name: name,
             spec: result.user?.spesialisasi,
             inst: result.user?.instansi,
+            avatar: result.user?.fotoProfile,
+          );
+        } else if (role == 'apotek' || role == 'apoteker') {
+          ApotekProfileState.instance.syncFromUser(
+            name: name,
+            avatar: result.user?.fotoProfile,
+          );
+        } else {
+          PasienProfileState.instance.syncFromUser(
+            name: name,
             avatar: result.user?.fotoProfile,
           );
         }
