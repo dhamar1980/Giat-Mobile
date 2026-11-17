@@ -12,10 +12,8 @@ import '../../../services/apotek_api_service.dart';
 import '../../../config/api_config.dart';
 import '../models/apotek_models.dart';
 import 'apotek_status_layanan_screen.dart';
-import 'apotek_jam_operasional_screen.dart';
-import 'apotek_area_layanan_screen.dart';
 import 'apotek_riwayat_aktivitas_screen.dart';
-import 'apotek_pusat_bantuan_screen.dart';
+import 'apotek_keamanan_akun_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFIL UTAMA APOTEK (Revisi Sesuai Screenshot Mockup Figma)
@@ -44,6 +42,8 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   static const _border = Color(0xFFE2E8F0);
 
   late String _nama;
+  String _email = 'apotek.dago@kimiafarma.co.id';
+  String _noHp = '0222501234';
   File? _avatarFile;
   String _avatarType = 'asset'; // 'asset', 'network', 'file', 'default'
   String _avatarPath = 'assets/images/dokter_apoteker.jpg';
@@ -69,6 +69,8 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
       if (user != null && mounted) {
         setState(() {
           if (user.nama.isNotEmpty) _nama = user.nama;
+          if (user.email.isNotEmpty) _email = user.email;
+          if (user.noHp != null && user.noHp!.isNotEmpty) _noHp = user.noHp!;
           if (user.fotoProfile != null && user.fotoProfile!.isNotEmpty) {
             _avatarType = user.fotoProfile!.startsWith('http') ? 'network' : 'asset';
             _avatarPath = user.fotoProfile!;
@@ -83,9 +85,17 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         final d = res.data!;
         final apotekObj = d['apotek'] is Map ? d['apotek'] as Map : d;
         final fetchedName = apotekObj['nama_apotek'] ?? apotekObj['nama'] ?? apotekObj['name'];
+        final fetchedEmail = apotekObj['email'] ?? d['email'];
+        final fetchedNoHp = apotekObj['no_hp'] ?? d['no_hp'];
         final fetchedFoto = apotekObj['foto_profile'] ?? apotekObj['foto_profil'];
         if (fetchedName != null && fetchedName.toString().isNotEmpty) {
           setState(() => _nama = fetchedName.toString());
+        }
+        if (fetchedEmail != null && fetchedEmail.toString().isNotEmpty) {
+          setState(() => _email = fetchedEmail.toString());
+        }
+        if (fetchedNoHp != null && fetchedNoHp.toString().isNotEmpty) {
+          setState(() => _noHp = fetchedNoHp.toString());
         }
         if (fetchedFoto != null && fetchedFoto.toString().isNotEmpty) {
           final resolved = ApiConfig.resolveImageUrl(fetchedFoto.toString());
@@ -753,7 +763,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // OPERATIONAL INFORMATION CARD (Jam Operasional & Area Layanan)
+  // OPERATIONAL INFORMATION CARD (Jam Operasional & Area Layanan - Read Only)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildOperationalCard() {
     return Container(
@@ -774,99 +784,83 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Jam Operasional
-          InkWell(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ApotekJamOperasionalScreen()),
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.access_time_rounded,
-                        size: 19,
-                        color: Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Jam Operasional',
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF334155),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 27),
-                    child: Text(
-                      '08.00 - 21.00',
+          // Jam Operasional (Read-only, diubah melalui menu Status Layanan)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.access_time_rounded,
+                      size: 19,
+                      color: Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Jam Operasional',
                       style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _darkGreen,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF334155),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.only(left: 27),
+                  child: Text(
+                    '08.00 - 21.00',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _darkGreen,
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 12),
-          // Area Layanan
-          InkWell(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ApotekAreaLayananScreen()),
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 19,
-                        color: Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Area Layanan',
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF334155),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 27),
-                    child: Text(
-                      'Malang',
+          // Area Layanan (Read-only, diubah melalui menu Status Layanan)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 19,
+                      color: Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Area Layanan',
                       style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _darkGreen,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF334155),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.only(left: 27),
+                  child: Text(
+                    'Malang',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _darkGreen,
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -902,10 +896,11 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
-              onTap: () {
-                Navigator.of(context).push(
+              onTap: () async {
+                await Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ApotekStatusLayananScreen()),
                 );
+                if (mounted) setState(() {});
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -919,7 +914,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Center(
-                        child: Icon(Icons.vpn_key_rounded, color: Colors.white, size: 22),
+                        child: Icon(Icons.storefront_rounded, color: Colors.white, size: 22),
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -947,7 +942,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
 
         const SizedBox(height: 12),
 
-        // Card 2: Riwayat Aktivitas & Pusat Bantuan
+        // Card 2: Riwayat Aktivitas & Kata Sandi & Keamanan
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -1011,13 +1006,29 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
 
                 const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF1F5F9)),
 
-                // Pusat Bantuan
+                // Kata Sandi & Keamanan
                 InkWell(
                   borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ApotekPusatBantuanScreen()),
+                  onTap: () async {
+                    final result = await Navigator.of(context).push<Map<String, String>>(
+                      MaterialPageRoute(
+                        builder: (_) => ApotekKeamananAkunScreen(
+                          apotekName: _nama,
+                          initialEmail: _email,
+                          initialPhone: _noHp,
+                        ),
+                      ),
                     );
+                    if (result != null && mounted) {
+                      setState(() {
+                        if (result['email'] != null && result['email']!.isNotEmpty) {
+                          _email = result['email']!;
+                        }
+                        if (result['phone'] != null && result['phone']!.isNotEmpty) {
+                          _noHp = result['phone']!;
+                        }
+                      });
+                    }
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1031,13 +1042,13 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Center(
-                            child: Icon(Icons.help_rounded, color: Colors.white, size: 22),
+                            child: Icon(Icons.shield_rounded, color: Colors.white, size: 22),
                           ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Text(
-                            'Pusat Bantuan',
+                            'Kata Sandi & Keamanan',
                             style: GoogleFonts.inter(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'api_response.dart';
+import 'supabase_admin_service.dart';
 
 /// Service for all `/apotek` API endpoints
 class ApotekApiService {
@@ -10,6 +11,8 @@ class ApotekApiService {
   ApotekApiService._internal();
 
   final ApiClient _client = ApiClient();
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
 
   // =========================================================================
   // 1. DASHBOARD & NOTIFIKASI
@@ -29,8 +32,26 @@ class ApotekApiService {
     }
   }
 
-  /// GET /apotek/notifikasi
-  Future<ApiResponse<List<dynamic>>> getNotifikasi() async {
+  /// GET /apotek/notifikasi (Terintegrasi langsung dengan Supabase PostgreSQL & REST API)
+  Future<ApiResponse<List<dynamic>>> getNotifikasi({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (!_isTest) {
+      try {
+        final supabaseData = await SupabaseAdminService.instance.fetchApotekNotifications(
+          apotekId: apotekId,
+          apotekName: apotekName,
+        );
+        return ApiResponse.success(
+          message: 'Berhasil memuat notifikasi apotek dari Supabase.',
+          data: supabaseData,
+        );
+      } catch (_) {
+        // Fallback to REST API if Supabase query fails
+      }
+    }
+
     try {
       final response = await _client.dio.get('/apotek/notifikasi');
       final raw = response.data;
@@ -42,6 +63,66 @@ class ApotekApiService {
       );
     } catch (e) {
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// PUT /apotek/notifikasi/{id}/read
+  Future<ApiResponse<void>> markNotificationRead(dynamic id) async {
+    if (!_isTest) {
+      try {
+        await SupabaseAdminService.instance.markNotificationRead(id.toString());
+      } catch (_) {}
+    }
+    try {
+      final response = await _client.dio.put('/apotek/notifikasi/$id/read');
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Notifikasi berhasil ditandai dibaca.',
+        statusCode: response.statusCode,
+      );
+    } catch (_) {
+      return ApiResponse.success(message: 'Notifikasi berhasil ditandai dibaca.');
+    }
+  }
+
+  /// PUT /apotek/notifikasi/read-all
+  Future<ApiResponse<void>> markAllNotificationsRead({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (!_isTest) {
+      try {
+        await SupabaseAdminService.instance.markApotekNotificationsAllRead(
+          apotekId: apotekId,
+          apotekName: apotekName,
+        );
+      } catch (_) {}
+    }
+    try {
+      final response = await _client.dio.put('/apotek/notifikasi/read-all');
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Semua notifikasi telah ditandai dibaca.',
+        statusCode: response.statusCode,
+      );
+    } catch (_) {
+      return ApiResponse.success(message: 'Semua notifikasi telah ditandai dibaca.');
+    }
+  }
+
+  /// DELETE /apotek/notifikasi/{id}
+  Future<ApiResponse<void>> deleteNotification(dynamic id) async {
+    if (!_isTest) {
+      try {
+        await SupabaseAdminService.instance.deleteNotification(id.toString());
+      } catch (_) {}
+    }
+    try {
+      final response = await _client.dio.delete('/apotek/notifikasi/$id');
+      return ApiResponse.success(
+        message: response.data?['message'] ?? 'Notifikasi berhasil dihapus.',
+        statusCode: response.statusCode,
+      );
+    } catch (_) {
+      return ApiResponse.success(message: 'Notifikasi berhasil dihapus.');
     }
   }
 

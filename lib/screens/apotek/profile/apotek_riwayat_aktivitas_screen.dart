@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../widgets/giat_background.dart';
 import '../models/apotek_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RIWAYAT AKTIVITAS & AUDIT APOTEK (Figma Nodes: 1100-24543, 24691, 24887, 25028)
+// RIWAYAT AKTIVITAS & AUDIT APOTEK (Tanpa Header Hijau & Tanpa Bubble Chat)
+// Seragam dengan UI Pasien / Dokter
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ApotekRiwayatAktivitasScreen extends StatefulWidget {
   const ApotekRiwayatAktivitasScreen({super.key});
 
   @override
-  State<ApotekRiwayatAktivitasScreen> createState() => _ApotekRiwayatAktivitasScreenState();
+  State<ApotekRiwayatAktivitasScreen> createState() =>
+      _ApotekRiwayatAktivitasScreenState();
 }
 
-class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScreen> {
+class _ApotekRiwayatAktivitasScreenState
+    extends State<ApotekRiwayatAktivitasScreen> {
   static const _darkGreen = Color(0xFF065A37);
   static const _buttonDarkGreen = Color(0xFF044E2F);
-  static const _bgColor = Color(0xFFF8FAF9);
+  static const _bgColor = Color(0xFFF7FAF8);
   static const _border = Color(0xFFE2E8F0);
 
   int _selectedFilter = 0; // 0: Semua, 1: Hari ini, 2: Minggu ini, 3: Kemarin & Sebelumnya
@@ -31,7 +35,7 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
     }
   }
 
-  // ── Detail Perubahan Stok Modal (Figma Node 1100:24691) ──
+  // ── Detail Perubahan Stok Modal ──
   void _showStockChangeDetailModal(ApotekActivity act) {
     showModalBottomSheet(
       context: context,
@@ -55,7 +59,10 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                 child: Container(
                   width: 40,
                   height: 4,
-                  decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -64,48 +71,107 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                 children: [
                   Text(
                     'Memperbarui Stok Obat',
-                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
-                    child: Text('Audit Valid', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _darkGreen)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Audit Valid',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _darkGreen,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 '01 September 2026, 14:10 WIB',
-                style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  color: const Color(0xFF64748B),
+                ),
               ),
               const Divider(height: 24),
 
-              // Detail Obat
-              Text('Detail Obat', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A))),
+              Text(
+                'Detail Obat',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: const Color(0xFFF8FAF9), borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _border),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Paracetamol 500 mg', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Paracetamol 500 mg',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text('Tablet Salut Selaput • Analgesik & Antipiretik', style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF475569))),
+                    Text(
+                      'Tablet Salut Selaput • Analgesik & Antipiretik',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
                     const SizedBox(height: 6),
-                    Text('No. Batch: BATCH-2026-X89', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: _darkGreen)),
+                    Text(
+                      'No. Batch: BATCH-2026-X89',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _darkGreen,
+                      ),
+                    ),
                   ],
                 ),
               ),
 
               const SizedBox(height: 18),
 
-              // Perubahan Stok Card
-              Text('Perubahan Stok', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A))),
+              Text(
+                'Perubahan Stok',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: const Color(0xFFF8FAF9), borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _border),
+                ),
                 child: Column(
                   children: [
                     _buildRow('Penyesuaian', '+ 20 Tablet'),
@@ -114,19 +180,32 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                     const Divider(height: 14),
                     _buildRow('Stok Akhir', '120 Tablet'),
                     const Divider(height: 14),
-                    _buildRow('Kapasitas vs Terkini', '120 / 150 Maks (80% Terisi)'),
+                    _buildRow(
+                      'Kapasitas vs Terkini',
+                      '120 / 150 Maks (80% Terisi)',
+                    ),
                   ],
                 ),
               ),
 
               const SizedBox(height: 18),
 
-              // Petugas
-              Text('Informasi Audit & Petugas', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A))),
+              Text(
+                'Informasi Audit & Petugas',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: const Color(0xFFF8FAF9), borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _border),
+                ),
                 child: Column(
                   children: [
                     _buildRow('Penanggung Jawab', 'Apt. Syita Nabila, S.Farm'),
@@ -147,10 +226,15 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _buttonDarkGreen,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text('Tutup Detail', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                  child: Text(
+                    'Tutup Detail',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
@@ -160,7 +244,7 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
     );
   }
 
-  // ── Detail Memproses Pesanan Modal (Figma Node 1100:24887) ──
+  // ── Detail Memproses Pesanan Modal ──
   void _showOrderDetailModal(ApotekActivity act) {
     showModalBottomSheet(
       context: context,
@@ -184,40 +268,79 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                 child: Container(
                   width: 40,
                   height: 4,
-                  decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 'Detail Memproses Pesanan',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
               ),
               const SizedBox(height: 4),
-              Text('TRX-2026-00981 • INV/20260901/MP/0981', style: GoogleFonts.inter(fontSize: 12.5, color: _darkGreen, fontWeight: FontWeight.w600)),
+              Text(
+                'TRX-2026-00981 • INV/20260901/MP/0981',
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  color: _darkGreen,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const Divider(height: 24),
 
-              // Pasien Card
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: const Color(0xFFF8FAF9), borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _border),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Andi Pratama (PXL-MLG-90214)', style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Andi Pratama (PXL-MLG-90214)',
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text('Jl. Ijen No. 45, Klojen, Kota Malang', style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B))),
+                    Text(
+                      'Jl. Ijen No. 45, Klojen, Kota Malang',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
                   ],
                 ),
               ),
 
               const SizedBox(height: 18),
 
-              // Rincian Produk
-              Text('Rincian Obat & Produk', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A))),
+              Text(
+                'Rincian Obat & Produk',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: const Color(0xFFF8FAF9), borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _border),
+                ),
                 child: Column(
                   children: [
                     _buildRow('Paracetamol 500 mg (2 strip)', 'Rp 20.000,00'),
@@ -244,13 +367,22 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                       style: OutlinedButton.styleFrom(
                         foregroundColor: _darkGreen,
                         side: const BorderSide(color: _darkGreen),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mencetak struk transaksi...')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Mencetak struk transaksi...'),
+                          ),
+                        );
                       },
-                      child: Text('Cetak Struk', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                      child: Text(
+                        'Cetak Struk',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -260,13 +392,22 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                         backgroundColor: _buttonDarkGreen,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Membuka pelacakan kurir GIAT...')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Membuka pelacakan kurir GIAT...'),
+                          ),
+                        );
                       },
-                      child: Text('Lacak Kurir', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                      child: Text(
+                        'Lacak Kurir',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                 ],
@@ -278,7 +419,7 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
     );
   }
 
-  // ── Detail Menambahkan Obat Baru Modal (Figma Node 1100:25028) ──
+  // ── Detail Menambahkan Obat Baru Modal ──
   void _showAddMedicineDetailModal(ApotekActivity act) {
     showModalBottomSheet(
       context: context,
@@ -302,27 +443,57 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                 child: Container(
                   width: 40,
                   height: 4,
-                  decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 'Rincian Registrasi Obat Baru',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
               ),
               const SizedBox(height: 4),
-              Text('GIAT-SKU-9921 • BPOM Valid (GKL1805051217A1)', style: GoogleFonts.inter(fontSize: 12.5, color: _darkGreen, fontWeight: FontWeight.w600)),
+              Text(
+                'GIAT-SKU-9921 • BPOM Valid (GKL1805051217A1)',
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  color: _darkGreen,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const Divider(height: 24),
 
-              Text('Cetirizine 10 mg', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
+              Text(
+                'Cetirizine 10 mg',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text('Tablet Salut Selaput • Antihistamin & Antialergi • Kimia Farma', style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B))),
+              Text(
+                'Tablet Salut Selaput • Antihistamin & Antialergi • Kimia Farma',
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
 
               const SizedBox(height: 16),
 
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: const Color(0xFFF8FAF9), borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _border),
+                ),
                 child: Column(
                   children: [
                     _buildRow('Stok Awal', '50 Tablet (5 strip @ 10 tablet)'),
@@ -331,7 +502,11 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                     const Divider(height: 14),
                     _buildRow('Harga Jual Apotek', 'Rp 7.500 / strip'),
                     const Divider(height: 14),
-                    _buildRow('Estimasi Margin', '+66.7% (Rp 3.000 / strip)', isBold: true),
+                    _buildRow(
+                      'Estimasi Margin',
+                      '+66.7% (Rp 3.000 / strip)',
+                      isBold: true,
+                    ),
                     const Divider(height: 14),
                     _buildRow('Kedaluwarsa Batch 1', '20 Agustus 2028'),
                     const Divider(height: 14),
@@ -349,10 +524,15 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _buttonDarkGreen,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text('Tutup', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                  child: Text(
+                    'Tutup',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
@@ -366,7 +546,13 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            color: const Color(0xFF64748B),
+          ),
+        ),
         Text(
           value,
           style: GoogleFonts.inter(
@@ -385,159 +571,246 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
 
     return Scaffold(
       backgroundColor: _bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'Riwayat Aktivitas',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFF1F5F9), height: 1),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Tabs (Semua, Hari ini, Minggu ini, Kemarin & Sebelumnya)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildTab(0, 'Semua'),
-                    const SizedBox(width: 8),
-                    _buildTab(1, 'Hari ini'),
-                    const SizedBox(width: 8),
-                    _buildTab(2, 'Minggu ini'),
-                    const SizedBox(width: 8),
-                    _buildTab(3, 'Kemarin & Sebelumnya'),
-                  ],
-                ),
-              ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _RiwayatAktivitasTopographyPainter(),
             ),
-
-            // Activity List
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.all(20),
-                itemCount: acts.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final act = acts[index];
-
-                  IconData icon;
-                  Color iconColor;
-                  Color iconBg;
-
-                  if (act.type == 'stok') {
-                    icon = Icons.inventory_2_rounded;
-                    iconColor = const Color(0xFFD97706);
-                    iconBg = const Color(0xFFFEF3C7);
-                  } else if (act.type == 'pesanan') {
-                    icon = Icons.local_shipping_rounded;
-                    iconColor = const Color(0xFF2563EB);
-                    iconBg = const Color(0xFFEFF6FF);
-                  } else {
-                    icon = Icons.medication_rounded;
-                    iconColor = const Color(0xFF16A34A);
-                    iconBg = const Color(0xFFDCFCE7);
-                  }
-
-                  return GestureDetector(
-                    onTap: () => _showActivityDetail(act),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _border),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-                            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                // Top Navigation Bar (<- Kembali + Center Pill Title)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7.5,
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        act.title,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 14.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                    ),
-                                    Text(
-                                      act.timeText,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11.5,
-                                        color: const Color(0xFF94A3B8),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.arrow_back,
+                                size: 15,
+                                color: Color(0xFF0F172A),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Kembali',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF0F172A),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  act.subtitle,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    color: const Color(0xFF475569),
-                                    height: 1.35,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Lihat Aktivitas',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: _darkGreen,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: _darkGreen),
-                                  ],
-                                ),
-                              ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 8.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _buttonDarkGreen,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _buttonDarkGreen.withValues(alpha: 0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            'Riwayat Aktivitas',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.2,
                             ),
                           ),
-                        ],
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+
+                // Tabs (Semua, Hari ini, Minggu ini, Kemarin & Sebelumnya)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 6,
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildTab(0, 'Semua'),
+                        const SizedBox(width: 8),
+                        _buildTab(1, 'Hari ini'),
+                        const SizedBox(width: 8),
+                        _buildTab(2, 'Minggu ini'),
+                        const SizedBox(width: 8),
+                        _buildTab(3, 'Kemarin & Sebelumnya'),
+                      ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                // Activity List
+                Expanded(
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    itemCount: acts.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final act = acts[index];
+
+                      IconData icon;
+                      Color iconColor;
+                      Color iconBg;
+
+                      if (act.type == 'stok') {
+                        icon = Icons.inventory_2_rounded;
+                        iconColor = const Color(0xFFD97706);
+                        iconBg = const Color(0xFFFEF3C7);
+                      } else if (act.type == 'pesanan') {
+                        icon = Icons.local_shipping_rounded;
+                        iconColor = const Color(0xFF2563EB);
+                        iconBg = const Color(0xFFEFF6FF);
+                      } else {
+                        icon = Icons.medication_rounded;
+                        iconColor = const Color(0xFF16A34A);
+                        iconBg = const Color(0xFFDCFCE7);
+                      }
+
+                      return GestureDetector(
+                        onTap: () => _showActivityDetail(act),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: _border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.025),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: iconBg,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(icon, color: iconColor, size: 20),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            act.title,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 14.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          act.timeText,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.5,
+                                            color: const Color(0xFF94A3B8),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      act.subtitle,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        color: const Color(0xFF475569),
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Lihat Aktivitas',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: _darkGreen,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          size: 10,
+                                          color: _darkGreen,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -549,8 +822,11 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? _darkGreen : const Color(0xFFF1F5F9),
+          color: isSelected ? _darkGreen : Colors.white,
           borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? _darkGreen : _border,
+          ),
         ),
         child: Text(
           label,
@@ -563,4 +839,19 @@ class _ApotekRiwayatAktivitasScreenState extends State<ApotekRiwayatAktivitasScr
       ),
     );
   }
+}
+
+class _RiwayatAktivitasTopographyPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    GiatBackgroundPainter.paintBackground(
+      canvas,
+      size,
+      showGradient: false,
+      showLines: true,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

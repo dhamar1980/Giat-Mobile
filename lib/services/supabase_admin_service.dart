@@ -3771,6 +3771,235 @@ class SupabaseAdminService {
       'status': 'selesai',
     };
   }
+
+  // ===========================================================================
+  // MODUL APOTEK: NOTIFIKASI REAL SUPABASE
+  // ===========================================================================
+
+  /// Menentukan ID Apotek (`id_apotek` / `user.id`) yang sedang login di Supabase
+  Future<String?> resolveCurrentApotekId({
+    String? overrideApotekId,
+    String? apotekName,
+  }) async {
+    if (overrideApotekId != null && overrideApotekId.trim().length >= 30) {
+      return overrideApotekId.trim();
+    }
+
+    final user = await StorageService().getUser();
+    if (user != null) {
+      final rawId = user.id.toString().trim();
+      if (rawId.length >= 30) {
+        final check = await _exec(
+          'SELECT TRIM(id_apotek) AS id FROM apotek WHERE TRIM(id_apotek) = @id LIMIT 1',
+          parameters: {'id': rawId},
+        );
+        if (check.isNotEmpty) {
+          return rawId;
+        }
+      }
+
+      final email = user.email.trim().toLowerCase();
+      if (email.isNotEmpty) {
+        final byEmail = await _exec(
+          '''
+          SELECT TRIM(ap.id_apotek) AS id
+          FROM "user" u
+          JOIN apotek ap ON TRIM(ap.id_apotek) = TRIM(u.id)
+          WHERE LOWER(TRIM(u.email)) = @email
+          LIMIT 1
+          ''',
+          parameters: {'email': email},
+        );
+        if (byEmail.isNotEmpty) {
+          final id = byEmail.first.toColumnMap()['id']?.toString().trim();
+          if (id != null && id.isNotEmpty) return id;
+        }
+      }
+
+      final nama = user.nama.trim();
+      if (nama.isNotEmpty) {
+        final byNama = await _exec(
+          '''
+          SELECT TRIM(id_apotek) AS id
+          FROM apotek
+          WHERE LOWER(TRIM(nama_apotek)) ILIKE @nama
+             OR LOWER(TRIM(penanggung_jawab)) ILIKE @nama
+          LIMIT 1
+          ''',
+          parameters: {'nama': '%$nama%'},
+        );
+        if (byNama.isNotEmpty) {
+          final id = byNama.first.toColumnMap()['id']?.toString().trim();
+          if (id != null && id.isNotEmpty) return id;
+        }
+      }
+    }
+
+    if (apotekName != null && apotekName.trim().isNotEmpty) {
+      final byFallbackName = await _exec(
+        '''
+        SELECT TRIM(id_apotek) AS id
+        FROM apotek
+        WHERE LOWER(TRIM(nama_apotek)) ILIKE @nama
+           OR LOWER(TRIM(penanggung_jawab)) ILIKE @nama
+        LIMIT 1
+        ''',
+        parameters: {'nama': '%${apotekName.trim().toLowerCase()}%'},
+      );
+      if (byFallbackName.isNotEmpty) {
+        final id = byFallbackName.first.toColumnMap()['id']?.toString().trim();
+        if (id != null && id.isNotEmpty) return id;
+      }
+    }
+
+    // Default fallback ke apotek utama di database (Apotek Kimia Farma Dago)
+    final firstApotek = await _exec(
+      'SELECT TRIM(id_apotek) AS id FROM apotek ORDER BY created_at ASC LIMIT 1',
+    );
+    if (firstApotek.isNotEmpty) {
+      return firstApotek.first.toColumnMap()['id']?.toString().trim();
+    }
+    return null;
+  }
+
+  /// Mengambil daftar notifikasi real untuk apotek dari tabel `notifikasi` di Supabase
+  Future<List<Map<String, dynamic>>> fetchApotekNotifications({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return [];
+
+    var aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) {
+      final firstApt = await _exec(
+        'SELECT TRIM(id_apotek) AS id FROM apotek ORDER BY created_at ASC LIMIT 1',
+      );
+      if (firstApt.isNotEmpty) {
+        aptId = firstApt.first[0]?.toString().trim();
+      }
+    }
+    if (aptId == null) return [];
+
+    final res = await _exec(
+      '''
+      SELECT
+        TRIM(n.id) AS id,
+        TRIM(n.id_user) AS id_user,
+        n.judul,
+        n.pesan,
+        COALESCE(n.kategori, 'sistem') AS kategori,
+        COALESCE(n.kategori, 'sistem') AS tipe,
+        n.is_read,
+        n.created_at
+      FROM notifikasi n
+      WHERE TRIM(n.id_user) = @aptId
+      ORDER BY n.created_at DESC
+      LIMIT 50
+      ''',
+      parameters: {'aptId': aptId},
+    );
+
+    final notifs = res.map((r) => _normalizeMap(r.toColumnMap())).toList();
+
+    // Sertakan notifikasi broadcast update sistem untuk Apotek / Semua bila belum ada
+    try {
+      final broadcastRes = await _exec(
+        '''
+        SELECT
+          TRIM(n.id) AS id,
+          TRIM(n.id_user) AS id_user,
+          n.judul,
+          n.pesan,
+          COALESCE(n.kategori, 'sistem') AS kategori,
+          COALESCE(n.kategori, 'sistem') AS tipe,
+          n.is_read,
+          n.created_at
+        FROM notifikasi n
+        WHERE LOWER(TRIM(COALESCE(n.kategori, ''))) = 'sistem'
+          AND (
+            LOWER(TRIM(n.judul)) LIKE '%[apotek]%'
+            OR LOWER(TRIM(n.judul)) LIKE '%[semua]%'
+            OR LOWER(TRIM(n.pesan)) LIKE '%apotek%'
+          )
+          AND TRIM(n.id) NOT IN (SELECT TRIM(id) FROM notifikasi WHERE TRIM(id_user) = @aptId)
+        ORDER BY n.created_at DESC
+        LIMIT 10
+        ''',
+        parameters: {'aptId': aptId},
+      );
+      for (final b in broadcastRes) {
+        notifs.add(_normalizeMap(b.toColumnMap()));
+      }
+    } catch (_) {}
+
+    notifs.sort((a, b) {
+      final tA = a['created_at']?.toString() ?? '';
+      final tB = b['created_at']?.toString() ?? '';
+      return tB.compareTo(tA);
+    });
+
+    return notifs;
+  }
+
+  /// Mengambil jumlah notifikasi belum dibaca (`is_read = false`) untuk apotek
+  Future<int> fetchApotekUnreadNotificationCount({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return 0;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return 0;
+
+    final res = await _exec(
+      '''
+      SELECT COUNT(*)::int AS cnt
+      FROM notifikasi
+      WHERE TRIM(id_user) = @aptId
+        AND is_read = false
+      ''',
+      parameters: {'aptId': aptId},
+    );
+    if (res.isEmpty) return 0;
+    return int.tryParse(res.first.toColumnMap()['cnt']?.toString() ?? '0') ?? 0;
+  }
+
+  /// Menandai semua notifikasi milik apotek sudah dibaca
+  Future<void> markApotekNotificationsAllRead({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return;
+    await _exec(
+      'UPDATE notifikasi SET is_read = true WHERE TRIM(id_user) = @aptId',
+      parameters: {'aptId': aptId},
+    );
+  }
+
+  /// Menghapus semua notifikasi milik apotek yang sudah dibaca
+  Future<void> clearApotekReadNotifications({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return;
+    await _exec(
+      'DELETE FROM notifikasi WHERE TRIM(id_user) = @aptId AND is_read = true',
+      parameters: {'aptId': aptId},
+    );
+  }
 }
 
 

@@ -9,9 +9,11 @@ import 'package:giat/screens/apotek/obat/apotek_obat_screen.dart';
 import 'package:giat/screens/apotek/obat/apotek_detail_obat_screen.dart';
 import 'package:giat/screens/apotek/obat/apotek_tambah_obat_screen.dart';
 import 'package:giat/screens/apotek/profile/apotek_profile_screen.dart';
+import 'package:giat/screens/apotek/profile/apotek_status_layanan_screen.dart';
 import 'package:giat/screens/apotek/profile/apotek_jam_operasional_screen.dart';
 import 'package:giat/screens/apotek/profile/apotek_area_layanan_screen.dart';
-import 'package:giat/screens/apotek/profile/apotek_pusat_bantuan_screen.dart';
+import 'package:giat/screens/apotek/profile/apotek_riwayat_aktivitas_screen.dart';
+import 'package:giat/screens/apotek/profile/apotek_keamanan_akun_screen.dart';
 import 'package:giat/screens/apotek/models/apotek_models.dart';
 
 void main() {
@@ -313,7 +315,23 @@ void main() {
     expect(find.text('Jam Operasional'), findsWidgets);
     expect(find.text('Area Layanan'), findsWidgets);
     expect(find.text('Riwayat Aktivitas'), findsWidgets);
-    expect(find.text('Pusat Bantuan'), findsWidgets);
+    expect(find.text('Kata Sandi & Keamanan'), findsWidgets);
+    expect(find.text('Pusat Bantuan'), findsNothing);
+
+    // Top Operational Card items are read-only (non-clickable)
+    await tester.tap(find.text('Jam Operasional').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Ubah Jam Operasional'), findsNothing);
+
+    // Open Status Layanan screen directly
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ApotekStatusLayananScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Status Layanan'), findsOneWidget);
+    expect(find.text('Kembali'), findsOneWidget);
 
     // Open Jam Operasional screen directly
     await tester.pumpWidget(
@@ -323,6 +341,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Ubah Jam Operasional'), findsOneWidget);
+    expect(find.text('Kembali'), findsOneWidget);
 
     // Open Area Layanan screen directly
     await tester.pumpWidget(
@@ -333,16 +352,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Area Layanan'), findsOneWidget);
     expect(find.text('Kota Malang'), findsOneWidget);
+    expect(find.text('Kembali'), findsOneWidget);
 
-    // Open Pusat Bantuan directly
+    // Open Riwayat Aktivitas screen directly
     await tester.pumpWidget(
       const MaterialApp(
-        home: ApotekPusatBantuanScreen(),
+        home: ApotekRiwayatAktivitasScreen(),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Pusat Bantuan'), findsOneWidget);
-    expect(find.text('Bagaimana cara memverifikasi resep?'), findsOneWidget);
+    expect(find.text('Riwayat Aktivitas'), findsOneWidget);
+    expect(find.text('Kembali'), findsOneWidget);
+
+    // Open Kata Sandi & Keamanan screen directly
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ApotekKeamananAkunScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Kata Sandi & Keamanan'), findsOneWidget);
+    expect(find.text('Perbarui Kata Sandi'), findsOneWidget);
+    expect(find.text('Email Terverifikasi'), findsOneWidget);
+    expect(find.text('Nomor Telepon Terverifikasi'), findsOneWidget);
   });
 
   testWidgets('ApotekDetailPesananScreen renders both Menunggu and Diproses flows faithfully', (tester) async {

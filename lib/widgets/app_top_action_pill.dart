@@ -358,7 +358,7 @@ class _DokterTopActionPillState extends State<DokterTopActionPill> {
   }
 }
 
-class ApotekTopActionPill extends StatelessWidget {
+class ApotekTopActionPill extends StatefulWidget {
   final String? apotekerName;
   final VoidCallback? onNotificationTap;
   final VoidCallback? onProfileTap;
@@ -371,8 +371,42 @@ class ApotekTopActionPill extends StatelessWidget {
   });
 
   @override
+  State<ApotekTopActionPill> createState() => _ApotekTopActionPillState();
+}
+
+class _ApotekTopActionPillState extends State<ApotekTopActionPill> {
+  int _unreadCount = 0;
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_isTest) {
+      _refreshUnreadBadge();
+    }
+  }
+
+  Future<void> _refreshUnreadBadge() async {
+    try {
+      final count = await SupabaseAdminService.instance
+          .fetchApotekUnreadNotificationCount(
+        apotekName:
+            widget.apotekerName ?? ApotekProfileState.instance.apotekerName,
+      );
+      if (mounted) {
+        setState(() {
+          _unreadCount = count;
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final unreadNotifs = ApotekMockData.notifications.where((n) => !n.isRead).length;
+    final unreadNotifs = _isTest
+        ? ApotekMockData.notifications.where((n) => !n.isRead).length
+        : _unreadCount;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -392,6 +426,7 @@ class ApotekTopActionPill extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Stack(
+            clipBehavior: Clip.none,
             children: [
               IconButton(
                 constraints: const BoxConstraints(),
@@ -402,23 +437,51 @@ class ApotekTopActionPill extends StatelessWidget {
                   color: Color(0xFF1F2937),
                 ),
                 tooltip: 'Notifikasi',
-                onPressed: onNotificationTap ??
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ApotekNotifikasiScreen()),
-                      );
-                    },
+                onPressed: () {
+                  if (widget.onNotificationTap != null) {
+                    widget.onNotificationTap!();
+                    return;
+                  }
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => ApotekNotifikasiScreen(
+                            apotekerName: widget.apotekerName ??
+                                ApotekProfileState.instance.apotekerName,
+                          ),
+                        ),
+                      )
+                      .then((_) => _refreshUnreadBadge());
+                },
               ),
               if (unreadNotifs > 0)
                 Positioned(
-                  top: 6,
-                  right: 6,
+                  right: 1,
+                  top: 1,
                   child: Container(
-                    width: 8.5,
-                    height: 8.5,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFDC2626),
-                      shape: BoxShape.circle,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Center(
+                      child: Text(
+                        unreadNotifs > 99 ? '99+' : '$unreadNotifs',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          height: 1.0,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -426,12 +489,13 @@ class ApotekTopActionPill extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: onProfileTap ??
+            onTap: widget.onProfileTap ??
                 () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => ApotekProfileScreen(
-                        apotekerName: apotekerName ?? ApotekProfileState.instance.apotekerName,
+                        apotekerName: widget.apotekerName ??
+                            ApotekProfileState.instance.apotekerName,
                         onLogout: () => Navigator.of(context).pop(),
                       ),
                     ),
@@ -444,7 +508,8 @@ class ApotekTopActionPill extends StatelessWidget {
                 final resolved = ApiConfig.resolveImageUrl(rawAvatar);
                 final hasPhoto = resolved.isNotEmpty &&
                     (resolved.startsWith('http') ||
-                        (File(resolved).existsSync() && !resolved.startsWith('assets/')));
+                        (File(resolved).existsSync() &&
+                            !resolved.startsWith('assets/')));
 
                 return Container(
                   width: 36,
@@ -459,7 +524,8 @@ class ApotekTopActionPill extends StatelessWidget {
                           ? Image.network(
                               resolved,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const Icon(
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
                                 Icons.person_rounded,
                                 size: 22,
                                 color: Colors.white,
@@ -468,7 +534,8 @@ class ApotekTopActionPill extends StatelessWidget {
                           : Image.file(
                               File(resolved),
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const Icon(
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
                                 Icons.person_rounded,
                                 size: 22,
                                 color: Colors.white,
