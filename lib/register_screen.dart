@@ -965,8 +965,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                 if (val == null || val.isEmpty) {
                   return 'Kata sandi tidak boleh kosong';
                 }
-                if (val.length < 6) {
-                  return 'Kata sandi minimal 6 karakter';
+                if (val.length < 8) {
+                  return 'Kata sandi minimal 8 karakter';
                 }
                 return null;
               },

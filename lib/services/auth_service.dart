@@ -53,20 +53,22 @@ class AuthService {
         debugPrint('Firebase Auth link notice (menggunakan token Google): $fbErr');
       }
 
-      if (idToken == null || idToken.isEmpty) {
-        return AuthResult(
-          success: false,
-          message: 'Gagal mendapatkan ID Token dari Google. Pastikan Google Play Services aktif.',
-        );
+      // 4. Kirim kredensial ke endpoint Backend GIAT (mendukung id_token, access_token & info profil Google)
+      final payload = <String, dynamic>{
+        'role': role,
+        'email': googleAccount.email,
+        'nama': googleAccount.displayName,
+      };
+      if (idToken != null && idToken.isNotEmpty) {
+        payload['id_token'] = idToken;
+      }
+      if (googleAuth.accessToken != null && googleAuth.accessToken!.isNotEmpty) {
+        payload['access_token'] = googleAuth.accessToken;
       }
 
-      // 4. Kirim ID Token ke endpoint Backend GIAT
       final response = await _apiClient.dio.post(
         '/auth/firebase/google',
-        data: {
-          'id_token': idToken,
-          'role': role,
-        },
+        data: payload,
       );
 
       final data = response.data;
@@ -580,6 +582,7 @@ class AuthService {
       return {
         'success': data?['success'] ?? true,
         'message': data?['message'] ?? 'Kode verifikasi telah dikirim ke email Anda.',
+        'otp': data?['data']?['otp'],
       };
     } catch (e) {
       return {
@@ -625,6 +628,7 @@ class AuthService {
       return {
         'success': data?['success'] ?? true,
         'message': data?['message'] ?? 'Kode OTP baru berhasil dikirim.',
+        'otp': data?['data']?['otp'],
       };
     } catch (e) {
       return {

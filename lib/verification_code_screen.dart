@@ -12,10 +12,12 @@ import 'services/auth_service.dart';
 
 class VerificationCodeScreen extends StatefulWidget {
   final String email;
+  final String? initialOtp;
 
   const VerificationCodeScreen({
     super.key,
     required this.email,
+    this.initialOtp,
   });
 
   @override
@@ -84,6 +86,12 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
 
     _animCtrl.forward();
     _startCountdown();
+
+    if (widget.initialOtp != null && widget.initialOtp!.length == 4) {
+      for (int i = 0; i < 4; i++) {
+        _otpControllers[i].text = widget.initialOtp![i];
+      }
+    }
   }
 
   void _startCountdown() {
@@ -111,6 +119,14 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
     _startCountdown();
     final res = await AuthService().resendOtp(widget.email);
     if (!mounted) return;
+    if (res['success'] == true && res['otp'] != null) {
+      final newOtp = res['otp'].toString();
+      if (newOtp.length == 4) {
+        for (int i = 0; i < 4; i++) {
+          _otpControllers[i].text = newOtp[i];
+        }
+      }
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(res['message'] ?? 'Kode baru telah dikirimkan ke ${widget.email}'),
