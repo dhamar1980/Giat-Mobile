@@ -506,10 +506,10 @@ class _ApotekTopActionPillState extends State<ApotekTopActionPill> {
               builder: (context, _) {
                 final rawAvatar = ApotekProfileState.instance.avatarPath;
                 final resolved = ApiConfig.resolveImageUrl(rawAvatar);
-                final hasPhoto = resolved.isNotEmpty &&
-                    (resolved.startsWith('http') ||
-                        (File(resolved).existsSync() &&
-                            !resolved.startsWith('assets/')));
+                final isAsset = resolved.startsWith('assets/');
+                final isNetwork = resolved.startsWith('http://') || resolved.startsWith('https://');
+                final isFile = resolved.isNotEmpty && !isAsset && !isNetwork && File(resolved).existsSync();
+                final hasPhoto = isNetwork || isAsset || isFile;
 
                 return Container(
                   width: 36,
@@ -520,7 +520,7 @@ class _ApotekTopActionPillState extends State<ApotekTopActionPill> {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: hasPhoto
-                      ? (resolved.startsWith('http')
+                      ? (isNetwork
                           ? Image.network(
                               resolved,
                               fit: BoxFit.cover,
@@ -531,16 +531,33 @@ class _ApotekTopActionPillState extends State<ApotekTopActionPill> {
                                 color: Colors.white,
                               ),
                             )
-                          : Image.file(
-                              File(resolved),
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                Icons.person_rounded,
-                                size: 22,
-                                color: Colors.white,
-                              ),
-                            ))
+                          : (isAsset
+                              ? Image.asset(
+                                  resolved,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(
+                                    Icons.person_rounded,
+                                    size: 22,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : (isFile
+                                  ? Image.file(
+                                      File(resolved),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          const Icon(
+                                        Icons.person_rounded,
+                                        size: 22,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.person_rounded,
+                                      size: 22,
+                                      color: Colors.white,
+                                    ))))
                       : const Icon(
                           Icons.person_rounded,
                           size: 22,

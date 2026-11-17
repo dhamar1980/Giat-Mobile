@@ -738,20 +738,48 @@ class _ApotekObatScreenState extends State<ApotekObatScreen> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      if (med.imagePath != null)
-                        Image.asset(
-                          med.imagePath!,
-                          width: 64,
-                          height: 64,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.medication_rounded, size: 30, color: _darkGreen),
-                          ),
-                        )
-                      else
-                        const Center(
-                          child: Icon(Icons.medication_rounded, size: 30, color: _darkGreen),
-                        ),
+                      Builder(
+                        builder: (_) {
+                          final path = med.imagePath;
+                          if (path == null || path.isEmpty) {
+                            return const Center(
+                              child: Icon(Icons.medication_rounded, size: 30, color: _darkGreen),
+                            );
+                          }
+                          if (path.startsWith('http://') || path.startsWith('https://')) {
+                            return Image.network(
+                              path,
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.medication_rounded, size: 30, color: _darkGreen),
+                              ),
+                            );
+                          }
+                          final file = File(path);
+                          if (file.existsSync()) {
+                            return Image.file(
+                              file,
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.medication_rounded, size: 30, color: _darkGreen),
+                              ),
+                            );
+                          }
+                          return Image.asset(
+                            path,
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.medication_rounded, size: 30, color: _darkGreen),
+                            ),
+                          );
+                        },
+                      ),
                       // Tanda Silang Overlay Merah jika Stok Habis (Screenshot 3: Omeprazole)
                       if (isHabis)
                         Container(

@@ -4688,6 +4688,10 @@ class SupabaseAdminService {
     if (aptId == null) return null;
     final cleanVal = fileOrUrl.trim();
 
+    try {
+      await _exec('ALTER TABLE apotek ALTER COLUMN foto_profile TYPE TEXT');
+    } catch (_) {}
+
     await _exec(
       '''
       UPDATE apotek
@@ -4700,6 +4704,13 @@ class SupabaseAdminService {
         'foto': cleanVal.isNotEmpty ? cleanVal : null,
       },
     );
+
+    try {
+      final savedUser = await StorageService().getUser();
+      if (savedUser != null && (savedUser.id.toString().trim() == aptId || savedUser.role == 'apotek')) {
+        await StorageService().saveUser(savedUser.copyWith(fotoProfile: cleanVal));
+      }
+    } catch (_) {}
 
     return {
       'id_apotek': aptId,
@@ -5715,29 +5726,19 @@ class SupabaseAdminService {
       },
     );
 
-    try {
-      await _exec(
-        '''
-        INSERT INTO stock_obat (
-          id_stock, id_obat, id_apoteker, jumlah_stock, tanggal_kadaluwarsa, created_at, updated_at
-        ) VALUES (
-          gen_random_uuid()::text, @idObat, @aptId, @stokBatch, @expDate::date, NOW(), NOW()
-        )
-        ''',
-        parameters: {
-          'idObat': newObatId,
-          'aptId': aptId,
-          'stokBatch': stokTotal,
-          'expDate': expDateStr,
-        },
-      );
-    } catch (_) {}
-
     return {
       'id_obat': newObatId,
       'id': newObatId,
       'nama_obat': namaObat,
+      'kategori': kategori,
+      'bentuk_sediaan': bentukSediaan,
+      'dosis': dosis,
+      'satuan_kemasan': satuanKemasan,
       'stok_total': stokTotal,
+      'harga_beli': hargaBeli,
+      'harga_jual': hargaJual,
+      'aturan_pakai_umum': aturanPakai,
+      'foto_obat': fotoObat,
       'no_batch': batchNo,
       'tanggal_kadaluwarsa': expDateStr,
     };

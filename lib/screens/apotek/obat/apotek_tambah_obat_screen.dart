@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/apotek_models.dart';
 import '../../../widgets/app_top_action_pill.dart';
 import '../../../services/apotek_api_service.dart';
@@ -36,13 +37,16 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
   final TextEditingController _doseCtrl = TextEditingController(text: '400 mg');
   final TextEditingController _packageCtrl = TextEditingController(text: 'Strip / Box');
   final TextEditingController _stockCtrl = TextEditingController(text: '50');
-  final TextEditingController _expCtrl = TextEditingController();
+  final TextEditingController _expCtrl = TextEditingController(text: '12/31/2028');
   final TextEditingController _buyPriceCtrl = TextEditingController(text: 'Rp. 12.000,00');
   final TextEditingController _sellPriceCtrl = TextEditingController(text: 'Rp. 16.500,00');
   final TextEditingController _notesCtrl = TextEditingController();
 
   String _selectedCategory = 'Analgesik';
   String _selectedForm = 'Tablet';
+  File? _medicineImageFile;
+  String? _medicineImagePath;
+  bool _isSubmitting = false;
 
   final List<String> _categoryOptions = [
     'Analgesik',
@@ -84,11 +88,244 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
       _doseCtrl.clear();
       _packageCtrl.clear();
       _stockCtrl.clear();
-      _expCtrl.clear();
+      _expCtrl.text = '12/31/2028';
       _buyPriceCtrl.clear();
       _sellPriceCtrl.clear();
       _notesCtrl.clear();
+      _medicineImageFile = null;
+      _medicineImagePath = null;
     });
+  }
+
+  Future<void> _pickMedicineImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+      setState(() {
+        _medicineImageFile = File(picked.path);
+        _medicineImagePath = picked.path;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memilih foto obat: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showImageSourceModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Upload Foto Obat',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Pilih foto obat kemasan atau botol dari kamera langsung atau galeri HP Anda.',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Action: Kamera
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.camera_alt_rounded, color: _darkGreen, size: 22),
+              ),
+              title: Text(
+                'Ambil dari Kamera',
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              subtitle: Text(
+                'Potret langsung kemasan obat dengan kamera',
+                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickMedicineImage(ImageSource.camera);
+              },
+            ),
+
+            const Divider(height: 16, thickness: 0.6, color: Color(0xFFE2E8F0)),
+
+            // Action: Galeri
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.photo_library_rounded, color: Color(0xFF2563EB), size: 22),
+              ),
+              title: Text(
+                'Pilih dari Galeri',
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              subtitle: Text(
+                'Pilih file foto obat yang tersimpan di galeri HP',
+                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickMedicineImage(ImageSource.gallery);
+              },
+            ),
+
+            if (_medicineImageFile != null || (_medicineImagePath != null && _medicineImagePath!.isNotEmpty)) ...[
+              const Divider(height: 16, thickness: 0.6, color: Color(0xFFE2E8F0)),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626), size: 22),
+                ),
+                title: Text(
+                  'Hapus Foto Obat',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFDC2626),
+                  ),
+                ),
+                subtitle: Text(
+                  'Kembalikan ke ilustrasi obat default',
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _medicineImageFile = null;
+                    _medicineImagePath = null;
+                  });
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewImage() {
+    if (_medicineImageFile != null) {
+      return Image.file(
+        _medicineImageFile!,
+        width: 60,
+        height: 60,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackPreview(),
+      );
+    }
+    if (_medicineImagePath != null && _medicineImagePath!.isNotEmpty) {
+      if (_medicineImagePath!.startsWith('http://') || _medicineImagePath!.startsWith('https://')) {
+        return Image.network(
+          _medicineImagePath!,
+          width: 60,
+          height: 60,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackPreview(),
+        );
+      }
+      final file = File(_medicineImagePath!);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          width: 60,
+          height: 60,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackPreview(),
+        );
+      }
+      return Image.asset(
+        _medicineImagePath!,
+        width: 60,
+        height: 60,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackPreview(),
+      );
+    }
+    return Image.asset(
+      'assets/images/antasida_strip.jpg',
+      width: 60,
+      height: 60,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _buildFallbackPreview(),
+    );
+  }
+
+  Widget _buildFallbackPreview() {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: const Color(0xFFDCFCE7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Icon(Icons.medication_rounded, color: _darkGreen, size: 28),
+    );
   }
 
   Future<void> _pickExpDate() async {
@@ -128,87 +365,121 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
   }
 
   Future<void> _saveNewMedicine() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final name = _nameCtrl.text.trim();
-    final category = _selectedCategory;
-    final dose = _doseCtrl.text.trim().isEmpty ? '400 mg' : _doseCtrl.text.trim();
-    final package = _packageCtrl.text.trim().isEmpty ? 'Strip / Box' : _packageCtrl.text.trim();
-    final stock = int.tryParse(_stockCtrl.text.replaceAll(RegExp(r'[^0-9]'), '').trim()) ?? 50;
-    final buy = _parsePrice(_buyPriceCtrl.text, 12000);
-    final sell = _parsePrice(_sellPriceCtrl.text, 16500);
-    final exp = _expCtrl.text.trim().isEmpty ? '12/31/2028' : _expCtrl.text.trim();
-    final notes = _notesCtrl.text.trim();
+    setState(() => _isSubmitting = true);
 
-    final newId = '#MED-${8845 + ApotekMockData.medicines.length}';
-    final batchNo = 'BATCH-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch % 10000}';
+    try {
+      final name = _nameCtrl.text.trim();
+      final category = _selectedCategory;
+      final dose = _doseCtrl.text.trim().isEmpty ? '400 mg' : _doseCtrl.text.trim();
+      final package = _packageCtrl.text.trim().isEmpty ? 'Strip / Box' : _packageCtrl.text.trim();
+      final stock = int.tryParse(_stockCtrl.text.replaceAll(RegExp(r'[^0-9]'), '').trim()) ?? 50;
+      final buy = _parsePrice(_buyPriceCtrl.text, 12000);
+      final sell = _parsePrice(_sellPriceCtrl.text, 16500);
+      final exp = _expCtrl.text.trim().isEmpty ? '12/31/2028' : _expCtrl.text.trim();
+      final notes = _notesCtrl.text.trim();
+      final imageToSave = _medicineImagePath ?? _medicineImageFile?.path ?? 'assets/images/antasida_strip.jpg';
 
-    if (Platform.environment.containsKey('FLUTTER_TEST')) {
-      final med = ApotekMedicine(
-        id: newId,
-        name: name,
-        category: category,
-        form: _selectedForm,
-        dose: dose,
-        packageUnit: package,
-        stock: stock,
-        stockUnit: _selectedForm,
-        buyPrice: buy,
-        sellPrice: sell,
-        expDate: exp,
-        imagePath: 'assets/images/antasida_strip.jpg',
-        usageRule: notes.isNotEmpty ? notes : null,
-        batches: [
-          ApotekMedicineBatch(
-            batchNo: batchNo,
-            qtyText: '$stock $_selectedForm',
-            expDate: exp,
-            status: 'Tersedia',
+      final newId = '#MED-${8845 + ApotekMockData.medicines.length}';
+      final batchNo = 'BATCH-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch % 10000}';
+
+      if (Platform.environment.containsKey('FLUTTER_TEST')) {
+        final med = ApotekMedicine(
+          id: newId,
+          name: name,
+          category: category,
+          form: _selectedForm,
+          dose: dose,
+          packageUnit: package,
+          stock: stock,
+          stockUnit: _selectedForm,
+          buyPrice: buy,
+          sellPrice: sell,
+          expDate: exp,
+          imagePath: imageToSave,
+          usageRule: notes.isNotEmpty ? notes : null,
+          batches: [
+            ApotekMedicineBatch(
+              batchNo: batchNo,
+              qtyText: '$stock $_selectedForm',
+              expDate: exp,
+              status: 'Tersedia',
+            ),
+          ],
+        );
+        ApotekMockData.addMedicine(med);
+      }
+
+      // Sinkronisasi data ke Supabase & REST API Backend Apotek
+      final res = await ApotekApiService().tambahObat({
+        'kode_obat': newId,
+        'nama_obat': name,
+        'kategori': category,
+        'bentuk': _selectedForm,
+        'bentuk_sediaan': _selectedForm,
+        'dosis': dose,
+        'satuan_kemasan': package,
+        'stok': stock,
+        'stok_total': stock,
+        'satuan_stok': _selectedForm,
+        'harga_beli': buy,
+        'harga_jual': sell,
+        'tanggal_kadaluarsa': exp,
+        'tanggal_kadaluwarsa': exp,
+        'nomor_batch': batchNo,
+        'no_batch': batchNo,
+        'aturan_pakai': notes,
+        'aturan_pakai_umum': notes,
+        'foto_obat': imageToSave,
+        'imagePath': imageToSave,
+      });
+
+      if (!mounted) return;
+
+      if (!res.success && !Platform.environment.containsKey('FLUTTER_TEST')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message ?? 'Gagal menyimpan obat. Silakan periksa kembali data Anda.'),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
           ),
-        ],
+        );
+        return;
+      }
+
+      widget.onMedicineAdded?.call();
+
+      final createdId = res.data?['id']?.toString() ?? newId;
+      final displayCode = createdId.length >= 4 && !createdId.startsWith('#')
+          ? '#MED-${createdId.substring(0, 4).toUpperCase()}'
+          : newId;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Obat $name ($displayCode) berhasil didaftarkan ke katalog apotek.'),
+          backgroundColor: _darkGreen,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
-      ApotekMockData.addMedicine(med);
+
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Terjadi kesalahan saat menyimpan obat: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
-
-    // Sinkronisasi data ke Supabase & REST API Backend Apotek
-    final res = await ApotekApiService().tambahObat({
-      'kode_obat': newId,
-      'nama_obat': name,
-      'kategori': category,
-      'bentuk': _selectedForm,
-      'bentuk_sediaan': _selectedForm,
-      'dosis': dose,
-      'satuan_kemasan': package,
-      'stok': stock,
-      'stok_total': stock,
-      'satuan_stok': _selectedForm,
-      'harga_beli': buy,
-      'harga_jual': sell,
-      'tanggal_kadaluarsa': exp,
-      'tanggal_kadaluwarsa': exp,
-      'nomor_batch': batchNo,
-      'no_batch': batchNo,
-      'aturan_pakai': notes,
-      'aturan_pakai_umum': notes,
-    });
-
-    widget.onMedicineAdded?.call();
-    if (!mounted) return;
-
-    final createdId = res.data?['id']?.toString() ?? newId;
-    final displayCode = createdId.length >= 4 && !createdId.startsWith('#')
-        ? '#MED-${createdId.substring(0, 4).toUpperCase()}'
-        : newId;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Obat $name ($displayCode) berhasil didaftarkan ke katalog apotek.'),
-        backgroundColor: _darkGreen,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-
-    Navigator.of(context).pop();
   }
 
   @override
@@ -350,73 +621,116 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
                           ),
                         ],
                       ),
-                      child: Row(
+                      child: Column(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.asset(
-                              'assets/images/antasida_strip.jpg',
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 60,
-                                height: 60,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(12),
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _showImageSourceModal(context),
+                                child: Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: _buildPreviewImage(),
+                                    ),
+                                    Positioned(
+                                      right: 0,
+                                      bottom: 0,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: _darkGreen,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 1.5),
+                                        ),
+                                        child: const Icon(
+                                          Icons.camera_alt_rounded,
+                                          color: Colors.white,
+                                          size: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: const Icon(Icons.medication_rounded, color: _darkGreen, size: 28),
                               ),
-                            ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Pratinjau Obat',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _nameCtrl.text.trim().isEmpty ? 'Nama Belum Diisi' : _nameCtrl.text.trim(),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _packageCtrl.text.trim().isEmpty ? 'Strip / Box' : _packageCtrl.text.trim(),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        color: const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  _selectedCategory,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Pratinjau Obat',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: const Color(0xFF64748B),
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onTap: () => _showImageSourceModal(context),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.add_a_photo_outlined, size: 15, color: _darkGreen),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _medicineImageFile != null ? 'Ganti Foto Obat' : 'Upload Foto Obat',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: _darkGreen,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _nameCtrl.text.trim().isEmpty ? 'Nama Belum Diisi' : _nameCtrl.text.trim(),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _packageCtrl.text.trim().isEmpty ? 'Strip / Box' : _packageCtrl.text.trim(),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    color: const Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _selectedCategory,
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                                ],
                               ),
                             ),
                           ),
@@ -710,18 +1024,27 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: _saveNewMedicine,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.save_outlined, size: 20, color: Colors.white),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Simpan Obat Stok',
-                              style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
+                        onPressed: _isSubmitting ? null : _saveNewMedicine,
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.2,
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.save_outlined, size: 20, color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Simpan Obat Stok',
+                                    style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
 

@@ -37,7 +37,6 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
   static const _cardBorder = Color(0xFFE2E8F0);
   static const _innerBorder = Color(0xFFCBD5E1);
 
-  bool _showAllHistory = false;
   bool _internalIsTopBarVisible = true;
   bool _isLoading = false;
   List<ApotekRecipe> _realRecipes = [];
@@ -73,7 +72,6 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
 
   List<ApotekRecipe> _getIncomingRecipes() {
     final all = _isTest ? ApotekMockData.recipes : _realRecipes;
-    if (_showAllHistory) return all;
     // Tampilkan resep masuk yang sudah ditebus/dibayar pasien namun belum diverifikasi apotek
     return all.where((r) => r.status == ApotekRecipeStatus.belumDiverifikasi).toList();
   }
@@ -189,32 +187,13 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Section Title: "Daftar Resep Masuk" (Screenshot 1)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Daftar Resep Masuk',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 16.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: () => setState(() => _showAllHistory = !_showAllHistory),
-                                child: Text(
-                                  _showAllHistory ? 'Belum Diverifikasi' : 'Lihat Riwayat',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: _darkGreen,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'Daftar Resep Masuk',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                            ),
                           ),
 
                           const SizedBox(height: 14),

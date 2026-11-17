@@ -109,8 +109,11 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         }
         if (fetchedFoto != null && fetchedFoto.toString().isNotEmpty) {
           final resolved = ApiConfig.resolveImageUrl(fetchedFoto.toString());
+          final resolvedType = (resolved.startsWith('http://') || resolved.startsWith('https://'))
+              ? 'network'
+              : (resolved.startsWith('assets/') ? 'asset' : 'file');
           setState(() {
-            _avatarType = 'network';
+            _avatarType = resolvedType;
             _avatarPath = resolved;
           });
           ApotekProfileState.instance.syncFromUser(
@@ -175,21 +178,28 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         errorBuilder: (c, e, s) => Container(
           color: const Color(0xFFDCFCE7),
           child: const Center(
-            child: Icon(Icons.person_rounded, size: 52, color: _darkGreen),
+            child: Icon(Icons.local_pharmacy_rounded, size: 52, color: _darkGreen),
           ),
         ),
       );
-    } else {
+    } else if (_avatarType == 'asset' || _avatarPath.startsWith('assets/')) {
       return Image.asset(
         _avatarPath,
         width: 104,
         height: 104,
         fit: BoxFit.cover,
         errorBuilder: (ctx, err, stack) => Container(
-          color: const Color(0xFF044E2F),
+          color: const Color(0xFFDCFCE7),
           child: const Center(
-            child: Icon(Icons.person_rounded, size: 52, color: Colors.white),
+            child: Icon(Icons.local_pharmacy_rounded, size: 52, color: _darkGreen),
           ),
+        ),
+      );
+    } else {
+      return Container(
+        color: const Color(0xFFDCFCE7),
+        child: const Center(
+          child: Icon(Icons.local_pharmacy_rounded, size: 52, color: _darkGreen),
         ),
       );
     }
@@ -212,16 +222,19 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         _avatarPath = file.path;
       });
 
-      // Unggah ke backend server GIAT
+      // Unggah & sinkronkan ke Supabase Real Database
       final res = await ApotekApiService().updateFotoProfile(file);
       final newUrl = res.data?['foto_profile'] ?? res.data?['foto_profil'] ?? res.data?['foto'] ?? res.data?['url'];
       String finalPhotoPath = file.path;
       if (newUrl != null && newUrl.toString().isNotEmpty) {
         final resolved = ApiConfig.resolveImageUrl(newUrl.toString());
         finalPhotoPath = resolved;
+        final resolvedType = (resolved.startsWith('http://') || resolved.startsWith('https://'))
+            ? 'network'
+            : (resolved.startsWith('assets/') ? 'asset' : 'file');
         if (mounted) {
           setState(() {
-            _avatarType = 'network';
+            _avatarType = resolvedType;
             _avatarPath = resolved;
           });
         }
@@ -231,25 +244,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
       // Update local storage
       final user = await StorageService().getUser();
       if (user != null) {
-        final updated = UserModel(
-          id: user.id,
-          nama: user.nama,
-          email: user.email,
-          noHp: user.noHp,
-          alamat: user.alamat,
-          jenisKelamin: user.jenisKelamin,
-          nik: user.nik,
-          fotoProfile: finalPhotoPath,
-          firebaseUid: user.firebaseUid,
-          authProvider: user.authProvider,
-          role: user.role,
-          spesialisasi: user.spesialisasi,
-          instansi: user.instansi,
-          noStr: user.noStr,
-          noSip: user.noSip,
-          tanggalLahir: user.tanggalLahir,
-          golonganDarah: user.golonganDarah,
-        );
+        final updated = user.copyWith(fotoProfile: finalPhotoPath);
         await StorageService().saveUser(updated);
       }
 
@@ -404,23 +399,34 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                   final isSelected = _avatarPath == item['path'];
 
                   return GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(ctx);
+                      final chosenPath = item['path']!;
+                      final chosenType = item['type']!;
                       setState(() {
-                        _avatarType = item['type']!;
-                        _avatarPath = item['path']!;
+                        _avatarFile = null;
+                        _avatarType = chosenType;
+                        _avatarPath = chosenPath;
                       });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Avatar ${item['name']} berhasil diterapkan!',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                      ApotekProfileState.instance.updateAvatar(chosenPath);
+                      await ApotekApiService().updateFotoProfile(chosenPath);
+                      final user = await StorageService().getUser();
+                      if (user != null) {
+                        await StorageService().saveUser(user.copyWith(fotoProfile: chosenPath));
+                      }
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Avatar ${item['name']} berhasil diterapkan!',
+                              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                            ),
+                            backgroundColor: _darkGreen,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          backgroundColor: _darkGreen,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      );
+                        );
+                      }
                     },
                     child: Container(
                       width: 58,
@@ -473,23 +479,32 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                   color: const Color(0xFFDC2626),
                 ),
               ),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
                 setState(() {
+                  _avatarFile = null;
                   _avatarType = 'default';
                   _avatarPath = '';
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Foto profil berhasil dihapus (avatar bawaan)',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ApotekProfileState.instance.updateAvatar('');
+                await ApotekApiService().updateFotoProfile('');
+                final user = await StorageService().getUser();
+                if (user != null) {
+                  await StorageService().saveUser(user.copyWith(fotoProfile: ''));
+                }
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Foto profil berhasil dihapus (avatar bawaan)',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                      ),
+                      backgroundColor: const Color(0xFFDC2626),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    backgroundColor: const Color(0xFFDC2626),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
+                  );
+                }
               },
             ),
           ],
