@@ -1,7 +1,7 @@
 /// Centralized API Constants for GIAT Backend
 class ApiConstants {
   /// URL Server / Cloudflare tunnel
-  static const String serverUrl = 'https://costumes-laid-newsletters-stops.trycloudflare.com/api';
+  static const String serverUrl = 'https://iowa-dollar-legislation-surveillance.trycloudflare.com/api';
 
   /// URL LAN Wi-Fi (untuk HP di jaringan Wi-Fi lokal)
   static const String lanUrl = 'http://192.168.1.7:8000/api';
