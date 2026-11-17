@@ -34,43 +34,55 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
 
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _nameCtrl = TextEditingController(text: 'Ibuprofen 400 mg');
-  final TextEditingController _doseCtrl = TextEditingController(text: '400 mg');
-  final TextEditingController _packageCtrl = TextEditingController(text: 'Strip / Box');
+  final TextEditingController _nameCtrl = TextEditingController(text: 'Ketosteril Tab');
+  final FocusNode _nameFocusNode = FocusNode();
+  final TextEditingController _doseCtrl = TextEditingController(text: '600 mg');
+  final TextEditingController _packageCtrl = TextEditingController(text: 'Strip / Box (100 Kaplet)');
   final TextEditingController _stockCtrl = TextEditingController(text: '50');
   final TextEditingController _expCtrl = TextEditingController(text: '12/31/2028');
-  final TextEditingController _buyPriceCtrl = TextEditingController(text: 'Rp. 12.000,00');
-  final TextEditingController _sellPriceCtrl = TextEditingController(text: 'Rp. 16.500,00');
-  final TextEditingController _notesCtrl = TextEditingController();
+  final TextEditingController _buyPriceCtrl = TextEditingController(text: 'Rp. 275.000,00');
+  final TextEditingController _sellPriceCtrl = TextEditingController(text: 'Rp. 320.000,00');
+  final TextEditingController _notesCtrl = TextEditingController(text: '1 kaplet per 5 kg berat badan per hari, dibagi 3 dosis saat makan besar.');
 
-  String _selectedCategory = 'Analgesik';
-  String _selectedForm = 'Tablet';
+  String _selectedCategory = 'Obat Ginjal';
+  String _selectedForm = 'Kaplet Salut Selaput';
   File? _medicineImageFile;
-  String? _medicineImagePath;
+  String? _medicineImagePath = 'assets/images/kidneys.jpg';
   bool _isSubmitting = false;
 
   final List<String> _categoryOptions = [
+    'Obat Ginjal',
+    'Pengikat Fosfat',
+    'Suplemen Anemia',
+    'Antihipertensi',
+    'Diuretik',
     'Analgesik',
     'Antibiotik',
-    'Antihipertensi',
-    'Antidiabetes',
     'Antasida',
+    'Antasida & Saluran Cerna',
+    'Antidiabetes',
     'Vitamin & Suplemen',
+    'Antihistamin',
+    'Lainnya',
   ];
 
   final List<String> _formOptions = [
     'Tablet',
+    'Kaplet Salut Selaput',
+    'Tablet Kunyah',
     'Kapsul',
     'Sirup',
     'Kaplet',
     'Injeksi',
     'Salep',
     'Tetes',
+    'Lainnya',
   ];
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _nameFocusNode.dispose();
     _doseCtrl.dispose();
     _packageCtrl.dispose();
     _stockCtrl.dispose();
@@ -79,6 +91,37 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
     _sellPriceCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  void _applyMasterObat(MasterObatItem item) {
+    setState(() {
+      _nameCtrl.text = item.nama;
+      if (!_categoryOptions.contains(item.kategori)) {
+        _categoryOptions.add(item.kategori);
+      }
+      _selectedCategory = item.kategori;
+
+      if (!_formOptions.contains(item.bentukSediaan)) {
+        _formOptions.add(item.bentukSediaan);
+      }
+      _selectedForm = item.bentukSediaan;
+
+      _doseCtrl.text = item.dosis;
+      _packageCtrl.text = item.satuanKemasan;
+      _buyPriceCtrl.text = _formatRupiah(item.hargaBeliDefault);
+      _sellPriceCtrl.text = _formatRupiah(item.hargaJualDefault);
+      _notesCtrl.text = item.aturanPakaiUmum;
+      _medicineImagePath = item.defaultImagePath;
+      _medicineImageFile = null;
+    });
+  }
+
+  String _formatRupiah(int val) {
+    final s = val.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return 'Rp. $s,00';
   }
 
   void _clearForm() {
