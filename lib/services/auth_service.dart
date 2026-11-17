@@ -396,6 +396,7 @@ class AuthService {
   Future<void> logout({bool allDevices = false}) async {
     // 1. Bersihkan token & sesi lokal terlebih dahulu agar status segera offline/keluar
     await _storage.clearAuth();
+    SupabaseAdminService.instance.clearApotekCache();
 
     // 2. Beritahu server backend & bersihkan sesi Firebase/Google di latar belakang
     try {

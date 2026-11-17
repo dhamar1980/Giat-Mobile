@@ -1,10 +1,10 @@
 /// Centralized API Constants for GIAT Backend
 class ApiConstants {
   /// URL Server / Cloudflare tunnel
-  static const String serverUrl = 'https://graduates-code-glen-ports.trycloudflare.com/api';
+  static const String serverUrl = 'https://costumes-laid-newsletters-stops.trycloudflare.com/api';
 
   /// URL LAN Wi-Fi (untuk HP di jaringan Wi-Fi lokal)
-  static const String lanUrl = 'http://10.80.131.1:8000/api';
+  static const String lanUrl = 'http://192.168.1.7:8000/api';
 
   /// URL Emulator Android
   static const String emulatorUrl = 'http://10.0.2.2:8000/api';
