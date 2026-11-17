@@ -51,13 +51,9 @@ void main() async {
         final user = await AuthService().getCurrentUser();
         if (user != null) {
           savedUser = user;
-        } else {
-          savedUser = null;
-          await StorageService().clearAuth();
         }
       } catch (_) {
-        savedUser = null;
-        await StorageService().clearAuth();
+        // Pertahankan savedUser lokal agar tidak logout paksa jika koneksi sedang lambat/offline
       }
     }
   }

@@ -3,8 +3,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:giat/screens/pasien/obat/pembelian_obat_screen.dart';
 import 'package:giat/screens/pasien/obat/keranjang_screen.dart';
 import 'package:giat/screens/pasien/obat/checkout_resep_screen.dart';
+import 'package:giat/services/cart_service.dart';
 
 void main() {
+  setUp(() {
+    CartService.instance.clearCart();
+    CartService.instance.addItem(
+      id: 'ketosteril',
+      name: 'Ketosteril Tablet',
+      category: 'Asam Amino Esensial',
+      badgeText: 'Resep',
+      badgeColor: const Color(0xFFDC2626),
+      packageInfo: 'Box (100 Kaplet)',
+      dosageInstruction: '3 kali sehari 1 kaplet',
+      unitPrice: 125000,
+      quantity: 1,
+    );
+    CartService.instance.addItem(
+      id: 'candesartan',
+      name: 'Candesartan 8mg',
+      category: 'Antihipertensi',
+      badgeText: 'Resep',
+      badgeColor: const Color(0xFFDC2626),
+      packageInfo: 'Strip (10 Tablet)',
+      dosageInstruction: '1 kali sehari 1 tablet',
+      unitPrice: 35000,
+      quantity: 1,
+    );
+  });
   testWidgets('PembelianObatScreen cart actions navigate to KeranjangScreen', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
