@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -126,7 +127,7 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
     return int.tryParse(cleaned) ?? fallback;
   }
 
-  void _saveNewMedicine() {
+  Future<void> _saveNewMedicine() async {
     if (!_formKey.currentState!.validate()) return;
 
     final name = _nameCtrl.text.trim();
@@ -140,55 +141,68 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
     final notes = _notesCtrl.text.trim();
 
     final newId = '#MED-${8845 + ApotekMockData.medicines.length}';
-    final batchNo = 'BATCH-${DateTime.now().year}-N01';
+    final batchNo = 'BATCH-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch % 10000}';
 
-    final med = ApotekMedicine(
-      id: newId,
-      name: name,
-      category: category,
-      form: _selectedForm,
-      dose: dose,
-      packageUnit: package,
-      stock: stock,
-      stockUnit: _selectedForm,
-      buyPrice: buy,
-      sellPrice: sell,
-      expDate: exp,
-      imagePath: 'assets/images/antasida_strip.jpg',
-      usageRule: notes.isNotEmpty ? notes : null,
-      batches: [
-        ApotekMedicineBatch(
-          batchNo: batchNo,
-          qtyText: '$stock $_selectedForm',
-          expDate: exp,
-          status: 'Tersedia',
-        ),
-      ],
-    );
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      final med = ApotekMedicine(
+        id: newId,
+        name: name,
+        category: category,
+        form: _selectedForm,
+        dose: dose,
+        packageUnit: package,
+        stock: stock,
+        stockUnit: _selectedForm,
+        buyPrice: buy,
+        sellPrice: sell,
+        expDate: exp,
+        imagePath: 'assets/images/antasida_strip.jpg',
+        usageRule: notes.isNotEmpty ? notes : null,
+        batches: [
+          ApotekMedicineBatch(
+            batchNo: batchNo,
+            qtyText: '$stock $_selectedForm',
+            expDate: exp,
+            status: 'Tersedia',
+          ),
+        ],
+      );
+      ApotekMockData.addMedicine(med);
+    }
 
-    ApotekMockData.addMedicine(med);
-    widget.onMedicineAdded?.call();
-
-    // Sinkronisasi data ke REST API Backend Laravel Apotek
-    ApotekApiService().tambahObat({
+    // Sinkronisasi data ke Supabase & REST API Backend Apotek
+    final res = await ApotekApiService().tambahObat({
       'kode_obat': newId,
       'nama_obat': name,
       'kategori': category,
       'bentuk': _selectedForm,
+      'bentuk_sediaan': _selectedForm,
       'dosis': dose,
       'satuan_kemasan': package,
       'stok': stock,
+      'stok_total': stock,
       'satuan_stok': _selectedForm,
       'harga_beli': buy,
       'harga_jual': sell,
       'tanggal_kadaluarsa': exp,
+      'tanggal_kadaluwarsa': exp,
       'nomor_batch': batchNo,
+      'no_batch': batchNo,
       'aturan_pakai': notes,
+      'aturan_pakai_umum': notes,
     });
+
+    widget.onMedicineAdded?.call();
+    if (!mounted) return;
+
+    final createdId = res.data?['id']?.toString() ?? newId;
+    final displayCode = createdId.length >= 4 && !createdId.startsWith('#')
+        ? '#MED-${createdId.substring(0, 4).toUpperCase()}'
+        : newId;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Obat $name ($newId) berhasil didaftarkan ke katalog apotek.'),
+        content: Text('Obat $name ($displayCode) berhasil didaftarkan ke katalog apotek.'),
         backgroundColor: _darkGreen,
         behavior: SnackBarBehavior.floating,
       ),

@@ -1919,13 +1919,26 @@ class SupabaseAdminService {
     String? existingNoResep;
     if (resolvedKonsultasiId != null && resolvedKonsultasiId.isNotEmpty) {
       final existingRes = await _exec(
-        'SELECT TRIM(id) AS id, no_resep FROM resep WHERE TRIM(id_konsultasi) = @idKonsultasi LIMIT 1',
+        '''
+        SELECT TRIM(r.id) AS id, r.no_resep, LOWER(TRIM(COALESCE(r.status, 'aktif'))) AS status,
+               (SELECT COUNT(*)::int FROM pesanan_obat po WHERE TRIM(po.id_resep) = TRIM(r.id) AND LOWER(TRIM(po.status_pembayaran)) = 'lunas') AS paid_cnt
+        FROM resep r
+        WHERE TRIM(r.id_konsultasi) = @idKonsultasi
+        LIMIT 1
+        ''',
         parameters: {'idKonsultasi': resolvedKonsultasiId},
       );
       if (existingRes.isNotEmpty) {
         final r = existingRes.first.toColumnMap();
-        existingResepId = r['id']?.toString().trim();
-        existingNoResep = r['no_resep']?.toString().trim();
+        final exStatus = r['status']?.toString() ?? 'aktif';
+        final paidCnt = int.tryParse(r['paid_cnt']?.toString() ?? '0') ?? 0;
+        if (exStatus == 'aktif' && paidCnt == 0) {
+          existingResepId = r['id']?.toString().trim();
+          existingNoResep = r['no_resep']?.toString().trim();
+        } else {
+          // Resep lama sudah ditebus/dibayar, buat baris resep baru untuk pasien
+          resolvedKonsultasiId = null;
+        }
       }
     }
 
@@ -1944,7 +1957,7 @@ class SupabaseAdminService {
         UPDATE resep
         SET diagnosis = @diagnosis,
             catatan_dokter = @catatanDokter,
-            status = @status,
+            status = 'aktif',
             tanggal_resep = CURRENT_DATE,
             created_at = NOW(),
             updated_at = NOW()
@@ -1954,7 +1967,6 @@ class SupabaseAdminService {
           'id': finalResepId,
           'diagnosis': diagnosis ?? 'Pemeriksaan Protokol Ginjal',
           'catatanDokter': catatanDokter ?? 'Resep elektronik diterbitkan melalui GIAT Telekonsultasi.',
-          'status': status,
         },
       );
       // Hapus item obat lama agar diganti dengan daftar item obat yang baru diterbitkan
@@ -2145,17 +2157,22 @@ class SupabaseAdminService {
         final itemRows = await _exec(
           '''
           SELECT 
-            TRIM(id) AS id,
-            TRIM(id_resep) AS id_resep,
-            nama_obat,
-            dosis,
-            aturan_pakai,
-            waktu_penggunaan,
-            jumlah,
-            catatan_khusus
-          FROM resep_item
-          WHERE TRIM(id_resep) = @rxId
-          ORDER BY created_at ASC
+            TRIM(ri.id) AS id,
+            TRIM(ri.id_resep) AS id_resep,
+            ri.nama_obat,
+            ri.dosis,
+            ri.aturan_pakai,
+            ri.waktu_penggunaan,
+            ri.jumlah,
+            ri.catatan_khusus,
+            COALESCE(
+              (SELECT ROUND(o.harga_jual)::int FROM obat o WHERE LOWER(TRIM(o.nama_obat)) = LOWER(TRIM(ri.nama_obat)) LIMIT 1),
+              (SELECT ROUND(o.harga_jual)::int FROM obat o WHERE LOWER(o.nama_obat) LIKE '%' || LOWER(SPLIT_PART(TRIM(ri.nama_obat), ' ', 1)) || '%' LIMIT 1),
+              65000
+            ) AS harga
+          FROM resep_item ri
+          WHERE TRIM(ri.id_resep) = @rxId
+          ORDER BY ri.created_at ASC
           ''',
           parameters: {'rxId': rxId},
         );
@@ -3620,17 +3637,22 @@ class SupabaseAdminService {
         final itemRows = await _exec(
           '''
           SELECT 
-            TRIM(id) AS id,
-            TRIM(id_resep) AS id_resep,
-            nama_obat,
-            dosis,
-            aturan_pakai,
-            waktu_penggunaan,
-            jumlah,
-            catatan_khusus
-          FROM resep_item
-          WHERE TRIM(id_resep) = @rxId
-          ORDER BY created_at ASC
+            TRIM(ri.id) AS id,
+            TRIM(ri.id_resep) AS id_resep,
+            ri.nama_obat,
+            ri.dosis,
+            ri.aturan_pakai,
+            ri.waktu_penggunaan,
+            ri.jumlah,
+            ri.catatan_khusus,
+            COALESCE(
+              (SELECT ROUND(o.harga_jual)::int FROM obat o WHERE LOWER(TRIM(o.nama_obat)) = LOWER(TRIM(ri.nama_obat)) LIMIT 1),
+              (SELECT ROUND(o.harga_jual)::int FROM obat o WHERE LOWER(o.nama_obat) LIKE '%' || LOWER(SPLIT_PART(TRIM(ri.nama_obat), ' ', 1)) || '%' LIMIT 1),
+              65000
+            ) AS harga
+          FROM resep_item ri
+          WHERE TRIM(ri.id_resep) = @rxId
+          ORDER BY ri.created_at ASC
           ''',
           parameters: {'rxId': rxId},
         );
@@ -3999,6 +4021,1972 @@ class SupabaseAdminService {
       'DELETE FROM notifikasi WHERE TRIM(id_user) = @aptId AND is_read = true',
       parameters: {'aptId': aptId},
     );
+  }
+
+  /// Membuat notifikasi baru untuk user apotek di tabel `notifikasi` Supabase
+  Future<void> createApotekNotification({
+    required String apotekId,
+    required String judul,
+    required String pesan,
+    String kategori = 'pesanan',
+  }) async {
+    if (_isTest) return;
+    final cleanAptId = apotekId.trim();
+    if (cleanAptId.isEmpty) return;
+
+    await _exec(
+      '''
+      INSERT INTO notifikasi (id, id_user, judul, pesan, kategori, is_read, created_at)
+      VALUES (gen_random_uuid()::text, @aptId, @judul, @pesan, @kategori, false, NOW())
+      ''',
+      parameters: {
+        'aptId': cleanAptId,
+        'judul': judul,
+        'pesan': pesan,
+        'kategori': kategori,
+      },
+    );
+  }
+
+  // ===========================================================================
+  // MODUL INTEGRASI ALUR RESEP DOKTER -> PASIEN -> PEMBAYARAN LUNAS -> APOTEK
+  // ===========================================================================
+
+  /// Mengembalikan status resep ke 'aktif' apabila pasien membatalkan / belum menyelesaikan pembayaran
+  Future<void> revertResepToAktifIfUnpaid({
+    String? idResep,
+    String? noResep,
+  }) async {
+    if (_isTest) return;
+    final cleanId = (idResep ?? '').trim().replaceAll('No.', '').trim();
+    final cleanNo = (noResep ?? '').trim().replaceAll('No.', '').trim();
+    if (cleanId.isEmpty && cleanNo.isEmpty) return;
+
+    try {
+      final rxRows = await _exec(
+        '''
+        SELECT TRIM(r.id) AS id,
+               (SELECT COUNT(*)::int FROM pesanan_obat po
+                WHERE TRIM(po.id_resep) = TRIM(r.id)
+                  AND LOWER(TRIM(po.status_pembayaran)) = 'lunas') AS paid_cnt
+        FROM resep r
+        WHERE TRIM(r.id) = @cleanId
+           OR TRIM(r.no_resep) = @cleanNo
+           OR TRIM(r.no_resep) = @cleanId
+           OR TRIM(r.id) = @cleanNo
+        LIMIT 1
+        ''',
+        parameters: {'cleanId': cleanId, 'cleanNo': cleanNo},
+      );
+      if (rxRows.isNotEmpty) {
+        final m = rxRows.first.toColumnMap();
+        final rId = m['id']?.toString().trim();
+        final paidCnt = int.tryParse(m['paid_cnt']?.toString() ?? '0') ?? 0;
+        if (rId != null && rId.isNotEmpty && paidCnt == 0) {
+          await _exec(
+            '''
+            UPDATE resep
+            SET status = 'aktif',
+                updated_at = NOW()
+            WHERE TRIM(id) = @id
+              AND LOWER(TRIM(status)) NOT IN ('diverifikasi', 'selesai')
+            ''',
+            parameters: {'id': rId},
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error revertResepToAktifIfUnpaid: $e');
+    }
+  }
+
+  /// Menyelesaikan pembayaran obat pasien (baik dari Resep Dokter maupun Pembelian Umum)
+  /// dan mengirimkan pesanan/resep yang sudah LUNAS tersebut ke User Apotek di Supabase
+  Future<Map<String, dynamic>?> completePasienObatPaymentInSupabase({
+    String? idPesanan,
+    String? noPesanan,
+    String? idResep,
+    String? noResep,
+    String? idPasien,
+    String? patientName,
+    String? idApotek,
+    String? metodePengambilan,
+    String? namaPenerima,
+    String? noHpPenerima,
+    String? alamatPengiriman,
+    String? metodePembayaran,
+    int? subtotal,
+    int? ongkosKirim,
+    int? totalBayar,
+    List<Map<String, dynamic>>? items,
+  }) async {
+    if (_isTest) return null;
+
+    try {
+      // 1. Resolve Apotek ID (default ke Apotek Kimia Farma Dago bila tidak ditentukan)
+      final targetApotekId = await resolveCurrentApotekId(overrideApotekId: idApotek) ??
+          '5cdfd84d-0124-4abf-a778-e8db2801863f';
+
+      // 2. Cek apakah ini transaksi penebusan resep dokter
+      String? resolvedResepId;
+      String? resolvedNoResep;
+      String? resepPasienId;
+      final cleanRxId = (idResep ?? '').trim().replaceAll('No.', '').trim();
+      final cleanRxNo = (noResep ?? '').trim().replaceAll('No.', '').trim();
+
+      if (cleanRxId.isNotEmpty || cleanRxNo.isNotEmpty) {
+        final rxRows = await _exec(
+          '''
+          SELECT TRIM(id) AS id, no_resep, TRIM(id_pasien) AS id_pasien
+          FROM resep
+          WHERE TRIM(id) = @rxId
+             OR TRIM(no_resep) = @rxNo
+             OR TRIM(no_resep) = @rxId
+             OR TRIM(id) = @rxNo
+          LIMIT 1
+          ''',
+          parameters: {'rxId': cleanRxId, 'rxNo': cleanRxNo},
+        );
+        if (rxRows.isNotEmpty) {
+          final rm = rxRows.first.toColumnMap();
+          resolvedResepId = rm['id']?.toString().trim();
+          resolvedNoResep = rm['no_resep']?.toString().trim();
+          resepPasienId = rm['id_pasien']?.toString().trim();
+        }
+      }
+
+      // 3. Resolve Pasien ID
+      String? targetPasienId = resepPasienId;
+      if (targetPasienId == null || targetPasienId.isEmpty) {
+        if (idPasien != null && idPasien.trim().length >= 30) {
+          targetPasienId = idPasien.trim();
+        } else {
+          targetPasienId = await resolveCurrentPasienId(
+            overridePasienId: idPasien,
+          );
+          if (targetPasienId == null && (patientName ?? namaPenerima) != null) {
+            final pSearchName = (patientName ?? namaPenerima ?? '').trim();
+            if (pSearchName.isNotEmpty) {
+              final byPName = await _exec(
+                'SELECT TRIM(id_pasien) AS id FROM pasien WHERE LOWER(TRIM(nama)) ILIKE @nama LIMIT 1',
+                parameters: {'nama': '%${pSearchName.toLowerCase()}%'},
+              );
+              if (byPName.isNotEmpty) {
+                targetPasienId = byPName.first.toColumnMap()['id']?.toString().trim();
+              }
+            }
+          }
+        }
+      }
+      if (targetPasienId == null || targetPasienId.isEmpty) {
+        final firstPas = await _exec('SELECT TRIM(id_pasien) AS id FROM pasien ORDER BY created_at ASC LIMIT 1');
+        if (firstPas.isNotEmpty) {
+          targetPasienId = firstPas.first.toColumnMap()['id']?.toString().trim();
+        }
+      }
+      if (targetPasienId == null || targetPasienId.isEmpty) return null;
+
+      // Ambil profil pasien untuk fallback nama/alamat/no_hp
+      final pasProfileRows = await _exec(
+        'SELECT nama, no_hp, alamat FROM pasien WHERE TRIM(id_pasien) = @pid LIMIT 1',
+        parameters: {'pid': targetPasienId},
+      );
+      final pasMap = pasProfileRows.isNotEmpty
+          ? pasProfileRows.first.toColumnMap()
+          : <String, dynamic>{};
+
+      final finalRecipientName = (namaPenerima != null && namaPenerima.trim().isNotEmpty)
+          ? namaPenerima.trim()
+          : (pasMap['nama']?.toString().trim().isNotEmpty == true
+              ? pasMap['nama'].toString().trim()
+              : (patientName ?? 'Pasien GIAT'));
+      final finalRecipientPhone = (noHpPenerima != null && noHpPenerima.trim().isNotEmpty)
+          ? noHpPenerima.trim()
+          : (pasMap['no_hp']?.toString().trim().isNotEmpty == true
+              ? pasMap['no_hp'].toString().trim()
+              : '081234567890');
+      final finalRecipientAddress = (alamatPengiriman != null && alamatPengiriman.trim().isNotEmpty)
+          ? alamatPengiriman.trim()
+          : (pasMap['alamat']?.toString().trim().isNotEmpty == true
+              ? pasMap['alamat'].toString().trim()
+              : 'Jl. Dago Asri No. 12, Coblong, Kota Bandung');
+
+      // 4. Jika ini penebusan resep dokter, ubah status resep menjadi 'sudah_ditebus'
+      // sehingga resep masuk ke daftar Resep Masuk di User Apotek (status: Belum Diverifikasi)
+      if (resolvedResepId != null && resolvedResepId.isNotEmpty) {
+        await _exec(
+          '''
+          UPDATE resep
+          SET status = CASE
+                WHEN LOWER(TRIM(status)) IN ('diverifikasi', 'selesai') THEN status
+                ELSE 'sudah_ditebus'
+              END,
+              updated_at = NOW()
+          WHERE TRIM(id) = @rxId
+          ''',
+          parameters: {'rxId': resolvedResepId},
+        );
+      }
+
+      // 5. Cari apakah baris pesanan_obat sudah ada di database
+      String? existingOrderId;
+      String? existingOrderNo;
+      final cleanOrderId = (idPesanan ?? '').trim();
+      final cleanOrderNo = (noPesanan ?? '').trim();
+
+      if (cleanOrderId.isNotEmpty || cleanOrderNo.isNotEmpty) {
+        final ordRows = await _exec(
+          '''
+          SELECT TRIM(id) AS id, no_pesanan, TRIM(id_resep) AS id_resep
+          FROM pesanan_obat
+          WHERE TRIM(id) = @oid
+             OR TRIM(no_pesanan) = @ono
+             OR TRIM(id) = @ono
+             OR TRIM(no_pesanan) = @oid
+          LIMIT 1
+          ''',
+          parameters: {'oid': cleanOrderId, 'ono': cleanOrderNo},
+        );
+        if (ordRows.isNotEmpty) {
+          final om = ordRows.first.toColumnMap();
+          existingOrderId = om['id']?.toString().trim();
+          existingOrderNo = om['no_pesanan']?.toString().trim();
+          if (resolvedResepId == null && om['id_resep'] != null) {
+            final dbRx = om['id_resep'].toString().trim();
+            if (dbRx.isNotEmpty) {
+              resolvedResepId = dbRx;
+              await _exec(
+                '''
+                UPDATE resep
+                SET status = CASE
+                      WHEN LOWER(TRIM(status)) IN ('diverifikasi', 'selesai') THEN status
+                      ELSE 'sudah_ditebus'
+                    END,
+                    updated_at = NOW()
+                WHERE TRIM(id) = @rxId
+                ''',
+                parameters: {'rxId': resolvedResepId},
+              );
+            }
+          }
+        }
+      }
+
+      if (existingOrderId == null && resolvedResepId != null && resolvedResepId.isNotEmpty) {
+        final byRxRows = await _exec(
+          '''
+          SELECT TRIM(id) AS id, no_pesanan
+          FROM pesanan_obat
+          WHERE TRIM(id_resep) = @rxId
+          ORDER BY created_at DESC
+          LIMIT 1
+          ''',
+          parameters: {'rxId': resolvedResepId},
+        );
+        if (byRxRows.isNotEmpty) {
+          final om = byRxRows.first.toColumnMap();
+          existingOrderId = om['id']?.toString().trim();
+          existingOrderNo = om['no_pesanan']?.toString().trim();
+        }
+      }
+
+      final isResepOrder = resolvedResepId != null && resolvedResepId.isNotEmpty;
+      final tipePesanan = isResepOrder ? 'resep' : 'umum';
+      final finalMetodeAmbil = (metodePengambilan ?? 'antar').toLowerCase().contains('ambil')
+          ? 'ambil'
+          : 'antar';
+      final finalMetodeBayar = (metodePembayaran ?? 'qris').toLowerCase();
+      final finalSubtotal = subtotal ?? 85000;
+      final finalOngkir = ongkosKirim ?? (finalMetodeAmbil == 'antar' ? 15000 : 0);
+      final finalTotal = totalBayar ?? (finalSubtotal + finalOngkir);
+
+      String finalOrderId;
+      String finalOrderNo;
+
+      if (existingOrderId != null && existingOrderId.isNotEmpty) {
+        finalOrderId = existingOrderId;
+        finalOrderNo = existingOrderNo ?? cleanOrderNo;
+        await _exec(
+          '''
+          UPDATE pesanan_obat
+          SET id_apotek = COALESCE(@aptId, id_apotek),
+              id_resep = COALESCE(@rxId, id_resep),
+              tipe_pesanan = @tipe,
+              status_pembayaran = 'lunas',
+              waktu_bayar = COALESCE(waktu_bayar, NOW()),
+              status_pesanan = CASE
+                WHEN LOWER(TRIM(status_pesanan)) IN ('diproses', 'selesai') THEN status_pesanan
+                ELSE 'menunggu_konfirmasi'
+              END,
+              progress_step = GREATEST(COALESCE(progress_step, 1), 1),
+              updated_at = NOW()
+          WHERE TRIM(id) = @id
+          ''',
+          parameters: {
+            'id': finalOrderId,
+            'aptId': targetApotekId,
+            'rxId': resolvedResepId,
+            'tipe': tipePesanan,
+          },
+        );
+      } else {
+        final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
+        finalOrderId = uuidRes.first.toColumnMap()['id'].toString().trim();
+        final ts = (DateTime.now().millisecondsSinceEpoch % 1000000).toString().padLeft(6, '0');
+        finalOrderNo = cleanOrderNo.isNotEmpty ? cleanOrderNo : 'ORD-GIAT-$ts';
+
+        await _exec(
+          '''
+          INSERT INTO pesanan_obat (
+            id, no_pesanan, id_pasien, id_apotek, id_resep, tipe_pesanan,
+            metode_pengambilan, nama_penerima, no_hp_penerima, alamat_pengiriman,
+            subtotal, ongkos_kirim, total_bayar, metode_pembayaran,
+            status_pembayaran, progress_step, status_pesanan, waktu_bayar,
+            created_at, updated_at
+          ) VALUES (
+            @id, @noPesanan, @idPasien, @idApotek, @idResep, @tipePesanan,
+            @metodeAmbil, @namaPenerima, @noHpPenerima, @alamatPengiriman,
+            @subtotal, @ongkir, @totalBayar, @metodeBayar,
+            'lunas', 1, 'menunggu_konfirmasi', NOW(),
+            NOW(), NOW()
+          )
+          ''',
+          parameters: {
+            'id': finalOrderId,
+            'noPesanan': finalOrderNo,
+            'idPasien': targetPasienId,
+            'idApotek': targetApotekId,
+            'idResep': resolvedResepId,
+            'tipePesanan': tipePesanan,
+            'metodeAmbil': finalMetodeAmbil,
+            'namaPenerima': finalRecipientName,
+            'noHpPenerima': finalRecipientPhone,
+            'alamatPengiriman': finalRecipientAddress,
+            'subtotal': finalSubtotal,
+            'ongkir': finalOngkir,
+            'totalBayar': finalTotal,
+            'metodeBayar': finalMetodeBayar,
+          },
+        );
+      }
+
+      // 6. Pastikan pesanan_obat_items terisi untuk pesanan ini
+      final existingItems = await _exec(
+        'SELECT COUNT(*)::int AS cnt FROM pesanan_obat_items WHERE TRIM(id_pesanan) = @pid',
+        parameters: {'pid': finalOrderId},
+      );
+      final existingItemCount = int.tryParse(
+            existingItems.first.toColumnMap()['cnt']?.toString() ?? '0',
+          ) ??
+          0;
+
+      if (existingItemCount == 0) {
+        // Ambil daftar obat apotek untuk resolusi FK id_obat
+        final aptObatRows = await _exec(
+          '''
+          SELECT TRIM(id_obat) AS id_obat, nama_obat, ROUND(harga_jual)::int AS harga_jual
+          FROM obat
+          WHERE TRIM(id_apotek) = @aptId
+          ORDER BY created_at ASC
+          ''',
+          parameters: {'aptId': targetApotekId},
+        );
+        final aptObatList = aptObatRows.map((r) => _normalizeMap(r.toColumnMap())).toList();
+        final defaultObatId = aptObatList.isNotEmpty
+            ? aptObatList.first['id_obat'].toString()
+            : '91d0bddb-c673-4245-92f3-2a681b645e67';
+
+        List<Map<String, dynamic>> itemsToInsert = [];
+        if (items != null && items.isNotEmpty) {
+          itemsToInsert = items;
+        } else if (resolvedResepId != null && resolvedResepId.isNotEmpty) {
+          final rxItemRows = await _exec(
+            '''
+            SELECT nama_obat, jumlah
+            FROM resep_item
+            WHERE TRIM(id_resep) = @rxId
+            ORDER BY created_at ASC
+            ''',
+            parameters: {'rxId': resolvedResepId},
+          );
+          for (final r in rxItemRows) {
+            final rm = r.toColumnMap();
+            itemsToInsert.add({
+              'nama_obat': rm['nama_obat']?.toString() ?? 'Obat Resep Ginjal',
+              'jumlah': int.tryParse(rm['jumlah']?.toString() ?? '1') ?? 1,
+            });
+          }
+        }
+
+        if (itemsToInsert.isEmpty) {
+          itemsToInsert.add({
+            'nama_obat': aptObatList.isNotEmpty
+                ? aptObatList.first['nama_obat'].toString()
+                : 'Renalvit Tab',
+            'jumlah': 1,
+            'harga_satuan': finalSubtotal,
+          });
+        }
+
+        for (final it in itemsToInsert) {
+          final medName = (it['nama_obat'] ?? it['nama'] ?? it['medicineName'] ?? 'Obat Ginjal').toString().trim();
+          final rawQty = (it['jumlah'] ?? it['qty'] ?? '1').toString();
+          final qtyMatch = RegExp(r'\d+').firstMatch(rawQty);
+          final qty = qtyMatch != null ? (int.tryParse(qtyMatch.group(0)!) ?? 1) : 1;
+
+          String matchedObatId = (it['id_obat'] ?? '').toString().trim();
+          int unitPrice = int.tryParse((it['harga_satuan'] ?? it['harga'] ?? '').toString()) ?? 0;
+
+          if (matchedObatId.length < 30 || unitPrice <= 0) {
+            final firstWord = medName.split(' ').first.toLowerCase();
+            final matched = aptObatList.firstWhere(
+              (o) => o['nama_obat'].toString().toLowerCase().contains(firstWord),
+              orElse: () => aptObatList.isNotEmpty ? aptObatList.first : <String, dynamic>{},
+            );
+            if (matched.isNotEmpty) {
+              if (matchedObatId.length < 30) {
+                matchedObatId = matched['id_obat'].toString();
+              }
+              if (unitPrice <= 0) {
+                unitPrice = int.tryParse(matched['harga_jual']?.toString() ?? '65000') ?? 65000;
+              }
+            }
+          }
+          if (matchedObatId.length < 30) matchedObatId = defaultObatId;
+          if (unitPrice <= 0) unitPrice = 65000;
+
+          await _exec(
+            '''
+            INSERT INTO pesanan_obat_items (
+              id, id_pesanan, id_obat, nama_obat, jumlah, harga_satuan, subtotal, created_at, updated_at
+            ) VALUES (
+              gen_random_uuid()::text, @idPesanan, @idObat, @namaObat, @jumlah, @hargaSatuan, @subtotal, NOW(), NOW()
+            )
+            ''',
+            parameters: {
+              'idPesanan': finalOrderId,
+              'idObat': matchedObatId,
+              'namaObat': medName,
+              'jumlah': qty > 0 ? qty : 1,
+              'hargaSatuan': unitPrice,
+              'subtotal': unitPrice * (qty > 0 ? qty : 1),
+            },
+          );
+        }
+      }
+
+      // 7. Catat riwayat tracking pembayaran lunas
+      try {
+        await _exec(
+          '''
+          INSERT INTO pesanan_obat_trackings (id, id_pesanan, status, keterangan, created_at, updated_at)
+          VALUES (
+            gen_random_uuid()::text,
+            @idPesanan,
+            'Pembayaran Lunas',
+            @ket,
+            NOW(),
+            NOW()
+          )
+          ''',
+          parameters: {
+            'idPesanan': finalOrderId,
+            'ket': isResepOrder
+                ? 'Pembayaran tebus resep dokter (${resolvedNoResep ?? cleanRxNo}) berhasil dikonfirmasi. Menunggu verifikasi apoteker.'
+                : 'Pembayaran pesanan obat ($finalOrderNo) berhasil dikonfirmasi dan siap diproses apotek.',
+          },
+        );
+      } catch (_) {}
+
+      // 8. Kirim notifikasi real ke User Apotek
+      await createApotekNotification(
+        apotekId: targetApotekId,
+        judul: isResepOrder ? 'Pesanan Resep Baru Masuk' : 'Pesanan Obat Baru Masuk',
+        pesan: isResepOrder
+            ? 'Resep dokter ${resolvedNoResep ?? cleanRxNo} untuk pasien $finalRecipientName telah dibayar (Lunas) dan menunggu verifikasi Anda.'
+            : 'Pesanan $finalOrderNo atas nama $finalRecipientName telah dibayar (Lunas) dan siap disiapkan obatnya.',
+        kategori: isResepOrder ? 'resep' : 'pesanan',
+      );
+
+      return {
+        'id': finalOrderId,
+        'no_pesanan': finalOrderNo,
+        'id_resep': resolvedResepId,
+        'no_resep': resolvedNoResep,
+        'id_apotek': targetApotekId,
+        'status_pembayaran': 'lunas',
+      };
+    } catch (e) {
+      debugPrint('Error completePasienObatPaymentInSupabase: $e');
+      return null;
+    }
+  }
+
+  // ===========================================================================
+  // MODUL APOTEK: PROFIL, JAM OPERASIONAL, AREA LAYANAN, STATUS & KEAMANAN REAL
+  // ===========================================================================
+
+  /// Mengambil profil lengkap Apotek beserta ringkasan jam operasional & area layanan dari Supabase
+  Future<Map<String, dynamic>?> fetchApotekProfileFull({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return null;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return null;
+
+    final rows = await _exec(
+      '''
+      SELECT
+        TRIM(a.id_apotek) AS id,
+        TRIM(a.id_apotek) AS id_apotek,
+        a.nama_apotek,
+        a.penanggung_jawab,
+        a.no_sipa_sia,
+        a.no_hp,
+        a.alamat,
+        a.lokasi_lat_long,
+        COALESCE(a.status_layanan, true) AS status_layanan,
+        a.foto_profile,
+        u.email,
+        u.nama AS nama_user
+      FROM apotek a
+      LEFT JOIN "user" u ON TRIM(u.id) = TRIM(a.id_apotek)
+      WHERE TRIM(a.id_apotek) = @aptId
+      LIMIT 1
+      ''',
+      parameters: {'aptId': aptId},
+    );
+    if (rows.isEmpty) return null;
+
+    final map = _normalizeMap(rows.first.toColumnMap());
+
+    // Ambil jam operasional real
+    final schedules = await fetchApotekJamOperasional(apotekId: aptId);
+    String jamRingkas = '08.00 - 22.00 WIB';
+    if (schedules.isNotEmpty) {
+      final openDays = schedules.where((s) => s['is_open'] == true).toList();
+      if (openDays.isNotEmpty) {
+        final firstOpen = (openDays.first['jam_buka_24'] ?? '08.00').toString();
+        final firstClose = (openDays.first['jam_tutup_24'] ?? '22.00').toString();
+        jamRingkas = '$firstOpen - $firstClose WIB';
+      } else {
+        jamRingkas = 'Tutup Sementara';
+      }
+    }
+
+    // Ambil area layanan aktif real
+    final areas = await fetchApotekAreaLayanan(apotekId: aptId);
+    final activeAreas = areas
+        .where((a) => a['is_active'] == true)
+        .map((a) => (a['nama_area'] ?? '').toString().trim())
+        .where((n) => n.isNotEmpty)
+        .toList();
+    final areaRingkas = activeAreas.isNotEmpty
+        ? activeAreas.join(', ')
+        : 'Kota Bandung dan Sekitarnya';
+
+    map['jam_operasional_ringkas'] = jamRingkas;
+    map['area_layanan_ringkas'] = areaRingkas;
+    map['jam_operasional'] = schedules;
+    map['area_layanan'] = areas;
+    return map;
+  }
+
+  /// Memperbarui data profil Apotek (nama, email, no_hp, alamat, penanggung_jawab, sipa) di Supabase
+  Future<Map<String, dynamic>?> updateApotekProfileFull(
+    Map<String, dynamic> data, {
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return null;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return null;
+
+    final current = await fetchApotekProfileFull(apotekId: aptId) ?? <String, dynamic>{};
+    final namaApotek = (data['nama_apotek'] ?? data['nama'] ?? data['name'] ?? current['nama_apotek'] ?? 'Apotek Mitra GIAT').toString().trim();
+    final penanggungJawab = (data['penanggung_jawab'] ?? current['penanggung_jawab'] ?? 'apt. Farhan Ramadhan, S.Farm').toString().trim();
+    final noHp = (data['no_hp'] ?? data['phone'] ?? current['no_hp'] ?? '').toString().trim();
+    final email = (data['email'] ?? current['email'] ?? '').toString().trim();
+    final alamat = (data['alamat'] ?? current['alamat'] ?? '').toString().trim();
+    final fotoProfile = (data['foto_profile'] ?? data['foto_profil'] ?? current['foto_profile'])?.toString().trim();
+
+    await _exec(
+      '''
+      UPDATE apotek
+      SET nama_apotek = @namaApotek,
+          penanggung_jawab = @penanggungJawab,
+          no_hp = CASE WHEN @noHp = '' THEN no_hp ELSE @noHp END,
+          alamat = CASE WHEN @alamat = '' THEN alamat ELSE @alamat END,
+          foto_profile = COALESCE(@fotoProfile, foto_profile),
+          updated_at = NOW()
+      WHERE TRIM(id_apotek) = @aptId
+      ''',
+      parameters: {
+        'aptId': aptId,
+        'namaApotek': namaApotek,
+        'penanggungJawab': penanggungJawab,
+        'noHp': noHp,
+        'alamat': alamat,
+        'fotoProfile': (fotoProfile != null && fotoProfile.isNotEmpty) ? fotoProfile : null,
+      },
+    );
+
+    await _exec(
+      '''
+      UPDATE "user"
+      SET nama = @namaApotek,
+          email = CASE WHEN @email = '' THEN email ELSE LOWER(@email) END,
+          no_hp = CASE WHEN @noHp = '' THEN no_hp ELSE @noHp END,
+          updated_at = NOW()
+      WHERE TRIM(id) = @aptId
+      ''',
+      parameters: {
+        'aptId': aptId,
+        'namaApotek': namaApotek,
+        'email': email,
+        'noHp': noHp,
+      },
+    );
+
+    try {
+      final savedUser = await StorageService().getUser();
+      if (savedUser != null) {
+        await StorageService().saveUser(
+          savedUser.copyWith(
+            nama: namaApotek,
+            email: email.isNotEmpty ? email : savedUser.email,
+            noHp: noHp.isNotEmpty ? noHp : savedUser.noHp,
+            fotoProfile: (fotoProfile != null && fotoProfile.isNotEmpty)
+                ? fotoProfile
+                : savedUser.fotoProfile,
+          ),
+        );
+      }
+    } catch (_) {}
+
+    return fetchApotekProfileFull(apotekId: aptId);
+  }
+
+  /// Memperbarui foto profil Apotek di Supabase
+  Future<Map<String, dynamic>?> updateApotekPhoto(
+    String fileOrUrl, {
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return null;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return null;
+    final cleanVal = fileOrUrl.trim();
+
+    await _exec(
+      '''
+      UPDATE apotek
+      SET foto_profile = @foto,
+          updated_at = NOW()
+      WHERE TRIM(id_apotek) = @aptId
+      ''',
+      parameters: {
+        'aptId': aptId,
+        'foto': cleanVal.isNotEmpty ? cleanVal : null,
+      },
+    );
+
+    return {
+      'id_apotek': aptId,
+      'foto_profile': cleanVal,
+      'foto_profil': cleanVal,
+      'url': cleanVal,
+    };
+  }
+
+  /// Memperbarui kata sandi akun Apotek di tabel `"user"` Supabase
+  /// Mengembalikan `null` jika berhasil, atau pesan error jika kata sandi lama salah
+  Future<String?> updateApotekPassword({
+    required String currentPassword,
+    required String newPassword,
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return null;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return 'Akun apotek tidak ditemukan di database.';
+
+    final check = await _exec(
+      r'''
+      SELECT (
+        (extensions.crypt(@currentPass, replace(password, '$2y$', '$2a$')) = replace(password, '$2y$', '$2a$'))
+        OR password = @currentPass
+      ) AS is_valid
+      FROM "user"
+      WHERE TRIM(id) = @id
+      LIMIT 1
+      ''',
+      parameters: {
+        'id': aptId,
+        'currentPass': currentPassword,
+      },
+    );
+
+    if (check.isEmpty || check.first.toColumnMap()['is_valid'] != true) {
+      return 'Kata sandi saat ini tidak sesuai.';
+    }
+
+    await _exec(
+      r'''
+      UPDATE "user"
+      SET password = replace(extensions.crypt(@newPass, extensions.gen_salt('bf', 12)), '$2a$', '$2y$'),
+          updated_at = NOW()
+      WHERE TRIM(id) = @id
+      ''',
+      parameters: {
+        'id': aptId,
+        'newPass': newPassword,
+      },
+    );
+
+    return null;
+  }
+
+  /// Mengubah status aktif/tutup layanan Apotek (`apotek.status_layanan`) di Supabase
+  Future<Map<String, dynamic>?> toggleApotekStatusLayanan({
+    bool? isActive,
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return null;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return null;
+
+    bool newStatus;
+    if (isActive != null) {
+      newStatus = isActive;
+    } else {
+      final cur = await _exec(
+        'SELECT COALESCE(status_layanan, true) AS st FROM apotek WHERE TRIM(id_apotek) = @aptId LIMIT 1',
+        parameters: {'aptId': aptId},
+      );
+      final curBool = cur.isNotEmpty ? (cur.first.toColumnMap()['st'] == true) : true;
+      newStatus = !curBool;
+    }
+
+    await _exec(
+      '''
+      UPDATE apotek
+      SET status_layanan = @st,
+          updated_at = NOW()
+      WHERE TRIM(id_apotek) = @aptId
+      ''',
+      parameters: {'aptId': aptId, 'st': newStatus},
+    );
+
+    return {
+      'id_apotek': aptId,
+      'status_layanan': newStatus,
+      'is_active': newStatus,
+    };
+  }
+
+  String _formatSqlTimeTo12h(String rawTime, {String fallback = '08:00 AM'}) {
+    final clean = rawTime.replaceAll('Time(', '').replaceAll(')', '').trim();
+    final parts = clean.split(':');
+    if (parts.length < 2) return fallback;
+    final h = int.tryParse(parts[0]) ?? 8;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final suffix = h >= 12 ? 'PM' : 'AM';
+    final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    return '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $suffix';
+  }
+
+  String _formatSqlTimeTo24hDot(String rawTime, {String fallback = '08.00'}) {
+    final clean = rawTime.replaceAll('Time(', '').replaceAll(')', '').trim();
+    final parts = clean.split(':');
+    if (parts.length < 2) return fallback;
+    final h = int.tryParse(parts[0]) ?? 8;
+    final m = int.tryParse(parts[1]) ?? 0;
+    return '${h.toString().padLeft(2, '0')}.${m.toString().padLeft(2, '0')}';
+  }
+
+  String _parse12hOr24hToSqlTime(String input, {String fallback = '08:00:00'}) {
+    final s = input.trim().toUpperCase();
+    final isPm = s.contains('PM');
+    final isAm = s.contains('AM');
+    final cleaned = s.replaceAll('AM', '').replaceAll('PM', '').replaceAll('.', ':').trim();
+    final parts = cleaned.split(':');
+    if (parts.isEmpty) return fallback;
+    int h = int.tryParse(parts[0].trim()) ?? 8;
+    int m = parts.length > 1 ? (int.tryParse(parts[1].trim()) ?? 0) : 0;
+    if (isPm && h < 12) h += 12;
+    if (isAm && h == 12) h = 0;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:00';
+  }
+
+  /// Mengambil jadwal jam operasional 7 hari milik Apotek dari tabel `apotek_jam_operasional` Supabase
+  Future<List<Map<String, dynamic>>> fetchApotekJamOperasional({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return [];
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return [];
+
+    final rows = await _exec(
+      '''
+      SELECT
+        TRIM(id) AS id,
+        TRIM(id_apotek) AS id_apotek,
+        LOWER(TRIM(hari)) AS hari,
+        COALESCE(is_open, true) AS is_open,
+        jam_buka::text AS jam_buka,
+        jam_tutup::text AS jam_tutup
+      FROM apotek_jam_operasional
+      WHERE TRIM(id_apotek) = @aptId
+      ''',
+      parameters: {'aptId': aptId},
+    );
+
+    final dayOrder = [
+      {'key': 'senin', 'label': 'Senin', 'short': 'S'},
+      {'key': 'selasa', 'label': 'Selasa', 'short': 'S'},
+      {'key': 'rabu', 'label': 'Rabu', 'short': 'R'},
+      {'key': 'kamis', 'label': 'Kamis', 'short': 'K'},
+      {'key': 'jumat', 'label': 'Jumat', 'short': 'J'},
+      {'key': 'sabtu', 'label': 'Sabtu', 'short': 'S'},
+      {'key': 'minggu', 'label': 'Minggu', 'short': 'M'},
+    ];
+
+    final Map<String, Map<String, dynamic>> byDay = {};
+    for (final r in rows) {
+      final m = _normalizeMap(r.toColumnMap());
+      final key = (m['hari'] ?? '').toString().toLowerCase().trim();
+      byDay[key] = m;
+    }
+
+    final List<Map<String, dynamic>> result = [];
+    for (final d in dayOrder) {
+      final key = d['key']!;
+      final existing = byDay[key];
+      final rawBuka = existing?['jam_buka']?.toString() ?? '08:00:00';
+      final rawTutup = existing?['jam_tutup']?.toString() ?? '22:00:00';
+      final isOpen = existing != null ? (existing['is_open'] == true) : true;
+      result.add({
+        'id': existing?['id']?.toString() ?? '',
+        'id_apotek': aptId,
+        'hari': key,
+        'day_name': d['label']!,
+        'short_day': d['short']!,
+        'is_open': isOpen,
+        'jam_buka': _formatSqlTimeTo12h(rawBuka, fallback: '08:00 AM'),
+        'jam_tutup': _formatSqlTimeTo12h(rawTutup, fallback: '10:00 PM'),
+        'jam_buka_24': _formatSqlTimeTo24hDot(rawBuka, fallback: '08.00'),
+        'jam_tutup_24': _formatSqlTimeTo24hDot(rawTutup, fallback: '22.00'),
+      });
+    }
+
+    return result;
+  }
+
+  /// Menyimpan perubahan jadwal jam operasional Apotek ke tabel `apotek_jam_operasional` Supabase
+  Future<List<Map<String, dynamic>>> updateApotekJamOperasional(
+    List<Map<String, dynamic>> schedules, {
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return schedules;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return schedules;
+
+    for (final s in schedules) {
+      final dayKey = (s['hari'] ?? s['day_name'] ?? s['dayName'] ?? '')
+          .toString()
+          .toLowerCase()
+          .trim();
+      if (dayKey.isEmpty) continue;
+      final isOpen = s['is_open'] == true || s['isOpen'] == true;
+      final openTimeSql = _parse12hOr24hToSqlTime(
+        (s['jam_buka'] ?? s['openTime'] ?? '08:00 AM').toString(),
+        fallback: '08:00:00',
+      );
+      final closeTimeSql = _parse12hOr24hToSqlTime(
+        (s['jam_tutup'] ?? s['closeTime'] ?? '10:00 PM').toString(),
+        fallback: '22:00:00',
+      );
+
+      final existing = await _exec(
+        '''
+        SELECT TRIM(id) AS id
+        FROM apotek_jam_operasional
+        WHERE TRIM(id_apotek) = @aptId
+          AND LOWER(TRIM(hari)) = @hari
+        LIMIT 1
+        ''',
+        parameters: {'aptId': aptId, 'hari': dayKey},
+      );
+
+      if (existing.isNotEmpty) {
+        final rowId = existing.first.toColumnMap()['id']?.toString().trim();
+        await _exec(
+          '''
+          UPDATE apotek_jam_operasional
+          SET is_open = @isOpen,
+              jam_buka = @jamBuka::time,
+              jam_tutup = @jamTutup::time,
+              updated_at = NOW()
+          WHERE TRIM(id) = @id
+          ''',
+          parameters: {
+            'id': rowId,
+            'isOpen': isOpen,
+            'jamBuka': openTimeSql,
+            'jamTutup': closeTimeSql,
+          },
+        );
+      } else {
+        await _exec(
+          '''
+          INSERT INTO apotek_jam_operasional (
+            id, id_apotek, hari, is_open, jam_buka, jam_tutup, created_at, updated_at
+          ) VALUES (
+            gen_random_uuid()::text, @aptId, @hari, @isOpen, @jamBuka::time, @jamTutup::time, NOW(), NOW()
+          )
+          ''',
+          parameters: {
+            'aptId': aptId,
+            'hari': dayKey,
+            'isOpen': isOpen,
+            'jamBuka': openTimeSql,
+            'jamTutup': closeTimeSql,
+          },
+        );
+      }
+    }
+
+    return fetchApotekJamOperasional(apotekId: aptId);
+  }
+
+  /// Mengambil daftar cakupan wilayah area layanan dari tabel `apotek_area_layanan` Supabase
+  Future<List<Map<String, dynamic>>> fetchApotekAreaLayanan({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return [];
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return [];
+
+    final rows = await _exec(
+      '''
+      SELECT
+        TRIM(id) AS id,
+        TRIM(id_apotek) AS id_apotek,
+        nama_area,
+        COALESCE(detail, 'Layanan pengantaran obat kurir farmasi') AS detail,
+        COALESCE(is_active, true) AS is_active
+      FROM apotek_area_layanan
+      WHERE TRIM(id_apotek) = @aptId
+      ORDER BY created_at ASC, nama_area ASC
+      ''',
+      parameters: {'aptId': aptId},
+    );
+
+    return rows.map((r) => _normalizeMap(r.toColumnMap())).toList();
+  }
+
+  /// Menyimpan daftar cakupan area layanan ke tabel `apotek_area_layanan` Supabase
+  Future<List<Map<String, dynamic>>> updateApotekAreaLayanan(
+    List<Map<String, dynamic>> areas, {
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return areas;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return areas;
+
+    for (final a in areas) {
+      final nama = (a['nama_area'] ?? a['name'] ?? '').toString().trim();
+      final detail = (a['detail'] ?? a['details'] ?? 'Layanan pengantaran obat kurir farmasi').toString().trim();
+      final isActive = a['is_active'] == true || a['isActive'] == true;
+      if (nama.isEmpty) continue;
+
+      final existing = await _exec(
+        '''
+        SELECT TRIM(id) AS id
+        FROM apotek_area_layanan
+        WHERE TRIM(id_apotek) = @aptId
+          AND LOWER(TRIM(nama_area)) = LOWER(@nama)
+        LIMIT 1
+        ''',
+        parameters: {'aptId': aptId, 'nama': nama},
+      );
+
+      if (existing.isNotEmpty) {
+        final rowId = existing.first.toColumnMap()['id']?.toString().trim();
+        await _exec(
+          '''
+          UPDATE apotek_area_layanan
+          SET is_active = @isActive,
+              detail = @detail,
+              updated_at = NOW()
+          WHERE TRIM(id) = @id
+          ''',
+          parameters: {
+            'id': rowId,
+            'isActive': isActive,
+            'detail': detail,
+          },
+        );
+      } else {
+        await _exec(
+          '''
+          INSERT INTO apotek_area_layanan (
+            id, id_apotek, nama_area, detail, is_active, created_at, updated_at
+          ) VALUES (
+            gen_random_uuid()::text, @aptId, @nama, @detail, @isActive, NOW(), NOW()
+          )
+          ''',
+          parameters: {
+            'aptId': aptId,
+            'nama': nama,
+            'detail': detail,
+            'isActive': isActive,
+          },
+        );
+      }
+    }
+
+    return fetchApotekAreaLayanan(apotekId: aptId);
+  }
+
+  // ===========================================================================
+  // MODUL APOTEK: RESEP DOKTER MASUK (HANYA YANG SUDAH DITEBUS & DIBAYAR PASIEN)
+  // ===========================================================================
+
+  /// Mengambil daftar resep dokter yang SUDAH DITEBUS & DIBAYAR LUNAS oleh pasien
+  /// Resep yang masih berstatus 'aktif' (belum dibeli/dibayar pasien) TIDAK ditampilkan di Apotek!
+  Future<List<Map<String, dynamic>>> fetchApotekResepList({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return [];
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return [];
+
+    final rows = await _exec(
+      '''
+      SELECT
+        TRIM(r.id) AS id,
+        TRIM(r.id) AS id_resep,
+        r.no_resep,
+        TRIM(r.id_pasien) AS id_pasien,
+        TRIM(r.id_dokter) AS id_dokter,
+        r.tanggal_resep::text AS tanggal_resep,
+        r.diagnosis,
+        r.catatan_dokter,
+        LOWER(TRIM(r.status)) AS status,
+        r.created_at,
+        r.updated_at,
+        COALESCE(p.nama, 'Pasien GIAT') AS nama_pasien,
+        p.alamat AS alamat_pasien,
+        p.no_hp AS no_hp_pasien,
+        p.nik AS nik_pasien,
+        COALESCE(d.nama, 'dr. Spesialis GIAT') AS nama_dokter,
+        d.no_sip AS no_sip_dokter,
+        TRIM(po.id) AS id_pesanan,
+        po.no_pesanan,
+        LOWER(TRIM(COALESCE(po.status_pembayaran, 'lunas'))) AS status_pembayaran,
+        LOWER(TRIM(COALESCE(po.status_pesanan, ''))) AS status_pesanan,
+        po.waktu_bayar,
+        po.updated_at AS pesanan_updated_at
+      FROM resep r
+      LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(r.id_pasien)
+      LEFT JOIN dokter d ON TRIM(d.id_dokter) = TRIM(r.id_dokter)
+      LEFT JOIN LATERAL (
+        SELECT id, no_pesanan, id_apotek, status_pembayaran, status_pesanan, waktu_bayar, updated_at
+        FROM pesanan_obat
+        WHERE TRIM(id_resep) = TRIM(r.id)
+        ORDER BY
+          CASE WHEN LOWER(TRIM(status_pembayaran)) = 'lunas' THEN 0 ELSE 1 END,
+          created_at DESC
+        LIMIT 1
+      ) po ON true
+      WHERE LOWER(TRIM(r.status)) IN ('sudah_ditebus', 'diverifikasi', 'selesai')
+        AND (
+          po.id IS NULL
+          OR (
+            LOWER(TRIM(po.status_pembayaran)) = 'lunas'
+            AND (TRIM(po.id_apotek) = @aptId OR po.id_apotek IS NULL)
+          )
+        )
+      ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+      ''',
+      parameters: {'aptId': aptId},
+    );
+
+    final List<Map<String, dynamic>> result = [];
+    for (final r in rows) {
+      final m = _normalizeMap(r.toColumnMap());
+      final rxId = m['id']?.toString().trim() ?? '';
+      final itemRows = await _exec(
+        '''
+        SELECT
+          TRIM(ri.id) AS id,
+          ri.nama_obat,
+          ri.dosis,
+          ri.aturan_pakai,
+          ri.waktu_penggunaan,
+          ri.jumlah,
+          ri.catatan_khusus,
+          COALESCE(
+            (SELECT o.bentuk_sediaan || ' • ' || o.satuan_kemasan
+             FROM obat o
+             WHERE LOWER(TRIM(o.nama_obat)) = LOWER(TRIM(ri.nama_obat))
+             LIMIT 1),
+            'Tablet • Kemasan Standar'
+          ) AS form_and_pack
+        FROM resep_item ri
+        WHERE TRIM(ri.id_resep) = @rxId
+        ORDER BY ri.created_at ASC
+        ''',
+        parameters: {'rxId': rxId},
+      );
+      m['items'] = itemRows.map((ir) => _normalizeMap(ir.toColumnMap())).toList();
+      result.add(m);
+    }
+
+    return result;
+  }
+
+  /// Memvalidasi & menerima Resep Dokter oleh Apotek (`Terima Resep`)
+  /// Mengubah status resep menjadi 'diverifikasi' dan memasukkan pesanan ke antrean Pesanan Menunggu di Apotek
+  Future<Map<String, dynamic>?> acceptApotekResep(
+    String resepIdOrNo, {
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return null;
+    final cleanRx = resepIdOrNo.trim().replaceAll('No.', '').trim();
+    if (cleanRx.isEmpty) return null;
+
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return null;
+
+    final rxRows = await _exec(
+      '''
+      SELECT TRIM(id) AS id, no_resep, TRIM(id_pasien) AS id_pasien
+      FROM resep
+      WHERE TRIM(id) = @rx OR TRIM(no_resep) = @rx
+      LIMIT 1
+      ''',
+      parameters: {'rx': cleanRx},
+    );
+    if (rxRows.isEmpty) return null;
+
+    final rm = rxRows.first.toColumnMap();
+    final rxId = rm['id']?.toString().trim() ?? '';
+    final noResep = rm['no_resep']?.toString().trim() ?? cleanRx;
+    final idPasien = rm['id_pasien']?.toString().trim() ?? '';
+
+    await _exec(
+      '''
+      UPDATE resep
+      SET status = 'diverifikasi',
+          updated_at = NOW()
+      WHERE TRIM(id) = @rxId
+      ''',
+      parameters: {'rxId': rxId},
+    );
+
+    // Pastikan pesanan_obat terkait sudah siap di antrean Menunggu (status_pesanan = 'menunggu_konfirmasi', progress_step = 2)
+    final ordRows = await _exec(
+      '''
+      SELECT TRIM(id) AS id, no_pesanan
+      FROM pesanan_obat
+      WHERE TRIM(id_resep) = @rxId
+      ORDER BY created_at DESC
+      LIMIT 1
+      ''',
+      parameters: {'rxId': rxId},
+    );
+
+    String? orderId;
+    String? orderNo;
+    if (ordRows.isNotEmpty) {
+      final om = ordRows.first.toColumnMap();
+      orderId = om['id']?.toString().trim();
+      orderNo = om['no_pesanan']?.toString().trim();
+      await _exec(
+        '''
+        UPDATE pesanan_obat
+        SET id_apotek = @aptId,
+            status_pembayaran = 'lunas',
+            status_pesanan = CASE
+              WHEN LOWER(TRIM(status_pesanan)) IN ('diproses', 'selesai') THEN status_pesanan
+              ELSE 'menunggu_konfirmasi'
+            END,
+            progress_step = GREATEST(COALESCE(progress_step, 1), 2),
+            updated_at = NOW()
+        WHERE TRIM(id) = @oid
+        ''',
+        parameters: {'oid': orderId, 'aptId': aptId},
+      );
+    } else {
+      final created = await completePasienObatPaymentInSupabase(
+        idResep: rxId,
+        noResep: noResep,
+        idPasien: idPasien,
+        idApotek: aptId,
+      );
+      orderId = created?['id']?.toString();
+      orderNo = created?['no_pesanan']?.toString();
+      if (orderId != null && orderId.isNotEmpty) {
+        await _exec(
+          '''
+          UPDATE pesanan_obat
+          SET progress_step = 2,
+              status_pesanan = 'menunggu_konfirmasi',
+              updated_at = NOW()
+          WHERE TRIM(id) = @oid
+          ''',
+          parameters: {'oid': orderId},
+        );
+      }
+    }
+
+    if (orderId != null && orderId.isNotEmpty) {
+      try {
+        await _exec(
+          '''
+          INSERT INTO pesanan_obat_trackings (id, id_pesanan, status, keterangan, created_at, updated_at)
+          VALUES (
+            gen_random_uuid()::text,
+            @oid,
+            'Resep Diverifikasi Apotek',
+            @ket,
+            NOW(),
+            NOW()
+          )
+          ''',
+          parameters: {
+            'oid': orderId,
+            'ket': 'Resep dokter ($noResep) telah diverifikasi oleh apoteker dan masuk antrean penyiapan obat.',
+          },
+        );
+      } catch (_) {}
+    }
+
+    if (idPasien.isNotEmpty) {
+      try {
+        await createPasienNotification(
+          pasienId: idPasien,
+          judul: 'Resep Dokter Diverifikasi Apotek',
+          pesan: 'Resep $noResep Anda telah diverifikasi oleh apoteker dan obat sedang dalam antrean penyiapan.',
+          kategori: 'resep',
+        );
+      } catch (_) {}
+    }
+
+    return {
+      'id_resep': rxId,
+      'no_resep': noResep,
+      'status': 'diverifikasi',
+      'id_pesanan': orderId,
+      'no_pesanan': orderNo,
+    };
+  }
+
+  // ===========================================================================
+  // MODUL APOTEK: PESANAN OBAT REAL (MENUNGGU, DIPROSES, SELESAI)
+  // ===========================================================================
+
+  /// Mengambil daftar pesanan obat yang SUDAH DIBAYAR LUNAS untuk Apotek dari Supabase
+  /// Untuk pesanan bertipe 'resep', hanya masuk ke daftar Pesanan setelah resep diverifikasi ('diverifikasi'/'selesai')
+  Future<List<Map<String, dynamic>>> fetchApotekPesananList({
+    String? apotekId,
+    String? apotekName,
+    String? status,
+  }) async {
+    if (_isTest) return [];
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return [];
+
+    final rows = await _exec(
+      '''
+      SELECT
+        TRIM(po.id) AS id,
+        po.no_pesanan,
+        TRIM(po.id_pasien) AS id_pasien,
+        TRIM(po.id_apotek) AS id_apotek,
+        TRIM(po.id_resep) AS id_resep,
+        LOWER(TRIM(COALESCE(po.tipe_pesanan, 'umum'))) AS tipe_pesanan,
+        po.metode_pengambilan,
+        po.nama_penerima,
+        po.no_hp_penerima,
+        po.alamat_pengiriman,
+        po.subtotal,
+        po.ongkos_kirim,
+        po.total_bayar,
+        po.metode_pembayaran,
+        LOWER(TRIM(COALESCE(po.status_pembayaran, ''))) AS status_pembayaran,
+        COALESCE(po.progress_step, 1) AS progress_step,
+        LOWER(TRIM(COALESCE(po.status_pesanan, 'menunggu_konfirmasi'))) AS status_pesanan,
+        po.waktu_bayar,
+        po.created_at,
+        po.updated_at,
+        COALESCE(p.nama, po.nama_penerima, 'Pasien GIAT') AS nama_pasien,
+        p.jenis_kelamin,
+        p.tanggal_lahir::text AS tanggal_lahir,
+        COALESCE(po.alamat_pengiriman, p.alamat, 'Kota Bandung') AS alamat_pasien,
+        r.no_resep,
+        r.tanggal_resep::text AS tanggal_resep,
+        LOWER(TRIM(COALESCE(r.status, ''))) AS status_resep,
+        COALESCE(d.nama, '') AS nama_dokter
+      FROM pesanan_obat po
+      LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(po.id_pasien)
+      LEFT JOIN resep r ON TRIM(r.id) = TRIM(po.id_resep)
+      LEFT JOIN dokter d ON TRIM(d.id_dokter) = TRIM(r.id_dokter)
+      WHERE TRIM(po.id_apotek) = @aptId
+        AND LOWER(TRIM(po.status_pembayaran)) = 'lunas'
+        AND LOWER(TRIM(po.status_pesanan)) NOT IN ('ditolak', 'batal', 'dibatalkan')
+        AND (
+          po.id_resep IS NULL
+          OR LOWER(TRIM(COALESCE(r.status, ''))) IN ('diverifikasi', 'selesai')
+          OR LOWER(TRIM(po.status_pesanan)) IN ('diproses', 'dikirim', 'selesai')
+          OR COALESCE(po.progress_step, 1) >= 2
+        )
+      ORDER BY COALESCE(po.updated_at, po.created_at) DESC
+      ''',
+      parameters: {'aptId': aptId},
+    );
+
+    final List<Map<String, dynamic>> result = [];
+    for (final r in rows) {
+      final m = _normalizeMap(r.toColumnMap());
+      final ordId = m['id']?.toString().trim() ?? '';
+      final itemRows = await _exec(
+        '''
+        SELECT
+          TRIM(poi.id) AS id,
+          TRIM(poi.id_obat) AS id_obat,
+          poi.nama_obat,
+          poi.jumlah,
+          poi.harga_satuan,
+          poi.subtotal,
+          COALESCE(o.bentuk_sediaan, 'Tablet') AS bentuk_sediaan,
+          COALESCE(o.satuan_kemasan, 'Strip / Box') AS satuan_kemasan,
+          COALESCE(o.stok_total, 100) AS stok_total
+        FROM pesanan_obat_items poi
+        LEFT JOIN obat o ON TRIM(o.id_obat) = TRIM(poi.id_obat)
+        WHERE TRIM(poi.id_pesanan) = @oid
+        ORDER BY poi.created_at ASC
+        ''',
+        parameters: {'oid': ordId},
+      );
+      m['items'] = itemRows.map((ir) => _normalizeMap(ir.toColumnMap())).toList();
+      result.add(m);
+    }
+
+    return result;
+  }
+
+  /// Memperbarui status pesanan obat di Apotek (`menunggu_konfirmasi`, `diproses`, `selesai`, `ditolak`)
+  Future<Map<String, dynamic>?> updateApotekPesananStatus(
+    String orderIdOrNo, {
+    required String newStatus,
+    int? progressStep,
+    String? alasanPenolakan,
+  }) async {
+    if (_isTest) return null;
+    final cleanOrd = orderIdOrNo.trim();
+    if (cleanOrd.isEmpty) return null;
+
+    final ordRows = await _exec(
+      '''
+      SELECT TRIM(id) AS id, no_pesanan, TRIM(id_pasien) AS id_pasien, TRIM(id_resep) AS id_resep
+      FROM pesanan_obat
+      WHERE TRIM(id) = @ord OR TRIM(no_pesanan) = @ord
+      LIMIT 1
+      ''',
+      parameters: {'ord': cleanOrd},
+    );
+    if (ordRows.isEmpty) return null;
+
+    final om = ordRows.first.toColumnMap();
+    final ordId = om['id']?.toString().trim() ?? '';
+    final noPesanan = om['no_pesanan']?.toString().trim() ?? cleanOrd;
+    final idPasien = om['id_pasien']?.toString().trim() ?? '';
+    final idResep = om['id_resep']?.toString().trim();
+
+    final normalizedStatus = newStatus.toLowerCase().trim();
+    final resolvedStep = progressStep ??
+        (normalizedStatus == 'selesai'
+            ? 5
+            : (normalizedStatus == 'diproses' ? 4 : 2));
+
+    await _exec(
+      '''
+      UPDATE pesanan_obat
+      SET status_pesanan = @st,
+          progress_step = @step,
+          alasan_penolakan = COALESCE(@alasan, alasan_penolakan),
+          updated_at = NOW()
+      WHERE TRIM(id) = @oid
+      ''',
+      parameters: {
+        'oid': ordId,
+        'st': normalizedStatus,
+        'step': resolvedStep,
+        'alasan': alasanPenolakan,
+      },
+    );
+
+    if (normalizedStatus == 'selesai' && idResep != null && idResep.isNotEmpty) {
+      await _exec(
+        '''
+        UPDATE resep
+        SET status = 'selesai',
+            updated_at = NOW()
+        WHERE TRIM(id) = @rxId
+        ''',
+        parameters: {'rxId': idResep},
+      );
+    }
+
+    // Tambahkan log tracking pesanan
+    String trackTitle = 'Status Pesanan Diperbarui';
+    String trackDesc = 'Status pesanan $noPesanan diperbarui menjadi $normalizedStatus.';
+    if (normalizedStatus == 'diproses') {
+      trackTitle = 'Pesanan Sedang Disiapkan';
+      trackDesc = 'Apoteker sedang menyiapkan dan mengemas obat untuk pesanan $noPesanan.';
+    } else if (normalizedStatus == 'selesai') {
+      trackTitle = 'Pesanan Selesai';
+      trackDesc = 'Pesanan obat $noPesanan telah selesai disiapkan dan diserahkan.';
+    }
+
+    try {
+      await _exec(
+        '''
+        INSERT INTO pesanan_obat_trackings (id, id_pesanan, status, keterangan, created_at, updated_at)
+        VALUES (gen_random_uuid()::text, @oid, @title, @desc, NOW(), NOW())
+        ''',
+        parameters: {
+          'oid': ordId,
+          'title': trackTitle,
+          'desc': trackDesc,
+        },
+      );
+    } catch (_) {}
+
+    if (idPasien.isNotEmpty) {
+      try {
+        await createPasienNotification(
+          pasienId: idPasien,
+          judul: trackTitle,
+          pesan: trackDesc,
+          kategori: 'obat',
+        );
+      } catch (_) {}
+    }
+
+    return {
+      'id': ordId,
+      'no_pesanan': noPesanan,
+      'status_pesanan': normalizedStatus,
+      'progress_step': resolvedStep,
+    };
+  }
+
+  // ===========================================================================
+  // MODUL APOTEK: INVENTARIS OBAT & BATCH STOK REAL SUPABASE
+  // ===========================================================================
+
+  /// Mengambil daftar inventaris obat beserta rincian batch stoknya dari tabel `obat` & `obat_batches` Supabase
+  Future<List<Map<String, dynamic>>> fetchApotekObatList({
+    String? apotekId,
+    String? apotekName,
+    String? query,
+  }) async {
+    if (_isTest) return [];
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return [];
+
+    String searchFilter = '';
+    final params = <String, dynamic>{'aptId': aptId};
+    if (query != null && query.trim().isNotEmpty) {
+      searchFilter = 'AND (LOWER(o.nama_obat) LIKE @q OR LOWER(o.kategori) LIKE @q)';
+      params['q'] = '%${query.trim().toLowerCase()}%';
+    }
+
+    final rows = await _exec(
+      '''
+      SELECT
+        TRIM(o.id_obat) AS id,
+        TRIM(o.id_obat) AS id_obat,
+        TRIM(o.id_apotek) AS id_apotek,
+        o.nama_obat,
+        o.kategori,
+        COALESCE(o.bentuk_sediaan, 'Tablet') AS bentuk_sediaan,
+        COALESCE(o.dosis, '-') AS dosis,
+        COALESCE(o.satuan_kemasan, 'Strip / Box') AS satuan_kemasan,
+        COALESCE(o.stok_total, 0) AS stok_total,
+        ROUND(COALESCE(o.harga_beli, 0))::int AS harga_beli,
+        ROUND(COALESCE(o.harga_jual, 0))::int AS harga_jual,
+        o.aturan_pakai_umum,
+        o.foto_obat,
+        o.created_at,
+        o.updated_at
+      FROM obat o
+      WHERE TRIM(o.id_apotek) = @aptId
+        $searchFilter
+      ORDER BY o.updated_at DESC, o.nama_obat ASC
+      ''',
+      parameters: params,
+    );
+
+    final List<Map<String, dynamic>> result = [];
+    for (final r in rows) {
+      final m = _normalizeMap(r.toColumnMap());
+      final idObat = m['id_obat']?.toString().trim() ?? '';
+      final batchRows = await _exec(
+        '''
+        SELECT
+          TRIM(id) AS id,
+          no_batch,
+          COALESCE(stok_batch, 0) AS stok_batch,
+          tanggal_kadaluwarsa::text AS tanggal_kadaluwarsa,
+          COALESCE(status, 'tersedia') AS status,
+          created_at
+        FROM obat_batches
+        WHERE TRIM(id_obat) = @idObat
+        ORDER BY created_at DESC
+        ''',
+        parameters: {'idObat': idObat},
+      );
+      m['batches'] = batchRows.map((br) => _normalizeMap(br.toColumnMap())).toList();
+      result.add(m);
+    }
+
+    return result;
+  }
+
+  DateTime _parseIndonesianOrIsoDate(String rawDate) {
+    final clean = rawDate.trim();
+    final direct = DateTime.tryParse(clean);
+    if (direct != null) return direct;
+
+    final months = <String, int>{
+      'jan': 1, 'januari': 1,
+      'feb': 2, 'februari': 2,
+      'mar': 3, 'maret': 3,
+      'apr': 4, 'april': 4,
+      'mei': 5,
+      'jun': 6, 'juni': 6,
+      'jul': 7, 'juli': 7,
+      'agu': 8, 'agustus': 8,
+      'sep': 9, 'september': 9,
+      'okt': 10, 'oktober': 10,
+      'nov': 11, 'november': 11,
+      'des': 12, 'desember': 12,
+    };
+
+    final parts = clean.split(RegExp(r'[\s/\-]+'));
+    if (parts.length >= 3) {
+      final d = int.tryParse(parts[0]) ?? 1;
+      final mKey = parts[1].toLowerCase();
+      final m = months[mKey] ?? int.tryParse(parts[1]) ?? 12;
+      final y = int.tryParse(parts[2]) ?? (DateTime.now().year + 2);
+      return DateTime(y, m, d);
+    }
+    return DateTime(DateTime.now().year + 2, 12, 31);
+  }
+
+  /// Mendaftarkan obat baru beserta batch stok awalnya ke tabel `obat`, `obat_batches` & `stock_obat` Supabase
+  Future<Map<String, dynamic>?> addApotekObat(
+    Map<String, dynamic> data, {
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return null;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return null;
+
+    final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
+    final newObatId = uuidRes.first.toColumnMap()['id'].toString().trim();
+
+    final namaObat = (data['nama_obat'] ?? data['name'] ?? '').toString().trim();
+    final kategori = (data['kategori'] ?? data['category'] ?? 'Obat Ginjal').toString().trim();
+    final bentukSediaan = (data['bentuk_sediaan'] ?? data['form'] ?? 'Tablet').toString().trim();
+    final dosis = (data['dosis'] ?? data['dose'] ?? '-').toString().trim();
+    final satuanKemasan = (data['satuan_kemasan'] ?? data['packageUnit'] ?? 'Strip / Box').toString().trim();
+    final stokTotal = int.tryParse((data['stok_total'] ?? data['stock'] ?? '0').toString()) ?? 0;
+    final hargaBeli = double.tryParse((data['harga_beli'] ?? data['buyPrice'] ?? '0').toString()) ?? 0;
+    final hargaJual = double.tryParse((data['harga_jual'] ?? data['sellPrice'] ?? '0').toString()) ?? 0;
+    final aturanPakai = (data['aturan_pakai_umum'] ?? data['usageRule'] ?? 'Gunakan sesuai petunjuk dokter atau apoteker.').toString().trim();
+    final fotoObat = (data['foto_obat'] ?? data['imagePath'])?.toString().trim();
+    final rawExp = (data['tanggal_kadaluwarsa'] ?? data['expDate'] ?? '2028-12-31').toString();
+    final expDate = _parseIndonesianOrIsoDate(rawExp);
+    final expDateStr = '${expDate.year}-${expDate.month.toString().padLeft(2, '0')}-${expDate.day.toString().padLeft(2, '0')}';
+
+    await _exec(
+      '''
+      INSERT INTO obat (
+        id_obat, id_apotek, nama_obat, kategori, bentuk_sediaan, dosis,
+        satuan_kemasan, stok_total, harga_beli, harga_jual, aturan_pakai_umum,
+        foto_obat, created_at, updated_at
+      ) VALUES (
+        @idObat, @aptId, @namaObat, @kategori, @bentukSediaan, @dosis,
+        @satuanKemasan, @stokTotal, @hargaBeli, @hargaJual, @aturanPakai,
+        @fotoObat, NOW(), NOW()
+      )
+      ''',
+      parameters: {
+        'idObat': newObatId,
+        'aptId': aptId,
+        'namaObat': namaObat,
+        'kategori': kategori,
+        'bentukSediaan': bentukSediaan,
+        'dosis': dosis,
+        'satuanKemasan': satuanKemasan,
+        'stokTotal': stokTotal,
+        'hargaBeli': hargaBeli,
+        'hargaJual': hargaJual,
+        'aturanPakai': aturanPakai,
+        'fotoObat': (fotoObat != null && fotoObat.isNotEmpty) ? fotoObat : null,
+      },
+    );
+
+    final batchNo = (data['no_batch'] ?? 'BATCH-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch % 10000}').toString().trim();
+    await _exec(
+      '''
+      INSERT INTO obat_batches (
+        id, id_obat, id_apotek, no_batch, stok_batch, tanggal_kadaluwarsa, status, created_at, updated_at
+      ) VALUES (
+        gen_random_uuid()::text, @idObat, @aptId, @noBatch, @stokBatch, @expDate::date,
+        CASE WHEN @stokBatch <= 0 THEN 'habis' WHEN @stokBatch <= 10 THEN 'stok_menipis' ELSE 'tersedia' END,
+        NOW(), NOW()
+      )
+      ''',
+      parameters: {
+        'idObat': newObatId,
+        'aptId': aptId,
+        'noBatch': batchNo,
+        'stokBatch': stokTotal,
+        'expDate': expDateStr,
+      },
+    );
+
+    try {
+      await _exec(
+        '''
+        INSERT INTO stock_obat (
+          id_stock, id_obat, id_apoteker, jumlah_stock, tanggal_kadaluwarsa, created_at, updated_at
+        ) VALUES (
+          gen_random_uuid()::text, @idObat, @aptId, @stokBatch, @expDate::date, NOW(), NOW()
+        )
+        ''',
+        parameters: {
+          'idObat': newObatId,
+          'aptId': aptId,
+          'stokBatch': stokTotal,
+          'expDate': expDateStr,
+        },
+      );
+    } catch (_) {}
+
+    return {
+      'id_obat': newObatId,
+      'id': newObatId,
+      'nama_obat': namaObat,
+      'stok_total': stokTotal,
+      'no_batch': batchNo,
+      'tanggal_kadaluwarsa': expDateStr,
+    };
+  }
+
+  /// Menambahkan batch stok obat baru & memperbarui `stok_total` di tabel `obat` & `obat_batches` Supabase
+  Future<Map<String, dynamic>?> addApotekStockBatch(
+    Map<String, dynamic> data, {
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return null;
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return null;
+
+    final rawIdObat = (data['id_obat'] ?? data['medicineId'] ?? '').toString().replaceAll('#MED-', '').trim();
+    final medName = (data['nama_obat'] ?? data['medicineName'] ?? '').toString().trim();
+
+    String? targetObatId;
+    if (rawIdObat.length >= 30) {
+      targetObatId = rawIdObat;
+    } else if (medName.isNotEmpty) {
+      final byName = await _exec(
+        '''
+        SELECT TRIM(id_obat) AS id_obat
+        FROM obat
+        WHERE TRIM(id_apotek) = @aptId
+          AND LOWER(TRIM(nama_obat)) = LOWER(@nama)
+        LIMIT 1
+        ''',
+        parameters: {'aptId': aptId, 'nama': medName},
+      );
+      if (byName.isNotEmpty) {
+        targetObatId = byName.first.toColumnMap()['id_obat']?.toString().trim();
+      }
+    }
+    if (targetObatId == null || targetObatId.isEmpty) return null;
+
+    final qty = int.tryParse((data['jumlah'] ?? data['quantity'] ?? data['stok_batch'] ?? '0').toString()) ?? 0;
+    final buyPrice = double.tryParse((data['harga_beli'] ?? data['buyPrice'] ?? '0').toString()) ?? 0;
+    final sellPrice = double.tryParse((data['harga_jual'] ?? data['sellPrice'] ?? '0').toString()) ?? 0;
+    final rawBatchNo = (data['no_batch'] ?? data['batchNo'] ?? '').toString().trim();
+    final batchNo = rawBatchNo.isNotEmpty
+        ? '$rawBatchNo-${DateTime.now().millisecondsSinceEpoch % 1000}'
+        : 'BATCH-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch % 10000}';
+    final rawExp = (data['tanggal_kadaluwarsa'] ?? data['expDate'] ?? '2028-12-31').toString();
+    final expDate = _parseIndonesianOrIsoDate(rawExp);
+    final expDateStr = '${expDate.year}-${expDate.month.toString().padLeft(2, '0')}-${expDate.day.toString().padLeft(2, '0')}';
+
+    await _exec(
+      '''
+      INSERT INTO obat_batches (
+        id, id_obat, id_apotek, no_batch, stok_batch, tanggal_kadaluwarsa, status, created_at, updated_at
+      ) VALUES (
+        gen_random_uuid()::text, @idObat, @aptId, @noBatch, @qty, @expDate::date, 'tersedia', NOW(), NOW()
+      )
+      ''',
+      parameters: {
+        'idObat': targetObatId,
+        'aptId': aptId,
+        'noBatch': batchNo,
+        'qty': qty,
+        'expDate': expDateStr,
+      },
+    );
+
+    await _exec(
+      '''
+      UPDATE obat
+      SET stok_total = COALESCE(stok_total, 0) + @qty,
+          harga_beli = CASE WHEN @buyPrice > 0 THEN @buyPrice ELSE harga_beli END,
+          harga_jual = CASE WHEN @sellPrice > 0 THEN @sellPrice ELSE harga_jual END,
+          updated_at = NOW()
+      WHERE TRIM(id_obat) = @idObat
+      ''',
+      parameters: {
+        'idObat': targetObatId,
+        'qty': qty,
+        'buyPrice': buyPrice,
+        'sellPrice': sellPrice,
+      },
+    );
+
+    return {
+      'id_obat': targetObatId,
+      'no_batch': rawBatchNo.isNotEmpty ? rawBatchNo : batchNo,
+      'stok_batch': qty,
+      'tanggal_kadaluwarsa': expDateStr,
+    };
+  }
+
+  // ===========================================================================
+  // MODUL APOTEK: RIWAYAT AKTIVITAS & DASHBOARD REAL SUPABASE
+  // ===========================================================================
+
+  /// Mengambil riwayat aktivitas & audit real Apotek dari Supabase (`pesanan_obat`, `resep`, `obat_batches`, `obat`)
+  Future<List<Map<String, dynamic>>> fetchApotekRiwayatAktivitas({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    if (_isTest) return [];
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) return [];
+
+    final profile = await fetchApotekProfileFull(apotekId: aptId);
+    final apotekerName = (profile?['penanggung_jawab'] ?? 'apt. Farhan Ramadhan, S.Farm').toString();
+    final sipaNo = (profile?['no_sipa_sia'] ?? 'SIPA-3273/1990/440/2022').toString();
+
+    final List<Map<String, dynamic>> activities = [];
+
+    // 1. Aktivitas Pesanan Obat
+    final orders = await fetchApotekPesananList(apotekId: aptId);
+    for (final ord in orders.take(15)) {
+      final noPesanan = (ord['no_pesanan'] ?? ord['id'] ?? 'ORD-GIAT').toString();
+      final namaPasien = (ord['nama_pasien'] ?? 'Pasien GIAT').toString();
+      final alamatPasien = (ord['alamat_pasien'] ?? 'Kota Bandung').toString();
+      final statusPesanan = (ord['status_pesanan'] ?? 'menunggu_konfirmasi').toString();
+      final rawTime = (ord['updated_at'] ?? ord['created_at'] ?? '').toString();
+      final totalBayar = double.tryParse((ord['total_bayar'] ?? '0').toString())?.round() ?? 0;
+      final ongkir = double.tryParse((ord['ongkos_kirim'] ?? '0').toString())?.round() ?? 0;
+
+      String title = 'Pesanan Obat Masuk';
+      String statusDesc = 'Pesanan siap disiapkan oleh apotek';
+      if (statusPesanan == 'diproses') {
+        title = 'Memproses Pesanan';
+        statusDesc = 'Obat sedang disiapkan & dikemas untuk pasien';
+      } else if (statusPesanan == 'selesai') {
+        title = 'Menyelesaikan Pesanan';
+        statusDesc = 'Pesanan telah selesai & diserahkan';
+      }
+
+      activities.add({
+        'id': 'act-ord-${ord['id']}',
+        'title': title,
+        'subtitle': '$noPesanan ($namaPasien) • $statusDesc',
+        'created_at': rawTime,
+        'type': 'pesanan',
+        'meta': {
+          'no_pesanan': noPesanan,
+          'nama_pasien': namaPasien,
+          'alamat_pasien': alamatPasien,
+          'total_bayar': totalBayar,
+          'ongkos_kirim': ongkir,
+          'items': ord['items'] ?? [],
+          'apoteker': apotekerName,
+          'sipa': sipaNo,
+        },
+      });
+    }
+
+    // 2. Aktivitas Batch Stok & Registrasi Obat
+    final meds = await fetchApotekObatList(apotekId: aptId);
+    for (final med in meds.take(10)) {
+      final medName = (med['nama_obat'] ?? 'Obat Ginjal').toString();
+      final kategori = (med['kategori'] ?? 'Obat Ginjal').toString();
+      final bentuk = (med['bentuk_sediaan'] ?? 'Tablet').toString();
+      final kemasan = (med['satuan_kemasan'] ?? 'Strip / Box').toString();
+      final stokTotal = int.tryParse((med['stok_total'] ?? '0').toString()) ?? 0;
+      final hargaBeli = int.tryParse((med['harga_beli'] ?? '0').toString()) ?? 0;
+      final hargaJual = int.tryParse((med['harga_jual'] ?? '0').toString()) ?? 0;
+      final batches = (med['batches'] as List?) ?? [];
+      final latestBatch = batches.isNotEmpty && batches.first is Map
+          ? Map<String, dynamic>.from(batches.first as Map)
+          : <String, dynamic>{};
+      final batchNo = (latestBatch['no_batch'] ?? 'BATCH-2026').toString();
+      final batchQty = int.tryParse((latestBatch['stok_batch'] ?? stokTotal).toString()) ?? stokTotal;
+      final expDate = (latestBatch['tanggal_kadaluwarsa'] ?? '2028-05-01').toString();
+      final rawTime = (med['updated_at'] ?? med['created_at'] ?? '').toString();
+
+      activities.add({
+        'id': 'act-stok-${med['id_obat']}',
+        'title': 'Memperbarui Stok Obat',
+        'subtitle': '$medName • Batch $batchNo ($stokTotal $bentuk tersedia)',
+        'created_at': rawTime,
+        'type': 'stok',
+        'meta': {
+          'nama_obat': medName,
+          'kategori': '$bentuk • $kategori',
+          'no_batch': batchNo,
+          'stok_batch': batchQty,
+          'stok_total': stokTotal,
+          'satuan': bentuk,
+          'kemasan': kemasan,
+          'harga_beli': hargaBeli,
+          'harga_jual': hargaJual,
+          'tanggal_kadaluwarsa': expDate,
+          'apoteker': apotekerName,
+          'sipa': sipaNo,
+        },
+      });
+    }
+
+    activities.sort((a, b) {
+      final tA = (a['created_at'] ?? '').toString();
+      final tB = (b['created_at'] ?? '').toString();
+      return tB.compareTo(tA);
+    });
+
+    return activities;
+  }
+
+  /// Mengambil data ringkasan Dashboard Utama Apotek secara real dari Supabase
+  Future<Map<String, dynamic>> fetchApotekDashboard({
+    String? apotekId,
+    String? apotekName,
+  }) async {
+    final aptId = await resolveCurrentApotekId(
+      overrideApotekId: apotekId,
+      apotekName: apotekName,
+    );
+    if (aptId == null) {
+      return {};
+    }
+
+    final profile = await fetchApotekProfileFull(apotekId: aptId) ?? <String, dynamic>{};
+    final recipes = await fetchApotekResepList(apotekId: aptId);
+    final orders = await fetchApotekPesananList(apotekId: aptId);
+    final medicines = await fetchApotekObatList(apotekId: aptId);
+
+    final belumDiverifikasiCount = recipes
+        .where((r) => (r['status'] ?? '') == 'sudah_ditebus')
+        .length;
+    final totalResepMasukCount = recipes.length;
+
+    final perluDiprosesCount = orders
+        .where((o) => (o['status_pesanan'] ?? '') != 'selesai')
+        .length;
+
+    final stokMenipisCount = medicines.where((m) {
+      final stk = int.tryParse((m['stok_total'] ?? '0').toString()) ?? 0;
+      return stk <= 10;
+    }).length;
+
+    return {
+      'apotek': profile,
+      'resep_masuk_count': belumDiverifikasiCount > 0 ? belumDiverifikasiCount : totalResepMasukCount,
+      'belum_diverifikasi_count': belumDiverifikasiCount,
+      'perlu_diproses_count': perluDiprosesCount,
+      'stok_menipis_count': stokMenipisCount,
+      'resep_list': recipes,
+      'pesanan_list': orders,
+      'obat_list': medicines,
+    };
   }
 }
 

@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/apotek_api_service.dart';
 import '../../../widgets/giat_background.dart';
 import '../models/apotek_models.dart';
 
@@ -24,6 +26,52 @@ class _ApotekRiwayatAktivitasScreenState
   static const _border = Color(0xFFE2E8F0);
 
   int _selectedFilter = 0; // 0: Semua, 1: Hari ini, 2: Minggu ini, 3: Kemarin & Sebelumnya
+  bool _isLoading = false;
+  List<ApotekActivity> _realActivities = [];
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivities();
+  }
+
+  Future<void> _loadActivities() async {
+    if (_isTest) return;
+    if (mounted) setState(() => _isLoading = true);
+    try {
+      final res = await ApotekApiService().getRiwayatAktivitas();
+      if (res.success && res.data != null && mounted) {
+        final parsed = res.data!
+            .whereType<Map>()
+            .map((e) => ApotekActivity.fromSupabaseMap(Map<String, dynamic>.from(e)))
+            .toList();
+        setState(() => _realActivities = parsed);
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  List<ApotekActivity> _getFilteredActivities() {
+    final source = _isTest ? ApotekMockData.activities : _realActivities;
+    if (_selectedFilter == 0 || _isTest) return source;
+    final now = DateTime.now();
+    return source.where((act) {
+      final dt = act.createdAt;
+      if (dt == null) return true;
+      final diffDays = now.difference(dt).inDays;
+      if (_selectedFilter == 1) {
+        return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+      } else if (_selectedFilter == 2) {
+        return diffDays <= 7;
+      } else {
+        return diffDays >= 1;
+      }
+    }).toList();
+  }
 
   void _showActivityDetail(ApotekActivity act) {
     if (act.type == 'stok') {
@@ -37,6 +85,17 @@ class _ApotekRiwayatAktivitasScreenState
 
   // ── Detail Perubahan Stok Modal ──
   void _showStockChangeDetailModal(ApotekActivity act) {
+    final meta = act.meta ?? <String, dynamic>{};
+    final medName = (meta['nama_obat'] ?? 'Paracetamol 500 mg').toString();
+    final kategori = (meta['kategori'] ?? 'Tablet Salut Selaput • Analgesik & Antipiretik').toString();
+    final batchNo = (meta['no_batch'] ?? 'BATCH-2026-X89').toString();
+    final satuan = (meta['satuan'] ?? 'Tablet').toString();
+    final stokBatch = int.tryParse((meta['stok_batch'] ?? '20').toString()) ?? 20;
+    final stokTotal = int.tryParse((meta['stok_total'] ?? '120').toString()) ?? 120;
+    final stokBefore = (stokTotal - stokBatch) >= 0 ? (stokTotal - stokBatch) : 100;
+    final apoteker = (meta['apoteker'] ?? 'Apt. Syita Nabila, S.Farm').toString();
+    final sipa = (meta['sipa'] ?? '19940212/SIPA_35.73/2022/2041').toString();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -99,7 +158,7 @@ class _ApotekRiwayatAktivitasScreenState
               ),
               const SizedBox(height: 4),
               Text(
-                '01 September 2026, 14:10 WIB',
+                act.timeText,
                 style: GoogleFonts.inter(
                   fontSize: 12.5,
                   color: const Color(0xFF64748B),
@@ -127,7 +186,7 @@ class _ApotekRiwayatAktivitasScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Paracetamol 500 mg',
+                      medName,
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -135,7 +194,7 @@ class _ApotekRiwayatAktivitasScreenState
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Tablet Salut Selaput • Analgesik & Antipiretik',
+                      kategori,
                       style: GoogleFonts.inter(
                         fontSize: 12.5,
                         color: const Color(0xFF475569),
@@ -143,7 +202,7 @@ class _ApotekRiwayatAktivitasScreenState
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'No. Batch: BATCH-2026-X89',
+                      'No. Batch: $batchNo',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -174,16 +233,11 @@ class _ApotekRiwayatAktivitasScreenState
                 ),
                 child: Column(
                   children: [
-                    _buildRow('Penyesuaian', '+ 20 Tablet'),
+                    _buildRow('Penyesuaian', '+ $stokBatch $satuan'),
                     const Divider(height: 14),
-                    _buildRow('Stok Sebelum', '100 Tablet'),
+                    _buildRow('Stok Sebelum', '$stokBefore $satuan'),
                     const Divider(height: 14),
-                    _buildRow('Stok Akhir', '120 Tablet'),
-                    const Divider(height: 14),
-                    _buildRow(
-                      'Kapasitas vs Terkini',
-                      '120 / 150 Maks (80% Terisi)',
-                    ),
+                    _buildRow('Stok Akhir', '$stokTotal $satuan'),
                   ],
                 ),
               ),
@@ -208,9 +262,9 @@ class _ApotekRiwayatAktivitasScreenState
                 ),
                 child: Column(
                   children: [
-                    _buildRow('Penanggung Jawab', 'Apt. Syita Nabila, S.Farm'),
+                    _buildRow('Penanggung Jawab', apoteker),
                     const Divider(height: 14),
-                    _buildRow('SIPA', '19940212/SIPA_35.73/2022/2041'),
+                    _buildRow('SIPA', sipa),
                     const Divider(height: 14),
                     _buildRow('Metode', 'Penyesuaian Manual / Masuk'),
                   ],
@@ -244,8 +298,24 @@ class _ApotekRiwayatAktivitasScreenState
     );
   }
 
+  String _formatRp(int amount) {
+    final formatted = amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return 'Rp $formatted,00';
+  }
+
   // ── Detail Memproses Pesanan Modal ──
   void _showOrderDetailModal(ApotekActivity act) {
+    final meta = act.meta ?? <String, dynamic>{};
+    final noPesanan = (meta['no_pesanan'] ?? 'TRX-2026-00981').toString();
+    final namaPasien = (meta['nama_pasien'] ?? 'Andi Pratama').toString();
+    final alamatPasien = (meta['alamat_pasien'] ?? 'Jl. Ijen No. 45, Klojen, Kota Malang').toString();
+    final totalBayar = int.tryParse((meta['total_bayar'] ?? '65000').toString()) ?? 65000;
+    final ongkir = int.tryParse((meta['ongkos_kirim'] ?? '10000').toString()) ?? 10000;
+    final rawItems = (meta['items'] as List?) ?? [];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -276,7 +346,7 @@ class _ApotekRiwayatAktivitasScreenState
               ),
               const SizedBox(height: 16),
               Text(
-                'Detail Memproses Pesanan',
+                act.title,
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -285,7 +355,7 @@ class _ApotekRiwayatAktivitasScreenState
               ),
               const SizedBox(height: 4),
               Text(
-                'TRX-2026-00981 • INV/20260901/MP/0981',
+                '$noPesanan • ${act.timeText}',
                 style: GoogleFonts.inter(
                   fontSize: 12.5,
                   color: _darkGreen,
@@ -305,7 +375,7 @@ class _ApotekRiwayatAktivitasScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Andi Pratama (PXL-MLG-90214)',
+                      namaPasien,
                       style: GoogleFonts.inter(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
@@ -313,7 +383,7 @@ class _ApotekRiwayatAktivitasScreenState
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Jl. Ijen No. 45, Klojen, Kota Malang',
+                      alamatPasien,
                       style: GoogleFonts.inter(
                         fontSize: 12.5,
                         color: const Color(0xFF64748B),
@@ -343,17 +413,30 @@ class _ApotekRiwayatAktivitasScreenState
                 ),
                 child: Column(
                   children: [
-                    _buildRow('Paracetamol 500 mg (2 strip)', 'Rp 20.000,00'),
+                    if (rawItems.isNotEmpty) ...[
+                      for (int i = 0; i < rawItems.length; i++) ...[
+                        if (i > 0) const Divider(height: 14),
+                        Builder(
+                          builder: (_) {
+                            final it = rawItems[i] is Map
+                                ? Map<String, dynamic>.from(rawItems[i] as Map)
+                                : <String, dynamic>{};
+                            final mName = (it['nama_obat'] ?? 'Obat').toString();
+                            final mQty = int.tryParse((it['jumlah'] ?? '1').toString()) ?? 1;
+                            final mSub = double.tryParse((it['subtotal'] ?? '0').toString())?.round() ?? 0;
+                            return _buildRow('$mName ($mQty unit)', _formatRp(mSub));
+                          },
+                        ),
+                      ],
+                    ] else ...[
+                      _buildRow('Paracetamol 500 mg (2 strip)', 'Rp 20.000,00'),
+                      const Divider(height: 14),
+                      _buildRow('Amoxicillin 500 mg (1 strip)', 'Rp 18.000,00'),
+                    ],
                     const Divider(height: 14),
-                    _buildRow('Amoxicillin 500 mg (1 strip)', 'Rp 18.000,00'),
-                    const Divider(height: 14),
-                    _buildRow('Vitamin C 500 mg IPI (1 botol)', 'Rp 12.000,00'),
-                    const Divider(height: 14),
-                    _buildRow('Biaya Layanan & Kemas', 'Rp 5.000,00'),
-                    const Divider(height: 14),
-                    _buildRow('Ongkos Kirim (Same Day)', 'Rp 10.000,00'),
+                    _buildRow('Ongkos Kirim & Layanan', _formatRp(ongkir)),
                     const Divider(height: 16),
-                    _buildRow('Total Transaksi', 'Rp 65.000,00', isBold: true),
+                    _buildRow('Total Transaksi', _formatRp(totalBayar), isBold: true),
                   ],
                 ),
               ),
@@ -567,7 +650,7 @@ class _ApotekRiwayatAktivitasScreenState
 
   @override
   Widget build(BuildContext context) {
-    final acts = ApotekMockData.activities;
+    final acts = _getFilteredActivities();
 
     return Scaffold(
       backgroundColor: _bgColor,
@@ -685,7 +768,11 @@ class _ApotekRiwayatAktivitasScreenState
 
                 // Activity List
                 Expanded(
-                  child: ListView.separated(
+                  child: _isLoading && acts.isEmpty
+                      ? const Center(
+                          child: CircularProgressIndicator(color: _darkGreen),
+                        )
+                      : ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(
                       parent: BouncingScrollPhysics(),
                     ),

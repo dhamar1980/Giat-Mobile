@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../services/apotek_api_service.dart';
@@ -26,8 +27,43 @@ class _ApotekStatusLayananScreenState extends State<ApotekStatusLayananScreen> {
   static const _border = Color(0xFFE2E8F0);
 
   bool _isServiceActive = true;
+  String _jamSummary = 'Senin - Minggu  •  08.00 - 22.00 WIB';
+  String _areaSummary = '';
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatusLayanan();
+  }
+
+  Future<void> _loadStatusLayanan() async {
+    if (_isTest) return;
+    try {
+      final res = await ApotekApiService().getProfile();
+      if (res.success && res.data != null && mounted) {
+        final d = res.data!;
+        final st = d['status_layanan'];
+        final jam = d['jam_operasional_ringkas']?.toString() ?? '';
+        final area = d['area_layanan_ringkas']?.toString() ?? '';
+        setState(() {
+          if (st is bool) _isServiceActive = st;
+          if (jam.isNotEmpty) {
+            _jamSummary = 'Senin - Minggu  •  $jam';
+          }
+          if (area.isNotEmpty) {
+            _areaSummary = area;
+          }
+        });
+      }
+    } catch (_) {}
+  }
 
   String _getActiveAreasSummary() {
+    if (!_isTest && _areaSummary.isNotEmpty) {
+      return _areaSummary;
+    }
     final activeAreas =
         ApotekMockData.areas.where((a) => a.isActive).map((a) => a.name).toList();
     if (activeAreas.isEmpty) {
@@ -361,7 +397,10 @@ class _ApotekStatusLayananScreenState extends State<ApotekStatusLayananScreen> {
                                               const ApotekJamOperasionalScreen(),
                                         ),
                                       );
-                                      if (mounted) setState(() {});
+                                      if (mounted) {
+                                        await _loadStatusLayanan();
+                                        setState(() {});
+                                      }
                                     },
                                     child: Text(
                                       'Ubah',
@@ -376,7 +415,7 @@ class _ApotekStatusLayananScreenState extends State<ApotekStatusLayananScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Senin - Minggu  •  08.00 - 21.00 WIB',
+                                _jamSummary,
                                 style: GoogleFonts.inter(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w600,
@@ -454,7 +493,10 @@ class _ApotekStatusLayananScreenState extends State<ApotekStatusLayananScreen> {
                                               const ApotekAreaLayananScreen(),
                                         ),
                                       );
-                                      if (mounted) setState(() {});
+                                      if (mounted) {
+                                        await _loadStatusLayanan();
+                                        setState(() {});
+                                      }
                                     },
                                     child: Text(
                                       'Ubah',

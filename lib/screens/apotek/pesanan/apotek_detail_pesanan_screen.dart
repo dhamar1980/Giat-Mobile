@@ -33,11 +33,12 @@ class _ApotekDetailPesananScreenState extends State<ApotekDetailPesananScreen> {
   void _startProcessOrder() {
     setState(() {
       widget.order.status = ApotekOrderStatus.diproses;
+      widget.order.progressStep = 4;
     });
     widget.onStatusChanged?.call();
 
-    // Sync to Backend POST /apotek/pesanan/{id}/proses
-    ApotekApiService().prosesPesanan(widget.order.id);
+    // Sync to Backend / Supabase
+    ApotekApiService().prosesPesanan(widget.order.dbId ?? widget.order.id);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -55,8 +56,8 @@ class _ApotekDetailPesananScreenState extends State<ApotekDetailPesananScreen> {
     });
     widget.onStatusChanged?.call();
 
-    // Sync to Backend POST /apotek/pesanan/{id}/selesai
-    ApotekApiService().selesaikanPesanan(widget.order.id);
+    // Sync to Backend / Supabase
+    ApotekApiService().selesaikanPesanan(widget.order.dbId ?? widget.order.id);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

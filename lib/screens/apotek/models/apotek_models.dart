@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/apotek_api_service.dart';
 import '../../../config/api_config.dart';
+import '../../../utils/time_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MODEL DATA APOTEK & FARMASI (Berdasarkan Desain & Alur Figma GIAT)
+// MODEL DATA APOTEK & FARMASI (Terintegrasi Real Data Supabase & Figma GIAT)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ApotekOrderItem {
@@ -28,6 +29,7 @@ enum ApotekOrderStatus {
 }
 
 class ApotekOrder {
+  final String? dbId; // UUID in pesanan_obat
   final String id; // e.g. "ORD-0124"
   final String patientName;
   final String patientInitials;
@@ -45,6 +47,7 @@ class ApotekOrder {
   final List<ApotekOrderItem> items;
 
   ApotekOrder({
+    this.dbId,
     required this.id,
     required this.patientName,
     required this.patientInitials,
@@ -61,6 +64,107 @@ class ApotekOrder {
     this.processStartTime = '01 Sep 2026, 10:18',
     this.progressStep = 4,
   });
+
+  factory ApotekOrder.fromSupabaseMap(Map<String, dynamic> m) {
+    final rawUuid = (m['id'] ?? '').toString().trim();
+    final noPesanan = (m['no_pesanan'] ?? rawUuid).toString().trim();
+    final pName = (m['nama_pasien'] ?? m['nama_penerima'] ?? 'Pasien GIAT').toString().trim();
+    final initials = pName.isNotEmpty
+        ? pName
+            .split(' ')
+            .where((w) => w.isNotEmpty)
+            .map((w) => w[0])
+            .take(2)
+            .join()
+            .toUpperCase()
+        : 'PG';
+
+    int age = 35;
+    final rawTglLahir = m['tanggal_lahir']?.toString() ?? '';
+    if (rawTglLahir.isNotEmpty) {
+      final birth = DateTime.tryParse(rawTglLahir);
+      if (birth != null) {
+        age = DateTime.now().year - birth.year;
+        if (age <= 0 || age > 110) age = 35;
+      }
+    }
+
+    final rawGender = (m['jenis_kelamin'] ?? '').toString().toUpperCase().trim();
+    final genderLabel = (rawGender == 'P' || rawGender.startsWith('PEREMPUAN'))
+        ? 'Perempuan'
+        : 'Laki-laki';
+
+    final pAddress = (m['alamat_pasien'] ?? m['alamat_pengiriman'] ?? 'Kota Bandung').toString().trim();
+    final rawCreated = (m['updated_at'] ?? m['created_at'] ?? '').toString();
+    final createdDt = DateTime.tryParse(rawCreated)?.toLocal();
+    final timeAgoStr = TimeUtils.formatRelativeTime(rawCreated);
+    final orderDateStr = createdDt != null
+        ? '${TimeUtils.formatDate(createdDt)} , ${TimeUtils.formatChatTime(createdDt, separator: ':')}'
+        : TimeUtils.formatDate(DateTime.now());
+    final procTimeStr = createdDt != null
+        ? '${TimeUtils.formatDate(createdDt)} , ${TimeUtils.formatChatTime(createdDt.add(const Duration(minutes: 3)), separator: ':')}'
+        : orderDateStr;
+
+    final rawRxNo = (m['no_resep'] ?? '').toString().trim();
+    final docName = (m['nama_dokter'] ?? '').toString().trim();
+    final rawRxDate = (m['tanggal_resep'] ?? '').toString().trim();
+    final rxDateFormatted = rawRxDate.isNotEmpty
+        ? TimeUtils.formatDate(rawRxDate, useIndonesianMonth: true)
+        : '';
+
+    final rawStatus = (m['status_pesanan'] ?? 'menunggu_konfirmasi').toString().toLowerCase().trim();
+    ApotekOrderStatus orderStatus = ApotekOrderStatus.menunggu;
+    if (rawStatus == 'selesai') {
+      orderStatus = ApotekOrderStatus.selesai;
+    } else if (rawStatus == 'diproses' || rawStatus == 'dikirim' || rawStatus == 'siap_diambil') {
+      orderStatus = ApotekOrderStatus.diproses;
+    }
+
+    final step = int.tryParse((m['progress_step'] ?? '2').toString()) ??
+        (orderStatus == ApotekOrderStatus.selesai
+            ? 5
+            : (orderStatus == ApotekOrderStatus.diproses ? 4 : 2));
+
+    final rawItems = (m['items'] as List?) ?? [];
+    final List<ApotekOrderItem> parsedItems = [];
+    for (final it in rawItems) {
+      if (it is Map) {
+        final im = Map<String, dynamic>.from(it);
+        final medName = (im['nama_obat'] ?? 'Obat Ginjal').toString().trim();
+        final bentuk = (im['bentuk_sediaan'] ?? 'Tablet').toString().trim();
+        final kemasan = (im['satuan_kemasan'] ?? 'Strip / Box').toString().trim();
+        final qty = int.tryParse((im['jumlah'] ?? '1').toString()) ?? 1;
+        final stok = int.tryParse((im['stok_total'] ?? '100').toString()) ?? 100;
+        parsedItems.add(
+          ApotekOrderItem(
+            medicineName: medName,
+            formAndPack: '$bentuk • $kemasan',
+            qtyText: '$qty $bentuk',
+            isAvailable: stok > 0,
+          ),
+        );
+      }
+    }
+
+    return ApotekOrder(
+      dbId: rawUuid.isNotEmpty ? rawUuid : null,
+      id: noPesanan,
+      patientName: pName,
+      patientInitials: initials,
+      patientAge: age,
+      patientGender: genderLabel,
+      patientAddress: pAddress,
+      timeText: timeAgoStr.isNotEmpty ? timeAgoStr : 'Baru saja',
+      recipeRef: rawRxNo,
+      doctorName: docName,
+      recipeDate: rxDateFormatted,
+      orderDateTime: orderDateStr,
+      processStartTime: procTimeStr,
+      progressStep: step,
+      status: orderStatus,
+      items: parsedItems,
+    );
+  }
 }
 
 enum ApotekRecipeStatus {
@@ -86,7 +190,8 @@ class ApotekRecipeItem {
 }
 
 class ApotekRecipe {
-  final String id; // e.g. "RSP-00125"
+  final String? dbId; // UUID in resep
+  final String id; // e.g. "RSP-00125" or "RXP-20261101-001"
   final String patientName;
   final String patientInitials;
   final String medRecNo; // e.g. "#RM-48291"
@@ -99,6 +204,7 @@ class ApotekRecipe {
   String? completedTime;
 
   ApotekRecipe({
+    this.dbId,
     required this.id,
     required this.patientName,
     required this.patientInitials,
@@ -111,6 +217,104 @@ class ApotekRecipe {
     this.verifiedTime,
     this.completedTime,
   });
+
+  factory ApotekRecipe.fromSupabaseMap(Map<String, dynamic> m) {
+    final rawUuid = (m['id'] ?? m['id_resep'] ?? '').toString().trim();
+    final noResep = (m['no_resep'] ?? rawUuid).toString().trim();
+    final pName = (m['nama_pasien'] ?? 'Pasien GIAT').toString().trim();
+    final initials = pName.isNotEmpty
+        ? pName
+            .split(' ')
+            .where((w) => w.isNotEmpty)
+            .map((w) => w[0])
+            .take(2)
+            .join()
+            .toUpperCase()
+        : 'PG';
+
+    final rawNik = (m['nik_pasien'] ?? m['id_pasien'] ?? '').toString().replaceAll(RegExp(r'[^0-9]'), '');
+    final rmSuffix = rawNik.length >= 5
+        ? rawNik.substring(rawNik.length - 5)
+        : (rawUuid.replaceAll(RegExp(r'[^0-9]'), '').padRight(5, '8').substring(0, 5));
+    final medRecNo = '#RM-$rmSuffix';
+
+    final docName = (m['nama_dokter'] ?? 'dr. Spesialis GIAT').toString().trim();
+    final rawDate = (m['tanggal_resep'] ?? m['created_at'] ?? '').toString();
+    final dateFormatted = TimeUtils.formatDate(rawDate, useIndonesianMonth: true);
+    final rawUpdated = (m['updated_at'] ?? m['created_at'] ?? '').toString();
+    final timeAgoStr = TimeUtils.formatRelativeTime(rawUpdated);
+
+    final rawStatus = (m['status'] ?? 'sudah_ditebus').toString().toLowerCase().trim();
+    final rawOrderStatus = (m['status_pesanan'] ?? '').toString().toLowerCase().trim();
+
+    ApotekRecipeStatus recStatus = ApotekRecipeStatus.belumDiverifikasi;
+    if (rawStatus == 'selesai' || rawOrderStatus == 'selesai') {
+      recStatus = ApotekRecipeStatus.selesai;
+    } else if (rawStatus == 'diverifikasi') {
+      recStatus = ApotekRecipeStatus.diverifikasi;
+    }
+
+    final updatedDt = DateTime.tryParse(rawUpdated)?.toLocal();
+    final formattedVerifTime = updatedDt != null
+        ? '${TimeUtils.formatDate(updatedDt, useIndonesianMonth: true)}, ${TimeUtils.formatChatTime(updatedDt, separator: ':')}'
+        : dateFormatted;
+
+    final rawItems = (m['items'] as List?) ?? [];
+    final List<ApotekRecipeItem> parsedItems = [];
+    for (final it in rawItems) {
+      if (it is Map) {
+        final im = Map<String, dynamic>.from(it);
+        final medName = (im['nama_obat'] ?? 'Obat Resep Ginjal').toString().trim();
+        final formAndPack = (im['form_and_pack'] ?? 'Tablet • Kemasan Standar').toString().trim();
+        final dosis = (im['dosis'] ?? '').toString().trim();
+        final aturan = (im['aturan_pakai'] ?? '3 x 1 tablet').toString().trim();
+        final waktu = (im['waktu_penggunaan'] ?? 'Sesudah Makan').toString().trim();
+        final catatan = (im['catatan_khusus'] ?? '').toString().trim();
+        final qty = int.tryParse((im['jumlah'] ?? '10').toString()) ?? 10;
+
+        final doseRuleStr = aturan.isNotEmpty
+            ? aturan
+            : (dosis.isNotEmpty ? dosis : 'Sesuai petunjuk dokter');
+        final usageNotesStr = [
+          if (waktu.isNotEmpty) 'Aturan Pakai: $waktu',
+          if (catatan.isNotEmpty) '($catatan)',
+        ].join(' ');
+
+        parsedItems.add(
+          ApotekRecipeItem(
+            medicineName: dosis.isNotEmpty && !medName.toLowerCase().contains(dosis.toLowerCase())
+                ? '$medName ($dosis)'
+                : medName,
+            formAndPack: formAndPack,
+            doseRule: doseRuleStr,
+            usageNotes: usageNotesStr.isNotEmpty
+                ? usageNotesStr
+                : 'Aturan Pakai: Sesudah Makan',
+            qtyText: '$qty Tablet',
+          ),
+        );
+      }
+    }
+
+    return ApotekRecipe(
+      dbId: rawUuid.isNotEmpty ? rawUuid : null,
+      id: noResep,
+      patientName: pName,
+      patientInitials: initials,
+      medRecNo: medRecNo,
+      doctorName: docName,
+      dateText: dateFormatted,
+      timeText: timeAgoStr.isNotEmpty ? timeAgoStr : 'Baru saja',
+      status: recStatus,
+      items: parsedItems,
+      verifiedTime: recStatus != ApotekRecipeStatus.belumDiverifikasi
+          ? formattedVerifTime
+          : null,
+      completedTime: recStatus == ApotekRecipeStatus.selesai
+          ? formattedVerifTime
+          : null,
+    );
+  }
 }
 
 enum ApotekMedicineStatus {
@@ -134,6 +338,7 @@ class ApotekMedicineBatch {
 }
 
 class ApotekMedicine {
+  final String? dbId; // UUID in obat
   final String id; // e.g. "#MED-8842"
   final String name;
   final String category; // e.g. "Analgesik & Antipiretik"
@@ -150,6 +355,7 @@ class ApotekMedicine {
   final List<ApotekMedicineBatch> batches;
 
   ApotekMedicine({
+    this.dbId,
     required this.id,
     required this.name,
     required this.category,
@@ -171,6 +377,74 @@ class ApotekMedicine {
     if (stock <= 10) return ApotekMedicineStatus.stokMenipis;
     return ApotekMedicineStatus.tersedia;
   }
+
+  factory ApotekMedicine.fromSupabaseMap(Map<String, dynamic> m) {
+    final rawUuid = (m['id_obat'] ?? m['id'] ?? '').toString().trim();
+    final shortCode = rawUuid.length >= 4
+        ? '#MED-${rawUuid.substring(0, 4).toUpperCase()}'
+        : '#MED-GIAT';
+    final name = (m['nama_obat'] ?? m['name'] ?? 'Obat Ginjal').toString().trim();
+    final category = (m['kategori'] ?? 'Obat Ginjal').toString().trim();
+    final form = (m['bentuk_sediaan'] ?? 'Tablet').toString().trim();
+    final dose = (m['dosis'] ?? '-').toString().trim();
+    final packageUnit = (m['satuan_kemasan'] ?? 'Strip / Box').toString().trim();
+    final stock = int.tryParse((m['stok_total'] ?? '0').toString()) ?? 0;
+    final stockUnit = form.split(' ').first;
+    final buyPrice = double.tryParse((m['harga_beli'] ?? '0').toString())?.round() ?? 0;
+    final sellPrice = double.tryParse((m['harga_jual'] ?? '0').toString())?.round() ?? 0;
+    final usageRule = (m['aturan_pakai_umum'] ?? 'Gunakan sesuai petunjuk dokter atau apoteker.').toString().trim();
+    final rawFoto = (m['foto_obat'] ?? '').toString().trim();
+
+    final rawBatches = (m['batches'] as List?) ?? [];
+    final List<ApotekMedicineBatch> parsedBatches = [];
+    String topExpDate = '01 Mei 2028';
+
+    for (final b in rawBatches) {
+      if (b is Map) {
+        final bm = Map<String, dynamic>.from(b);
+        final bNo = (bm['no_batch'] ?? 'BATCH-2026').toString().trim();
+        final bQty = int.tryParse((bm['stok_batch'] ?? '0').toString()) ?? 0;
+        final rawExp = (bm['tanggal_kadaluwarsa'] ?? '2028-05-01').toString();
+        final formattedExp = TimeUtils.formatDate(rawExp);
+        if (parsedBatches.isEmpty && formattedExp.isNotEmpty) {
+          topExpDate = formattedExp;
+        }
+        final bStatusRaw = (bm['status'] ?? 'tersedia').toString().toLowerCase();
+        String bStatusLabel = 'Tersedia';
+        if (bQty <= 0 || bStatusRaw == 'habis') {
+          bStatusLabel = 'Habis';
+        } else if (bQty <= 10 || bStatusRaw.contains('menipis')) {
+          bStatusLabel = 'Stok Menipis';
+        }
+        parsedBatches.add(
+          ApotekMedicineBatch(
+            batchNo: bNo,
+            qtyText: '$bQty $stockUnit',
+            expDate: formattedExp,
+            status: bStatusLabel,
+          ),
+        );
+      }
+    }
+
+    return ApotekMedicine(
+      dbId: rawUuid.isNotEmpty ? rawUuid : null,
+      id: shortCode,
+      name: name,
+      category: category,
+      form: form,
+      dose: dose,
+      packageUnit: packageUnit,
+      stock: stock,
+      stockUnit: stockUnit,
+      buyPrice: buyPrice,
+      sellPrice: sellPrice,
+      expDate: topExpDate,
+      usageRule: usageRule,
+      imagePath: rawFoto.isNotEmpty ? ApiConfig.resolveImageUrl(rawFoto) : null,
+      batches: parsedBatches,
+    );
+  }
 }
 
 class ApotekActivity {
@@ -179,6 +453,8 @@ class ApotekActivity {
   final String subtitle;
   final String timeText;
   final String type; // "stok" | "obat" | "pesanan" | "resep"
+  final DateTime? createdAt;
+  final Map<String, dynamic>? meta;
 
   const ApotekActivity({
     required this.id,
@@ -186,7 +462,26 @@ class ApotekActivity {
     required this.subtitle,
     required this.timeText,
     required this.type,
+    this.createdAt,
+    this.meta,
   });
+
+  factory ApotekActivity.fromSupabaseMap(Map<String, dynamic> m) {
+    final rawCreated = (m['created_at'] ?? '').toString();
+    final dt = DateTime.tryParse(rawCreated)?.toLocal();
+    final timeStr = dt != null
+        ? '${TimeUtils.formatDate(dt)}, ${TimeUtils.formatChatTime(dt, separator: ':')} WIB'
+        : TimeUtils.formatRelativeTime(rawCreated);
+    return ApotekActivity(
+      id: (m['id'] ?? '').toString(),
+      title: (m['title'] ?? 'Aktivitas Apotek').toString(),
+      subtitle: (m['subtitle'] ?? '').toString(),
+      timeText: timeStr,
+      type: (m['type'] ?? 'pesanan').toString(),
+      createdAt: dt,
+      meta: m['meta'] is Map ? Map<String, dynamic>.from(m['meta'] as Map) : null,
+    );
+  }
 }
 
 class ApotekDaySchedule {
@@ -924,12 +1219,16 @@ class ApotekProfileState extends ChangeNotifier {
 
   String _apotekerName = '';
   String _apotekName = '';
-  String _sipaNumber = '19950812/SIPA_35.09/2022/2048';
-  String _siaNumber = '503/A.1/042/35.09/2021';
+  String _sipaNumber = 'SIPA-3273/1990/440/2022';
+  String _siaNumber = 'SIA-3273/1990/440/2022';
+  String _jamOperasionalRingkas = '08.00 - 22.00 WIB';
+  String _areaLayananRingkas = 'Kota Bandung dan Sekitarnya, Kabupaten Bandung, Kota Cimahi';
+  bool _isServiceActive = true;
   String _avatarType = 'default'; // 'asset', 'network', 'file', 'default'
   String _avatarPath = '';
 
-  String get apotekerName => _apotekerName.isNotEmpty ? _apotekerName : 'Apt. Aminah, S.Farm';
+  String get apotekerName =>
+      _apotekerName.isNotEmpty ? _apotekerName : 'apt. Farhan Ramadhan, S.Farm';
   set apotekerName(String val) {
     if (_apotekerName != val) {
       _apotekerName = val;
@@ -937,7 +1236,8 @@ class ApotekProfileState extends ChangeNotifier {
     }
   }
 
-  String get apotekName => _apotekName.isNotEmpty ? _apotekName : 'Apotek Kimia Farma - Jember';
+  String get apotekName =>
+      _apotekName.isNotEmpty ? _apotekName : 'Apotek Kimia Farma Dago';
   set apotekName(String val) {
     if (_apotekName != val) {
       _apotekName = val;
@@ -957,6 +1257,30 @@ class ApotekProfileState extends ChangeNotifier {
   set siaNumber(String val) {
     if (_siaNumber != val) {
       _siaNumber = val;
+      notifyListeners();
+    }
+  }
+
+  String get jamOperasionalRingkas => _jamOperasionalRingkas;
+  set jamOperasionalRingkas(String val) {
+    if (_jamOperasionalRingkas != val) {
+      _jamOperasionalRingkas = val;
+      notifyListeners();
+    }
+  }
+
+  String get areaLayananRingkas => _areaLayananRingkas;
+  set areaLayananRingkas(String val) {
+    if (_areaLayananRingkas != val) {
+      _areaLayananRingkas = val;
+      notifyListeners();
+    }
+  }
+
+  bool get isServiceActive => _isServiceActive;
+  set isServiceActive(bool val) {
+    if (_isServiceActive != val) {
+      _isServiceActive = val;
       notifyListeners();
     }
   }
@@ -984,6 +1308,9 @@ class ApotekProfileState extends ChangeNotifier {
     String? sipa,
     String? sia,
     String? avatar,
+    String? jamRingkas,
+    String? areaRingkas,
+    bool? serviceActive,
   }) {
     bool changed = false;
     if (name != null && name.trim().isNotEmpty && _apotekerName != name.trim()) {
@@ -1000,6 +1327,18 @@ class ApotekProfileState extends ChangeNotifier {
     }
     if (sia != null && sia.trim().isNotEmpty && _siaNumber != sia.trim()) {
       _siaNumber = sia.trim();
+      changed = true;
+    }
+    if (jamRingkas != null && jamRingkas.trim().isNotEmpty && _jamOperasionalRingkas != jamRingkas.trim()) {
+      _jamOperasionalRingkas = jamRingkas.trim();
+      changed = true;
+    }
+    if (areaRingkas != null && areaRingkas.trim().isNotEmpty && _areaLayananRingkas != areaRingkas.trim()) {
+      _areaLayananRingkas = areaRingkas.trim();
+      changed = true;
+    }
+    if (serviceActive != null && _isServiceActive != serviceActive) {
+      _isServiceActive = serviceActive;
       changed = true;
     }
     if (avatar != null && avatar.trim().isNotEmpty) {
@@ -1025,6 +1364,7 @@ class ApotekProfileState extends ChangeNotifier {
       if (user != null) {
         syncFromUser(
           name: user.nama,
+          farmasiName: user.nama,
           avatar: user.fotoProfile,
         );
       } else if (fallbackName != null && fallbackName.isNotEmpty) {
@@ -1037,16 +1377,24 @@ class ApotekProfileState extends ChangeNotifier {
       if (res.success && res.data != null) {
         final d = res.data!;
         final apotekObj = d['apotek'] is Map ? d['apotek'] as Map : d;
-        final fetchedName = apotekObj['nama_apotek'] ?? apotekObj['nama'] ?? apotekObj['name'] ?? fallbackName;
+        final fetchedApoteker = apotekObj['penanggung_jawab'] ?? apotekObj['nama_apotek'] ?? apotekObj['nama'] ?? fallbackName;
+        final fetchedFarmasi = apotekObj['nama_apotek'] ?? apotekObj['nama'] ?? fallbackName;
         final fetchedFoto = apotekObj['foto_profile'] ?? apotekObj['foto_profil'];
-        final fetchedSipa = apotekObj['no_sipa'] ?? apotekObj['sipa'];
-        final fetchedSia = apotekObj['no_sia'] ?? apotekObj['sia'];
+        final fetchedSipa = apotekObj['no_sipa_sia'] ?? apotekObj['no_sipa'] ?? apotekObj['sipa'];
+        final fetchedSia = apotekObj['no_sia'] ?? apotekObj['no_sipa_sia'] ?? apotekObj['sia'];
+        final fetchedJam = apotekObj['jam_operasional_ringkas'] ?? d['jam_operasional_ringkas'];
+        final fetchedArea = apotekObj['area_layanan_ringkas'] ?? d['area_layanan_ringkas'];
+        final fetchedStatus = apotekObj['status_layanan'] ?? d['status_layanan'];
 
         syncFromUser(
-          name: fetchedName?.toString(),
+          name: fetchedApoteker?.toString(),
+          farmasiName: fetchedFarmasi?.toString(),
           sipa: fetchedSipa?.toString(),
           sia: fetchedSia?.toString(),
           avatar: fetchedFoto?.toString(),
+          jamRingkas: fetchedJam?.toString(),
+          areaRingkas: fetchedArea?.toString(),
+          serviceActive: fetchedStatus is bool ? fetchedStatus : null,
         );
       }
     } catch (_) {}

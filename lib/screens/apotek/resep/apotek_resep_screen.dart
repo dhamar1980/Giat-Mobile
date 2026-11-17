@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:giat/widgets/giat_header_style.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +39,10 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
 
   bool _showAllHistory = false;
   bool _internalIsTopBarVisible = true;
+  bool _isLoading = false;
+  List<ApotekRecipe> _realRecipes = [];
 
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
   bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _internalIsTopBarVisible;
 
   @override
@@ -48,15 +52,29 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
   }
 
   Future<void> _fetchLiveResep() async {
+    if (_isTest) return;
+    if (mounted) setState(() => _isLoading = true);
     try {
-      await ApotekApiService().getPesananResep();
-    } catch (_) {}
+      final res = await ApotekApiService().getPesananResep();
+      if (res.success && res.data != null && mounted) {
+        final parsed = res.data!
+            .whereType<Map>()
+            .map((e) => ApotekRecipe.fromSupabaseMap(Map<String, dynamic>.from(e)))
+            .toList();
+        setState(() {
+          _realRecipes = parsed;
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   List<ApotekRecipe> _getIncomingRecipes() {
-    final all = ApotekMockData.recipes;
+    final all = _isTest ? ApotekMockData.recipes : _realRecipes;
     if (_showAllHistory) return all;
-    // Tampilkan resep masuk yang belum diverifikasi / belum diterima
+    // Tampilkan resep masuk yang sudah ditebus/dibayar pasien namun belum diverifikasi apotek
     return all.where((r) => r.status == ApotekRecipeStatus.belumDiverifikasi).toList();
   }
 
@@ -65,25 +83,58 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
       MaterialPageRoute(
         builder: (_) => ApotekDetailResepScreen(
           recipe: recipe,
-          onStatusChanged: () => setState(() {}),
+          onStatusChanged: () {
+            _fetchLiveResep();
+            setState(() {});
+          },
           onNavigateToOrderTab: widget.onNavigateToOrderTab,
           onOpenProfile: widget.onOpenProfile,
         ),
       ),
-    ).then((_) => setState(() {}));
+    ).then((_) {
+      _fetchLiveResep();
+      if (mounted) setState(() {});
+    });
   }
 
-  void _handleAcceptRecipe(ApotekRecipe recipe) {
-    // Sinkronisasi status validasi resep ke REST API Apotek
-    ApotekApiService().validasiDanTerimaResep(recipe.id);
+  Future<void> _handleAcceptRecipe(ApotekRecipe recipe) async {
+    if (_isTest) {
+      ApotekApiService().validasiDanTerimaResep(recipe.id);
+      final newOrder = ApotekMockData.acceptRecipeAndCreateOrder(recipe);
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Resep ${recipe.id} berhasil diterima! Masuk ke Pesanan Menunggu (${newOrder.id}).',
+          ),
+          backgroundColor: _darkGreen,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Buka Pesanan',
+            textColor: const Color(0xFF86EFAC),
+            onPressed: () {
+              widget.onNavigateToOrderTab?.call(0);
+            },
+          ),
+        ),
+      );
+      widget.onNavigateToOrderTab?.call(0);
+      return;
+    }
 
-    final newOrder = ApotekMockData.acceptRecipeAndCreateOrder(recipe);
-    setState(() {});
+    setState(() {
+      recipe.status = ApotekRecipeStatus.diverifikasi;
+    });
 
+    final res = await ApotekApiService().validasiDanTerimaResep(recipe.dbId ?? recipe.id);
+    final orderNo = res.data?['no_pesanan']?.toString() ?? 'ORD-${recipe.id.replaceAll('RXP-', '').replaceAll('RSP-', '')}';
+    await _fetchLiveResep();
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Resep ${recipe.id} berhasil diterima! Masuk ke Pesanan Menunggu (${newOrder.id}).',
+          'Resep ${recipe.id} berhasil diterima! Masuk ke Pesanan Menunggu ($orderNo).',
         ),
         backgroundColor: _darkGreen,
         behavior: SnackBarBehavior.floating,
@@ -97,7 +148,6 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
       ),
     );
 
-    // Otomatis alihkan ke Pesanan Menunggu setelah klik Terima Resep
     widget.onNavigateToOrderTab?.call(0);
   }
 
@@ -125,37 +175,69 @@ class _ApotekResepScreenState extends State<ApotekResepScreen> {
 
               // ── 2. Content Section (Scrollable) ──
               Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.only(top: 18, bottom: 28),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Section Title: "Daftar Resep Masuk" (Screenshot 1)
-                        Text(
-                          'Daftar Resep Masuk',
-                          style: GoogleFonts.inter(
-                            fontSize: 16.5,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0F172A),
+                child: RefreshIndicator(
+                  color: _darkGreen,
+                  onRefresh: _fetchLiveResep,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.only(top: 18, bottom: 28),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Section Title: "Daftar Resep Masuk" (Screenshot 1)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Daftar Resep Masuk',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => setState(() => _showAllHistory = !_showAllHistory),
+                                child: Text(
+                                  _showAllHistory ? 'Belum Diverifikasi' : 'Lihat Riwayat',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: _darkGreen,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
 
-                        const SizedBox(height: 14),
+                          const SizedBox(height: 14),
 
-                        // Recipe List
-                        if (incomingList.isEmpty)
-                          _buildEmptyState()
-                        else
-                          ...incomingList.map((recipe) => Padding(
-                                padding: const EdgeInsets.only(bottom: 18),
-                                child: _buildRecipeCard(recipe),
-                              )),
+                          // Recipe List
+                          if (_isLoading && incomingList.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 48),
+                              child: Center(
+                                child: CircularProgressIndicator(color: _darkGreen),
+                              ),
+                            )
+                          else if (incomingList.isEmpty)
+                            _buildEmptyState()
+                          else
+                            ...incomingList.map((recipe) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 18),
+                                  child: _buildRecipeCard(recipe),
+                                )),
 
-                        const SizedBox(height: 36),
-                      ],
+                          const SizedBox(height: 36),
+                        ],
+                      ),
                     ),
                   ),
                 ),

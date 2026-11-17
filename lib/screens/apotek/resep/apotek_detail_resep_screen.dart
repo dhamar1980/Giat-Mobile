@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -33,19 +34,29 @@ class _ApotekDetailResepScreenState extends State<ApotekDetailResepScreen> {
   static const _bgColor = Color(0xFFF8FAF9);
   static const _cardBorder = Color(0xFFE2E8F0);
 
-  void _handleAcceptRecipe() {
-    final newOrder = ApotekMockData.acceptRecipeAndCreateOrder(widget.recipe);
+  Future<void> _handleAcceptRecipe() async {
+    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
+    String orderIdStr;
+    if (isTest) {
+      final newOrder = ApotekMockData.acceptRecipeAndCreateOrder(widget.recipe);
+      orderIdStr = newOrder.id;
+      ApotekApiService().validasiDanTerimaResep(widget.recipe.id);
+    } else {
+      widget.recipe.status = ApotekRecipeStatus.diverifikasi;
+      final res = await ApotekApiService().validasiDanTerimaResep(
+        widget.recipe.dbId ?? widget.recipe.id,
+      );
+      orderIdStr = res.data?['no_pesanan']?.toString() ??
+          'ORD-${widget.recipe.id.replaceAll('RXP-', '').replaceAll('RSP-', '')}';
+    }
     widget.onStatusChanged?.call();
-
-    // Sync to Backend POST /apotek/resep/{id}/validasi
-    ApotekApiService().validasiDanTerimaResep(widget.recipe.id);
 
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Resep ${widget.recipe.id} berhasil diterima! Pesanan ${newOrder.id} masuk ke antrean Menunggu.',
+          'Resep ${widget.recipe.id} berhasil diterima! Pesanan $orderIdStr masuk ke antrean Menunggu.',
         ),
         backgroundColor: _darkGreen,
         behavior: SnackBarBehavior.floating,

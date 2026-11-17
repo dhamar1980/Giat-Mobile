@@ -10,6 +10,7 @@ import 'pembayaran_qris_screen.dart';
 import 'pembayaran_transfer_bank_screen.dart';
 import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/supabase_admin_service.dart';
 import '../../../services/cart_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../utils/time_utils.dart';
@@ -1297,7 +1298,7 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
     if (_isProcessingCheckout) return;
     setState(() => _isProcessingCheckout = true);
 
-    final rxNumber = widget.resepData?.rxNumber ?? 'RX-2026-0901-08';
+    final rxNumber = widget.resepData?.rxNumber ?? '';
     final itemCount = widget.resepData != null
         ? '${widget.resepData!.medications.length} jenis obat'
         : (widget.cartItems != null && widget.cartItems!.isNotEmpty
@@ -1629,12 +1630,29 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
             orderData.statusPesanan,
       );
 
-      // 5. Jika status_pembayaran == 'lunas', tandai resep dokter sudah ditebus & arahkan pasien ke Lacak Obat
+      // 5. Jika status_pembayaran == 'lunas', tandai resep dokter sudah ditebus, kirim ke Apotek & arahkan pasien ke Lacak Obat
       if (isLunas) {
         if (widget.resepData != null) {
           final cleanRx = widget.resepData!.id ?? rxNumber.replaceAll('No.', '').trim();
           await PasienApiService().markResepDitebus(cleanRx);
         }
+
+        await SupabaseAdminService.instance.completePasienObatPaymentInSupabase(
+          idPesanan: idPesanan,
+          noPesanan: noPesanan,
+          idResep: widget.resepData?.id,
+          noResep: rxNumber,
+          patientName: widget.userName,
+          metodePengambilan: _metodePengambilan,
+          namaPenerima: _recipientName,
+          noHpPenerima: _recipientPhone,
+          alamatPengiriman: _recipientAddress,
+          metodePembayaran: _metodePembayaran,
+          subtotal: _subtotalObat,
+          ongkosKirim: _biayaPengiriman,
+          totalBayar: finalTotalAmount,
+          items: orderItemsList,
+        );
 
         if (widget.cartItems != null && widget.cartItems!.isNotEmpty) {
           CartService.instance.clearSelected();
@@ -1668,6 +1686,15 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
         );
         return;
       } else {
+        // Pastikan jika belum dibayar lunas, resep tetap berstatus 'aktif' (belum masuk ke Apotek)
+        if (widget.resepData != null) {
+          await SupabaseAdminService.instance.revertResepToAktifIfUnpaid(
+            idResep: widget.resepData!.id,
+            noResep: rxNumber,
+          );
+        }
+
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

@@ -61,7 +61,10 @@ class _ResepDokterScreenState extends State<ResepDokterScreen> {
             final statusStr = (m['status'] ?? '').toString().toLowerCase();
 
             String statusLabel = 'Belum Ditebus';
-            if (statusStr == 'selesai' || statusStr == 'sudah ditebus' || statusStr == 'sudah_ditebus') {
+            if (statusStr == 'selesai' ||
+                statusStr == 'sudah ditebus' ||
+                statusStr == 'sudah_ditebus' ||
+                statusStr == 'diverifikasi') {
               statusLabel = 'Sudah Ditebus';
             } else if (statusStr == 'kadaluwarsa' || statusStr == 'expired') {
               statusLabel = 'Kadaluwarsa';

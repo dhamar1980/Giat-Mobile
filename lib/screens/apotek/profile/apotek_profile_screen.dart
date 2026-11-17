@@ -44,6 +44,8 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   late String _nama;
   String _email = 'apotek.dago@kimiafarma.co.id';
   String _noHp = '0222501234';
+  String _jamOperasionalRingkas = '08.00 - 22.00 WIB';
+  String _areaLayananRingkas = 'Kota Bandung dan Sekitarnya';
   File? _avatarFile;
   String _avatarType = 'asset'; // 'asset', 'network', 'file', 'default'
   String _avatarPath = 'assets/images/dokter_apoteker.jpg';
@@ -88,6 +90,8 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         final fetchedEmail = apotekObj['email'] ?? d['email'];
         final fetchedNoHp = apotekObj['no_hp'] ?? d['no_hp'];
         final fetchedFoto = apotekObj['foto_profile'] ?? apotekObj['foto_profil'];
+        final fetchedJam = apotekObj['jam_operasional_ringkas'] ?? d['jam_operasional_ringkas'];
+        final fetchedArea = apotekObj['area_layanan_ringkas'] ?? d['area_layanan_ringkas'];
         if (fetchedName != null && fetchedName.toString().isNotEmpty) {
           setState(() => _nama = fetchedName.toString());
         }
@@ -96,6 +100,12 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         }
         if (fetchedNoHp != null && fetchedNoHp.toString().isNotEmpty) {
           setState(() => _noHp = fetchedNoHp.toString());
+        }
+        if (fetchedJam != null && fetchedJam.toString().isNotEmpty) {
+          setState(() => _jamOperasionalRingkas = fetchedJam.toString());
+        }
+        if (fetchedArea != null && fetchedArea.toString().isNotEmpty) {
+          setState(() => _areaLayananRingkas = fetchedArea.toString());
         }
         if (fetchedFoto != null && fetchedFoto.toString().isNotEmpty) {
           final resolved = ApiConfig.resolveImageUrl(fetchedFoto.toString());
@@ -106,6 +116,8 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
           ApotekProfileState.instance.syncFromUser(
             name: _nama,
             avatar: resolved,
+            jamRingkas: _jamOperasionalRingkas,
+            areaRingkas: _areaLayananRingkas,
           );
         }
       }
@@ -812,7 +824,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                 Padding(
                   padding: const EdgeInsets.only(left: 27),
                   child: Text(
-                    '08.00 - 21.00',
+                    _jamOperasionalRingkas,
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -852,7 +864,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                 Padding(
                   padding: const EdgeInsets.only(left: 27),
                   child: Text(
-                    'Malang',
+                    _areaLayananRingkas,
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -900,7 +912,7 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                 await Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ApotekStatusLayananScreen()),
                 );
-                if (mounted) setState(() {});
+                if (mounted) _loadProfile();
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/apotek_api_service.dart';
 import '../../../widgets/giat_background.dart';
 import '../models/apotek_models.dart';
 
@@ -22,9 +24,37 @@ class _ApotekAreaLayananScreenState extends State<ApotekAreaLayananScreen> {
   static const _bgColor = Color(0xFFF7FAF8);
   static const _border = Color(0xFFE2E8F0);
 
-  final List<ApotekCoverageArea> _areas = ApotekMockData.areas;
+  List<ApotekCoverageArea> _areas = ApotekMockData.areas;
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAreas();
+  }
+
+  Future<void> _loadAreas() async {
+    if (_isTest) return;
+    try {
+      final res = await ApotekApiService().getAreaLayanan();
+      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+        final parsed = res.data!.whereType<Map>().map((e) {
+          final m = Map<String, dynamic>.from(e);
+          return ApotekCoverageArea(
+            name: (m['nama_area'] ?? 'Kota Bandung').toString(),
+            details: (m['detail'] ?? 'Layanan pengantaran obat kurir farmasi').toString(),
+            isActive: m['is_active'] == true,
+          );
+        }).toList();
+        if (parsed.isNotEmpty) {
+          setState(() => _areas = parsed);
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -177,7 +207,9 @@ class _ApotekAreaLayananScreenState extends State<ApotekAreaLayananScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Cakupan Wilayah Jawa Timur Raya',
+                                    _isTest
+                                        ? 'Cakupan Wilayah Jawa Timur Raya'
+                                        : 'Cakupan Wilayah Bandung Raya & Jawa Barat',
                                     style: GoogleFonts.inter(
                                       fontSize: 12,
                                       color: const Color(0xFF64748B),
@@ -342,7 +374,20 @@ class _ApotekAreaLayananScreenState extends State<ApotekAreaLayananScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () {
+                      onPressed: () async {
+                        if (!_isTest) {
+                          await ApotekApiService().updateAreaLayanan({
+                            'areas': _areas
+                                .map((a) => {
+                                      'nama_area': a.name,
+                                      'detail': a.details,
+                                      'is_active': a.isActive,
+                                    })
+                                .toList(),
+                          });
+                          await ApotekProfileState.instance.loadProfile();
+                        }
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(

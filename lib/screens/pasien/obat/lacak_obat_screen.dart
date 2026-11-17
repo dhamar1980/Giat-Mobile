@@ -6,6 +6,7 @@ import '../widgets/midtrans_payment_webview_page.dart';
 import 'pembayaran_model.dart';
 import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/supabase_admin_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../widgets/app_top_action_pill.dart';
 
@@ -140,6 +141,14 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
       if (statusRes.success && statusRes.data != null) {
         final d = statusRes.data!;
         final isPaid = MidtransPaymentWebViewPage.isStatusLunas(d);
+        if (isPaid) {
+          await SupabaseAdminService.instance.completePasienObatPaymentInSupabase(
+            idPesanan: id,
+            noPesanan: d['no_pesanan']?.toString() ?? _displayOrderNo,
+            noResep: widget.orderData?.prescriptionNumber,
+            patientName: widget.userName,
+          );
+        }
         setState(() {
           _statusPembayaran = isPaid
               ? 'lunas'
@@ -285,6 +294,12 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
     if (!mounted) return;
     if (webViewRes?.isPaid == true) {
       setState(() => _statusPembayaran = 'lunas');
+      await SupabaseAdminService.instance.completePasienObatPaymentInSupabase(
+        idPesanan: id,
+        noPesanan: _displayOrderNo,
+        noResep: widget.orderData?.prescriptionNumber,
+        patientName: widget.userName,
+      );
     }
     await _syncPaymentAndTrackingStatus(silent: false);
   }

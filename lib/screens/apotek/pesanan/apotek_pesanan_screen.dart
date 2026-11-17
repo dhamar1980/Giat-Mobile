@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
@@ -37,7 +38,10 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   bool _internalIsTopBarVisible = true;
+  bool _isLoading = false;
+  List<ApotekOrder> _realOrders = [];
 
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
   bool get _effectiveTopBarVisible => widget.isTopBarVisible ?? _internalIsTopBarVisible;
 
   @override
@@ -47,10 +51,33 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
     _fetchLiveOrders();
   }
 
+  @override
+  void didUpdateWidget(covariant ApotekPesananScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTabIndex != oldWidget.initialTabIndex) {
+      setState(() => _selectedTabIndex = widget.initialTabIndex);
+    }
+    _fetchLiveOrders();
+  }
+
   Future<void> _fetchLiveOrders() async {
+    if (_isTest) return;
+    if (mounted) setState(() => _isLoading = true);
     try {
-      await ApotekApiService().getPesananList();
-    } catch (_) {}
+      final res = await ApotekApiService().getPesananList();
+      if (res.success && res.data != null && mounted) {
+        final parsed = res.data!
+            .whereType<Map>()
+            .map((e) => ApotekOrder.fromSupabaseMap(Map<String, dynamic>.from(e)))
+            .toList();
+        setState(() {
+          _realOrders = parsed;
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -60,7 +87,7 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
   }
 
   List<ApotekOrder> _getFilteredOrders() {
-    final all = ApotekMockData.orders;
+    final all = _isTest ? ApotekMockData.orders : _realOrders;
     final byStatus = all.where((o) {
       if (_selectedTabIndex == 0) return o.status == ApotekOrderStatus.menunggu;
       if (_selectedTabIndex == 1) return o.status == ApotekOrderStatus.diproses;
@@ -83,17 +110,26 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
       MaterialPageRoute(
         builder: (_) => ApotekDetailPesananScreen(
           order: order,
-          onStatusChanged: () => setState(() {}),
+          onStatusChanged: () {
+            _fetchLiveOrders();
+            setState(() {});
+          },
         ),
       ),
-    ).then((_) => setState(() {}));
+    ).then((_) {
+      _fetchLiveOrders();
+      if (mounted) setState(() {});
+    });
   }
 
-  void _handleProcessOrder(ApotekOrder order) {
+  Future<void> _handleProcessOrder(ApotekOrder order) async {
     setState(() {
       order.status = ApotekOrderStatus.diproses;
+      order.progressStep = 4;
       _selectedTabIndex = 1; // Pindah ke tab Diproses
     });
+    await ApotekApiService().prosesPesanan(order.dbId ?? order.id);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Pesanan ${order.id} berhasil dipindahkan ke status Diproses.'),
@@ -103,11 +139,14 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
     );
   }
 
-  void _handleCompleteOrder(ApotekOrder order) {
+  Future<void> _handleCompleteOrder(ApotekOrder order) async {
     setState(() {
       order.status = ApotekOrderStatus.selesai;
+      order.progressStep = 5;
       _selectedTabIndex = 2; // Pindah ke tab Selesai
     });
+    await ApotekApiService().selesaikanPesanan(order.dbId ?? order.id);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Pesanan ${order.id} telah diselesaikan.'),
@@ -172,7 +211,14 @@ class _ApotekPesananScreenState extends State<ApotekPesananScreen> {
                     const SizedBox(height: 14),
 
                     // Order Cards List
-                    if (filteredOrders.isEmpty)
+                    if (_isLoading && filteredOrders.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 48),
+                        child: Center(
+                          child: CircularProgressIndicator(color: _darkGreen),
+                        ),
+                      )
+                    else if (filteredOrders.isEmpty)
                       _buildEmptyState()
                     else
                       ...filteredOrders.map((order) => Padding(

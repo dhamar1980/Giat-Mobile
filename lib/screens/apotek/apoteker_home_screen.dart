@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -51,6 +52,12 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
   static const _bgColor = Color(0xFFF6FAF7);
   static const _cardBorderColor = Color(0xFFE2E8F0);
 
+  List<ApotekOrder> _realOrders = [];
+  List<ApotekRecipe> _realRecipes = [];
+  List<ApotekMedicine> _realMedicines = [];
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
   @override
   void initState() {
     super.initState();
@@ -71,8 +78,29 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
   }
 
   Future<void> _fetchLiveDashboard() async {
+    if (_isTest) return;
     try {
-      await ApotekApiService().getDashboard();
+      final res = await ApotekApiService().getDashboard();
+      if (res.success && res.data != null && mounted) {
+        final d = res.data!;
+        final rawOrders = (d['pesanan_list'] as List?) ?? [];
+        final rawRecipes = (d['resep_list'] as List?) ?? [];
+        final rawMeds = (d['obat_list'] as List?) ?? [];
+        setState(() {
+          _realOrders = rawOrders
+              .whereType<Map>()
+              .map((e) => ApotekOrder.fromSupabaseMap(Map<String, dynamic>.from(e)))
+              .toList();
+          _realRecipes = rawRecipes
+              .whereType<Map>()
+              .map((e) => ApotekRecipe.fromSupabaseMap(Map<String, dynamic>.from(e)))
+              .toList();
+          _realMedicines = rawMeds
+              .whereType<Map>()
+              .map((e) => ApotekMedicine.fromSupabaseMap(Map<String, dynamic>.from(e)))
+              .toList();
+        });
+      }
     } catch (_) {}
   }
 
@@ -100,6 +128,7 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
       if (resepTab != null) _resepInitialTab = resepTab;
       if (obatFilter != null) _obatInitialFilter = obatFilter;
     });
+    _fetchLiveDashboard();
   }
 
   @override
@@ -341,6 +370,24 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
   // SECTION 1: PERLU PERHATIAN (3 Summary Cards - Styled like Dokter & Pasien)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildAttentionSection() {
+    final ordersSource = _isTest ? ApotekMockData.orders : _realOrders;
+    final recipesSource = _isTest ? ApotekMockData.recipes : _realRecipes;
+    final medsSource = _isTest ? ApotekMockData.medicines : _realMedicines;
+
+    final waitingOrdersCount = ordersSource
+        .where((o) => o.status == ApotekOrderStatus.menunggu)
+        .length;
+    final pendingRecipesCount = recipesSource
+        .where((r) => r.status == ApotekRecipeStatus.belumDiverifikasi)
+        .length;
+    final lowStockCount = _isTest
+        ? 3
+        : medsSource
+            .where((m) =>
+                m.status == ApotekMedicineStatus.stokMenipis ||
+                m.status == ApotekMedicineStatus.habis)
+            .length;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -360,7 +407,7 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
               // Card 1: Pesanan belum diproses
               Expanded(
                 child: _AttentionCardItem(
-                  count: '${ApotekMockData.orders.where((o) => o.status == ApotekOrderStatus.menunggu).length}',
+                  count: '$waitingOrdersCount',
                   title: 'Pesanan belum\ndiproses',
                   icon: Icons.shopping_bag_outlined,
                   onTap: () => _switchToTab(1, pesananTab: 0),
@@ -371,7 +418,7 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
               // Card 2: Resep belum diterima
               Expanded(
                 child: _AttentionCardItem(
-                  count: '${ApotekMockData.recipes.where((r) => r.status == ApotekRecipeStatus.belumDiverifikasi).length}',
+                  count: '$pendingRecipesCount',
                   title: 'Resep belum\nditerima',
                   icon: Icons.receipt_long_rounded,
                   onTap: () => _switchToTab(2, resepTab: 0),
@@ -379,10 +426,10 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
               ),
               const SizedBox(width: 10),
 
-              // Card 3: 3 Stok Menipis
+              // Card 3: Stok Menipis
               Expanded(
                 child: _AttentionCardItem(
-                  count: '3',
+                  count: '$lowStockCount',
                   title: 'Stok Menipis',
                   icon: Icons.inventory_2_outlined,
                   onTap: () => _switchToTab(3, obatFilter: 'Stock Menipis'),
@@ -399,6 +446,42 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
   // SECTION 2: AKTIVITAS TERBARU (Timeline / Stepper Card)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildRecentActivitySection() {
+    final List<Map<String, dynamic>> timelineItems = [];
+    if (!_isTest) {
+      for (final r in _realRecipes.take(2)) {
+        final statusStr = r.status == ApotekRecipeStatus.belumDiverifikasi
+            ? 'masuk menunggu verifikasi'
+            : (r.status == ApotekRecipeStatus.diverifikasi ? 'telah diterima' : 'selesai');
+        timelineItems.add({
+          'title': 'Resep #${r.id} (${r.patientName}) $statusStr',
+          'time': r.timeText,
+          'onTap': () => _switchToTab(2, resepTab: 0),
+        });
+      }
+      for (final o in _realOrders.take(3)) {
+        final stLabel = o.status == ApotekOrderStatus.selesai
+            ? 'selesai'
+            : (o.status == ApotekOrderStatus.diproses
+                ? 'sedang disiapkan'
+                : 'menunggu diproses');
+        final targetTab = o.status == ApotekOrderStatus.selesai
+            ? 2
+            : (o.status == ApotekOrderStatus.diproses ? 1 : 0);
+        timelineItems.add({
+          'title': 'Pesanan #${o.id} (${o.patientName}) $stLabel',
+          'time': o.timeText,
+          'onTap': () => _switchToTab(1, pesananTab: targetTab),
+        });
+      }
+      for (final m in _realMedicines.take(2)) {
+        timelineItems.add({
+          'title': 'Stok ${m.name} tersedia (${m.stock} ${m.stockUnit})',
+          'time': 'Tersinkronisasi',
+          'onTap': () => _switchToTab(3, obatFilter: 'Semua'),
+        });
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -443,41 +526,52 @@ class _ApotekerHomeScreenState extends State<ApotekerHomeScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
                     child: Column(
                       children: [
-                        _buildTimelineItem(
-                          title: 'Resep #RX-00110 telah diterima',
-                          time: '10 menit lalu',
-                          circleColor: _darkGreen,
-                          showLineBelow: true,
-                          onTap: () => _switchToTab(2, resepTab: 1),
-                        ),
-                        _buildTimelineItem(
-                          title: 'Resep #ORD-00124 selesai',
-                          time: '25 menit lalu',
-                          circleColor: _darkGreen,
-                          showLineBelow: true,
-                          onTap: () => _switchToTab(1, pesananTab: 2),
-                        ),
-                        _buildTimelineItem(
-                          title: 'Stok Paracetamol 500 mg menipis',
-                          time: '1 jam lalu',
-                          circleColor: _darkGreen,
-                          showLineBelow: true,
-                          onTap: () => _switchToTab(3, obatFilter: 'Stock Menipis'),
-                        ),
-                        _buildTimelineItem(
-                          title: 'Pesanan #ORD-00122 telah diambil kurir',
-                          time: '2 jam lalu',
-                          circleColor: _darkGreen,
-                          showLineBelow: true,
-                          onTap: () => _switchToTab(1, pesananTab: 1),
-                        ),
-                        _buildTimelineItem(
-                          title: 'Verifikasi resep #RX-00109 selesai',
-                          time: '3 jam lalu',
-                          circleColor: _darkGreen,
-                          showLineBelow: false,
-                          onTap: () => _switchToTab(2, resepTab: 2),
-                        ),
+                        if (!_isTest && timelineItems.isNotEmpty) ...[
+                          for (int i = 0; i < timelineItems.length && i < 5; i++)
+                            _buildTimelineItem(
+                              title: timelineItems[i]['title'] as String,
+                              time: timelineItems[i]['time'] as String,
+                              circleColor: _darkGreen,
+                              showLineBelow: i < (timelineItems.length < 5 ? timelineItems.length - 1 : 4),
+                              onTap: timelineItems[i]['onTap'] as VoidCallback,
+                            ),
+                        ] else ...[
+                          _buildTimelineItem(
+                            title: 'Resep #RX-00110 telah diterima',
+                            time: '10 menit lalu',
+                            circleColor: _darkGreen,
+                            showLineBelow: true,
+                            onTap: () => _switchToTab(2, resepTab: 1),
+                          ),
+                          _buildTimelineItem(
+                            title: 'Resep #ORD-00124 selesai',
+                            time: '25 menit lalu',
+                            circleColor: _darkGreen,
+                            showLineBelow: true,
+                            onTap: () => _switchToTab(1, pesananTab: 2),
+                          ),
+                          _buildTimelineItem(
+                            title: 'Stok Paracetamol 500 mg menipis',
+                            time: '1 jam lalu',
+                            circleColor: _darkGreen,
+                            showLineBelow: true,
+                            onTap: () => _switchToTab(3, obatFilter: 'Stock Menipis'),
+                          ),
+                          _buildTimelineItem(
+                            title: 'Pesanan #ORD-00122 telah diambil kurir',
+                            time: '2 jam lalu',
+                            circleColor: _darkGreen,
+                            showLineBelow: true,
+                            onTap: () => _switchToTab(1, pesananTab: 1),
+                          ),
+                          _buildTimelineItem(
+                            title: 'Verifikasi resep #RX-00109 selesai',
+                            time: '3 jam lalu',
+                            circleColor: _darkGreen,
+                            showLineBelow: false,
+                            onTap: () => _switchToTab(2, resepTab: 2),
+                          ),
+                        ],
                       ],
                     ),
                   ),

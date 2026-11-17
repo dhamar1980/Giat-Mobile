@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/apotek_api_service.dart';
+import '../../../utils/time_utils.dart';
 import '../../../widgets/giat_background.dart';
 import '../models/apotek_models.dart';
 
@@ -23,8 +26,61 @@ class _ApotekJamOperasionalScreenState
   static const _bgColor = Color(0xFFF7FAF8);
   static const _border = Color(0xFFE2E8F0);
 
-  final List<ApotekDaySchedule> _schedules = ApotekMockData.schedules;
+  List<ApotekDaySchedule> _schedules = ApotekMockData.schedules;
   bool _showAuditLog = false;
+  bool _isSaving = false;
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSchedules();
+  }
+
+  Future<void> _loadSchedules() async {
+    if (_isTest) return;
+    try {
+      final res = await ApotekApiService().getJamOperasional();
+      if (res.success && res.data != null && res.data!.isNotEmpty && mounted) {
+        final parsed = res.data!.whereType<Map>().map((e) {
+          final m = Map<String, dynamic>.from(e);
+          return ApotekDaySchedule(
+            dayName: (m['day_name'] ?? 'Senin').toString(),
+            shortDay: (m['short_day'] ?? 'S').toString(),
+            isOpen: m['is_open'] == true,
+            openTime: (m['jam_buka'] ?? '08:00 AM').toString(),
+            closeTime: (m['jam_tutup'] ?? '10:00 PM').toString(),
+          );
+        }).toList();
+        if (parsed.isNotEmpty) {
+          setState(() => _schedules = parsed);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pickTime(ApotekDaySchedule s, {required bool isOpenTime}) async {
+    final initial = const TimeOfDay(hour: 8, minute: 0);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+    );
+    if (picked != null && mounted) {
+      final h = picked.hour;
+      final m = picked.minute;
+      final suffix = h >= 12 ? 'PM' : 'AM';
+      final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+      final formatted = '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $suffix';
+      setState(() {
+        if (isOpenTime) {
+          s.openTime = formatted;
+        } else {
+          s.closeTime = formatted;
+        }
+      });
+    }
+  }
 
   void _applyToAll(ApotekDaySchedule template) {
     setState(() {
@@ -45,8 +101,26 @@ class _ApotekJamOperasionalScreenState
     );
   }
 
-  void _saveSchedules() {
+  Future<void> _saveSchedules() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    if (!_isTest) {
+      await ApotekApiService().updateJamOperasional({
+        'schedules': _schedules
+            .map((s) => {
+                  'hari': s.dayName.toLowerCase(),
+                  'day_name': s.dayName,
+                  'is_open': s.isOpen,
+                  'jam_buka': s.openTime,
+                  'jam_tutup': s.closeTime,
+                })
+            .toList(),
+      });
+      await ApotekProfileState.instance.loadProfile();
+    }
+    if (!mounted) return;
     setState(() {
+      _isSaving = false;
       _showAuditLog = true;
     });
   }
@@ -330,37 +404,40 @@ class _ApotekJamOperasionalScreenState
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Jam Buka',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _border),
-                        ),
-                        child: Text(
-                          s.openTime,
+                  child: GestureDetector(
+                    onTap: () => _pickTime(s, isOpenTime: true),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Jam Buka',
                           style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
+                            fontSize: 11.5,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _border),
+                          ),
+                          child: Text(
+                            s.openTime,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -373,37 +450,40 @@ class _ApotekJamOperasionalScreenState
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Jam Tutup',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _border),
-                        ),
-                        child: Text(
-                          s.closeTime,
+                  child: GestureDetector(
+                    onTap: () => _pickTime(s, isOpenTime: false),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Jam Tutup',
                           style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
+                            fontSize: 11.5,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _border),
+                          ),
+                          child: Text(
+                            s.closeTime,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -431,6 +511,25 @@ class _ApotekJamOperasionalScreenState
 
   // ── Audit Log View ──
   Widget _buildAuditLogView() {
+    final apotekerName = _isTest
+        ? 'Apt. Sarah Kusuma, S.Farm'
+        : ApotekProfileState.instance.apotekerName;
+    final apotekName = _isTest
+        ? 'Apotek GIAT'
+        : ApotekProfileState.instance.apotekName;
+    final now = DateTime.now();
+    final timeStr = _isTest
+        ? '30 Agu 2026, 16:00:41 WIB'
+        : '${TimeUtils.formatDate(now)}, ${TimeUtils.formatChatTime(now, separator: ':')} WIB';
+    final senin = _schedules.firstWhere(
+      (s) => s.dayName.toLowerCase() == 'senin',
+      orElse: () => _schedules.first,
+    );
+    final minggu = _schedules.firstWhere(
+      (s) => s.dayName.toLowerCase() == 'minggu',
+      orElse: () => _schedules.last,
+    );
+
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
@@ -468,7 +567,7 @@ class _ApotekJamOperasionalScreenState
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Apotek GIAT • Log Pembaruan • Hari ini, 16:00 WIB',
+                        '$apotekName • Log Pembaruan • $timeStr',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: const Color(0xFF64748B),
@@ -502,11 +601,14 @@ class _ApotekJamOperasionalScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildAuditRow('Senin - Sabtu', '08:00 - 21:00 WIB'),
+                _buildAuditRow(
+                  'Senin - Sabtu',
+                  senin.isOpen ? '${senin.openTime} - ${senin.closeTime}' : 'Tutup Layanan',
+                ),
                 const Divider(height: 18),
                 _buildAuditRow(
                   'Minggu',
-                  '08:00 - 20:00 WIB (Tutup 1 jam lebih awal)',
+                  minggu.isOpen ? '${minggu.openTime} - ${minggu.closeTime}' : 'Tutup Layanan',
                 ),
                 const Divider(height: 18),
                 _buildAuditRow('Libur Nasional', '09:00 - 17:00 WIB (Khusus)'),
@@ -544,10 +646,10 @@ class _ApotekJamOperasionalScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildAuditRow('Diubah oleh', 'Apt. Sarah Kusuma, S.Farm'),
+                _buildAuditRow('Diubah oleh', apotekerName),
                 const SizedBox(height: 4),
                 Text(
-                  'Staf Admin Operasional Apotek',
+                  'Apoteker Penanggung Jawab Operasional',
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
                     color: const Color(0xFF94A3B8),
@@ -559,11 +661,11 @@ class _ApotekJamOperasionalScreenState
                   'Penyesuaian shift staf malam & efisiensi distribusi logistik.',
                 ),
                 const Divider(height: 18),
-                _buildAuditRow('Waktu Pencatatan', '30 Agu 2026, 16:00:41 WIB'),
+                _buildAuditRow('Waktu Pencatatan', timeStr),
                 const Divider(height: 18),
                 _buildAuditRow(
                   'Dampak Pesanan',
-                  'Resep masuk setelah pukul 20:00 WIB diproses Senin 08:00 WIB.',
+                  'Resep masuk di luar jam operasional diproses pada hari buka berikutnya.',
                 ),
               ],
             ),

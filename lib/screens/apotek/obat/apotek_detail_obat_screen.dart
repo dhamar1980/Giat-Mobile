@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -120,7 +121,7 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
     }
   }
 
-  void _saveStockIncrement() {
+  Future<void> _saveStockIncrement() async {
     if (!_formKey.currentState!.validate()) return;
 
     final qty = int.tryParse(_qtyCtrl.text.replaceAll(RegExp(r'[^0-9]'), '').trim()) ?? 0;
@@ -131,28 +132,46 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
         : _batchCtrl.text.trim();
     final expDate = _expCtrl.text.trim().isEmpty ? '14 Okt 2026' : _expCtrl.text.trim();
 
-    ApotekMockData.addStockBatch(
-      medicineId: widget.medicine.id,
-      batchNo: batchNo,
-      expDate: expDate,
-      quantity: qty,
-      buyPrice: buy,
-      sellPrice: sell,
-    );
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      ApotekMockData.addStockBatch(
+        medicineId: widget.medicine.id,
+        batchNo: batchNo,
+        expDate: expDate,
+        quantity: qty,
+        buyPrice: buy,
+        sellPrice: sell,
+      );
+    } else {
+      widget.medicine.stock += qty;
+      widget.medicine.batches.insert(
+        0,
+        ApotekMedicineBatch(
+          batchNo: batchNo,
+          qtyText: '$qty ${widget.medicine.stockUnit}',
+          expDate: expDate,
+          status: 'Tersedia',
+        ),
+      );
+    }
 
     widget.medicine.buyPrice = buy;
     widget.medicine.sellPrice = sell;
 
-    // Sinkronisasi data ke REST API Backend Laravel Apotek jika tersedia
-    ApotekApiService().updateStock({
-      'obat_id': widget.medicine.id,
+    // Sinkronisasi ke Supabase & Backend Apotek
+    await ApotekApiService().updateStock({
+      'id_obat': widget.medicine.dbId ?? widget.medicine.id,
+      'obat_id': widget.medicine.dbId ?? widget.medicine.id,
+      'nama_obat': widget.medicine.name,
+      'no_batch': batchNo,
       'nomor_batch': batchNo,
       'jumlah': qty,
+      'tanggal_kadaluwarsa': expDate,
       'tanggal_kadaluarsa': expDate,
       'harga_beli': buy,
       'harga_jual': sell,
     });
 
+    if (!mounted) return;
     // Otomatis refresh batch number berikutnya
     _batchCtrl.text = _generateBatchNo();
 

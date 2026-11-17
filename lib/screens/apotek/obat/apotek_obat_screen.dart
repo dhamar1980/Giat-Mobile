@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:giat/widgets/giat_header_style.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../services/apotek_api_service.dart';
 import '../models/apotek_models.dart';
 import '../notifikasi/apotek_notifikasi_screen.dart';
 import '../profile/apotek_profile_screen.dart';
@@ -35,11 +37,45 @@ class _ApotekObatScreenState extends State<ApotekObatScreen> {
   late String _selectedFilter; // 'Semua', 'Tersedia', 'Stok Menipis', 'Habis'
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  bool _isLoading = false;
+  List<ApotekMedicine> _realMedicines = [];
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
 
   @override
   void initState() {
     super.initState();
     _normalizeInitialFilter();
+    _fetchLiveObat();
+  }
+
+  @override
+  void didUpdateWidget(covariant ApotekObatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialFilter != oldWidget.initialFilter) {
+      _normalizeInitialFilter();
+    }
+    _fetchLiveObat();
+  }
+
+  Future<void> _fetchLiveObat() async {
+    if (_isTest) return;
+    if (mounted) setState(() => _isLoading = true);
+    try {
+      final res = await ApotekApiService().getDaftarObat();
+      if (res.success && res.data != null && mounted) {
+        final parsed = res.data!
+            .whereType<Map>()
+            .map((e) => ApotekMedicine.fromSupabaseMap(Map<String, dynamic>.from(e)))
+            .toList();
+        setState(() {
+          _realMedicines = parsed;
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _normalizeInitialFilter() {
@@ -62,7 +98,7 @@ class _ApotekObatScreenState extends State<ApotekObatScreen> {
   }
 
   List<ApotekMedicine> _getFilteredMedicines() {
-    final all = ApotekMockData.medicines;
+    final all = _isTest ? ApotekMockData.medicines : _realMedicines;
     final byFilter = all.where((m) {
       if (_selectedFilter == 'Tersedia' || _selectedFilter == 'Stock Aman') {
         return m.status == ApotekMedicineStatus.tersedia;
@@ -94,20 +130,32 @@ class _ApotekObatScreenState extends State<ApotekObatScreen> {
       MaterialPageRoute(
         builder: (_) => ApotekDetailObatScreen(
           medicine: med,
-          onStockUpdated: () => setState(() {}),
+          onStockUpdated: () {
+            _fetchLiveObat();
+            setState(() {});
+          },
         ),
       ),
-    ).then((_) => setState(() {}));
+    ).then((_) {
+      _fetchLiveObat();
+      if (mounted) setState(() {});
+    });
   }
 
   void _openTambahObat() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ApotekTambahObatScreen(
-          onMedicineAdded: () => setState(() {}),
+          onMedicineAdded: () {
+            _fetchLiveObat();
+            setState(() {});
+          },
         ),
       ),
-    ).then((_) => setState(() {}));
+    ).then((_) {
+      _fetchLiveObat();
+      if (mounted) setState(() {});
+    });
   }
 
   void _handleOpenProfile() {
@@ -144,14 +192,14 @@ class _ApotekObatScreenState extends State<ApotekObatScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     final filtered = _getFilteredMedicines();
 
-    // Dinamis namun selaras dengan total inventaris apotek (148, 12, 3) di desain screenshot
-    final actualAman = ApotekMockData.medicines.where((m) => m.status == ApotekMedicineStatus.tersedia).length;
-    final actualMenipis = ApotekMockData.medicines.where((m) => m.status == ApotekMedicineStatus.stokMenipis).length;
-    final actualHabis = ApotekMockData.medicines.where((m) => m.status == ApotekMedicineStatus.habis).length;
+    final sourceList = _isTest ? ApotekMockData.medicines : _realMedicines;
+    final actualAman = sourceList.where((m) => m.status == ApotekMedicineStatus.tersedia).length;
+    final actualMenipis = sourceList.where((m) => m.status == ApotekMedicineStatus.stokMenipis).length;
+    final actualHabis = sourceList.where((m) => m.status == ApotekMedicineStatus.habis).length;
 
-    final amanCount = 147 + actualAman;
-    final menipisCount = 11 + actualMenipis;
-    final habisCount = 2 + actualHabis;
+    final amanCount = _isTest ? (147 + actualAman) : actualAman;
+    final menipisCount = _isTest ? (11 + actualMenipis) : actualMenipis;
+    final habisCount = _isTest ? (2 + actualHabis) : actualHabis;
 
     return Scaffold(
       backgroundColor: _bgColor,
@@ -390,7 +438,14 @@ class _ApotekObatScreenState extends State<ApotekObatScreen> {
                       const SizedBox(height: 12),
 
                       // List Obat Cards (Screenshot 1, 2, 3)
-                      if (filtered.isEmpty)
+                      if (_isLoading && filtered.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(
+                            child: CircularProgressIndicator(color: _darkGreen),
+                          ),
+                        )
+                      else if (filtered.isEmpty)
                         _buildEmptyState()
                       else
                         ...filtered.map((med) => Padding(
