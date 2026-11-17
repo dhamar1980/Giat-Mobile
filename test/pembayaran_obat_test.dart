@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:giat/screens/pasien/notifikasi/pasien_notifikasi_screen.dart';
 import 'package:giat/screens/pasien/obat/pembayaran_model.dart';
 import 'package:giat/screens/pasien/obat/pembayaran_qris_screen.dart';
 import 'package:giat/screens/pasien/obat/pembayaran_transfer_bank_screen.dart';
@@ -39,10 +40,10 @@ void main() {
     expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
     expect(find.byIcon(Icons.person_rounded), findsOneWidget);
 
-    // Test reminder tap shows notification SnackBar
+    // Test reminder tap navigates to PasienNotifikasiScreen
     await tester.tap(find.byIcon(Icons.notifications_none_rounded));
-    await tester.pump();
-    expect(find.text('Tidak ada notifikasi baru.'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byType(PasienNotifikasiScreen), findsOneWidget);
   });
 
   testWidgets('PembayaranTransferBankScreen renders VA data and bank selector properly', (WidgetTester tester) async {

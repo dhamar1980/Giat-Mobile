@@ -52,8 +52,12 @@ class _MasterLayoutState extends State<MasterLayout> {
     _currentIndex = widget.initialIndex;
     _activatedTabs = {_currentIndex};
     _unreadCount = StorageService().getUnreadNotificationCount();
-    PasienProfileState.instance.syncFromUser(name: widget.userName);
-    PasienProfileState.instance.loadProfile(fallbackName: widget.userName);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        PasienProfileState.instance.syncFromUser(name: widget.userName);
+        PasienProfileState.instance.loadProfile(fallbackName: widget.userName);
+      }
+    });
     ReminderNotificationService.instance.startMonitoring();
     ReminderNotificationService.instance.unreadCountNotifier
         .addListener(_onUnreadChanged);

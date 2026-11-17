@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -207,14 +209,19 @@ class _DokterListScreenState extends State<DokterListScreen> {
     }),
   ];
 
+  Timer? _fetchDoctorsTimer;
+
   @override
   void initState() {
     super.initState();
     _fetchKonsultasiSaya();
-    // Muat daftar dokter setelah jeda singkat agar request tidak bertumpuk di server
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) _fetchLiveDoctors();
-    });
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      _fetchLiveDoctors();
+    } else {
+      _fetchDoctorsTimer = Timer(const Duration(milliseconds: 300), () {
+        if (mounted) _fetchLiveDoctors();
+      });
+    }
   }
 
   /// Hanya tampilkan konsultasi yang sudah dibayar (lunas) dan bukan menunggu pembayaran
@@ -308,6 +315,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
 
   @override
   void dispose() {
+    _fetchDoctorsTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }

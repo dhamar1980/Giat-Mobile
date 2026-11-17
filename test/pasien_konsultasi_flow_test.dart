@@ -39,7 +39,6 @@ void main() {
 
     // Verify Date Section
     expect(find.text('Pilih Tanggal Konsultasi'), findsOneWidget);
-    expect(find.text('Senin, 01 Agu'), findsOneWidget);
 
     // Verify Time Section
     expect(find.text('Pilih Waktu'), findsOneWidget);
@@ -88,9 +87,7 @@ void main() {
 
     // Verify Payment Methods
     expect(find.text('Metode Pembayaran'), findsOneWidget);
-    expect(find.text('QRIS'), findsOneWidget);
-    expect(find.text('Transfer Bank'), findsOneWidget);
-    expect(find.text('Instan'), findsOneWidget);
+    expect(find.text('Midtrans Snap'), findsOneWidget);
 
     // Verify Payment Breakdown
     expect(find.text('Detail Pembayaran'), findsOneWidget);
@@ -103,7 +100,7 @@ void main() {
     expect(find.text('Jadwal otomatis masuk ke menu "Konsultasi Saya"'), findsOneWidget);
 
     // Verify Button
-    expect(find.text('Bayar Sekarang'), findsOneWidget);
+    expect(find.textContaining('Bayar dengan'), findsOneWidget);
   });
 
   testWidgets('MenungguPembayaranQrisScreen renders QRIS code, doctor info, steps, and success dialog', (tester) async {

@@ -103,7 +103,7 @@ void main() {
 
       // Check top elements
       expect(find.text('Kembali'), findsOneWidget);
-      expect(find.text('Pilihan Jawaban Anda'), findsOneWidget);
+      expect(find.text('Jawaban Anda'), findsOneWidget);
       expect(find.text('Lanjutkan'), findsOneWidget);
     });
 
@@ -137,7 +137,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify category badge, label & confidence badge
-      expect(find.text('RISIKO TINGGI'), findsOneWidget);
+      expect(find.text('Risiko Tinggi'), findsOneWidget);
       expect(find.text('Berisiko Penyakit Ginjal Kronis (CKD)'), findsOneWidget);
       expect(find.text('Keyakinan AI: 62.6%'), findsOneWidget);
       expect(find.text('Total Skor Risiko: 10 poin'), findsOneWidget);
