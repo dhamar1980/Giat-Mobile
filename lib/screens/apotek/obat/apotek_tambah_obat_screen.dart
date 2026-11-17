@@ -485,7 +485,7 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
       if (!res.success && !Platform.environment.containsKey('FLUTTER_TEST')) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(res.message ?? 'Gagal menyimpan obat. Silakan periksa kembali data Anda.'),
+            content: Text(res.message.isNotEmpty ? res.message : 'Gagal menyimpan obat. Silakan periksa kembali data Anda.'),
             backgroundColor: const Color(0xFFDC2626),
             behavior: SnackBarBehavior.floating,
           ),
@@ -837,15 +837,193 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Chip pilihan cepat katalog standar GIAT
+                          Row(
+                            children: [
+                              const Icon(Icons.auto_awesome, size: 14, color: _darkGreen),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  'Pilih Cepat Obat Standar GIAT:',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF334155),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                'Ketosteril Tab',
+                                'Calos 500mg',
+                                'Natrium Bikarbonat 500mg',
+                                'Candesartan 8mg',
+                                'Furosemide 40mg',
+                                'Amlodipine 5mg',
+                                'Renalvit Tab',
+                                'Paracetamol 500mg',
+                              ].map((name) {
+                                final item = MasterObatCatalog.findByName(name);
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: ActionChip(
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    backgroundColor: const Color(0xFFEFF6FF),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: const BorderSide(color: Color(0xFFBFDBFE)),
+                                    ),
+                                    label: Text(
+                                      name,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF1E40AF),
+                                      ),
+                                    ),
+                                    onPressed: () {
+                                      if (item != null) _applyMasterObat(item);
+                                    },
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
                           // Nama Obat*
                           _buildFieldLabel('Nama Obat'),
                           const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _nameCtrl,
-                            onChanged: (_) => setState(() {}),
-                            style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF0F172A)),
-                            decoration: _buildInputDecoration(hint: 'Ibuprofen 400 mg'),
-                            validator: (v) => (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                          RawAutocomplete<MasterObatItem>(
+                            textEditingController: _nameCtrl,
+                            focusNode: _nameFocusNode,
+                            optionsBuilder: (TextEditingValue textEditingValue) {
+                              if (textEditingValue.text.isEmpty) {
+                                return MasterObatCatalog.all.take(8);
+                              }
+                              return MasterObatCatalog.search(textEditingValue.text);
+                            },
+                            displayStringForOption: (MasterObatItem option) => option.nama,
+                            onSelected: (MasterObatItem selection) {
+                              _applyMasterObat(selection);
+                            },
+                            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                              return TextFormField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                onChanged: (_) => setState(() {}),
+                                style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF0F172A)),
+                                decoration: _buildInputDecoration(
+                                  hint: 'Ketik & cari nama obat standar (mis. Ketosteril, Calos)...',
+                                  prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF64748B)),
+                                ),
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+                              );
+                            },
+                            optionsViewBuilder: (context, onSelected, options) {
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  elevation: 6,
+                                  borderRadius: BorderRadius.circular(14),
+                                  color: Colors.white,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxHeight: 260,
+                                      maxWidth: MediaQuery.of(context).size.width - 76,
+                                    ),
+                                    child: ListView.separated(
+                                      padding: const EdgeInsets.symmetric(vertical: 6),
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                      itemBuilder: (BuildContext context, int index) {
+                                        final MasterObatItem option = options.elementAt(index);
+                                        return InkWell(
+                                          onTap: () => onSelected(option),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 34,
+                                                  height: 34,
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFF0FDF4),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                                                  ),
+                                                  child: const Center(
+                                                    child: Icon(Icons.medication_rounded, size: 18, color: _darkGreen),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        option.nama,
+                                                        style: GoogleFonts.inter(
+                                                          fontSize: 13.5,
+                                                          fontWeight: FontWeight.w700,
+                                                          color: const Color(0xFF0F172A),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        '${option.kategori} • ${option.dosis} • ${option.satuanKemasan}',
+                                                        style: GoogleFonts.inter(
+                                                          fontSize: 11,
+                                                          color: const Color(0xFF64748B),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFF1F5F9),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    'Pilih',
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: _darkGreen,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '💡 Memilih dari katalog standar otomatis menyinkronkan data dengan Resep Dokter dan Pesanan Pasien.',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: const Color(0xFF64748B),
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
 
                           const SizedBox(height: 14),
@@ -855,6 +1033,7 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
                             value: _selectedCategory,
+                            isExpanded: true,
                             icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
                             decoration: _buildInputDecoration(hint: 'Pilih Kategori'),
                             style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF0F172A)),
@@ -873,6 +1052,7 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
                             value: _selectedForm,
+                            isExpanded: true,
                             icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
                             decoration: _buildInputDecoration(hint: 'Pilih Bentuk'),
                             style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF0F172A)),

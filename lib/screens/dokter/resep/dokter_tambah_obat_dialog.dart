@@ -3,9 +3,9 @@ import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dokter_models.dart';
-import '../notifikasi/dokter_notifikasi_screen.dart';
 import '../../../widgets/app_top_action_pill.dart';
 import '../../../services/dokter_api_service.dart';
+import '../../../constants/master_obat_data.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM TAMBAH / EDIT OBAT RESEP (Sesuai Desain Tambah Obat)
@@ -49,17 +49,7 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
     'Pagi dan Malam hari',
   ];
 
-  final List<String> _suggestedMedicines = [
-    'Candesartan 8mg',
-    'Candesartan 16mg',
-    'Furosemide 40mg',
-    'Amlodipine 5mg',
-    'Amlodipine 10mg',
-    'Ketosteril 600mg',
-    'Natrium Bikarbonat 500mg',
-    'Paracetamol 500mg',
-    'Asam Folat 1mg',
-  ];
+  final List<String> _suggestedMedicines = MasterObatCatalog.all.map((e) => e.nama).toList();
   final Map<String, Map<String, dynamic>> _liveObatCatalog = {};
 
   bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
@@ -99,9 +89,12 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
         }
         if (names.isNotEmpty) {
           setState(() {
-            _suggestedMedicines
-              ..clear()
-              ..addAll(names);
+            // Gabungkan obat yang ada di Apotek mitra dengan Master Katalog GIAT
+            for (final n in names) {
+              if (!_suggestedMedicines.contains(n)) {
+                _suggestedMedicines.insert(0, n);
+              }
+            }
           });
         }
       }
@@ -122,40 +115,37 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
   void _onMedicineSelected(String name) {
     _namaObatCtrl.text = name;
 
+    // 1. Cek dari MasterObatCatalog (standar klinis nasional/global)
+    final master = MasterObatCatalog.findByName(name);
+    if (master != null) {
+      _dosisCtrl.text = master.dosis;
+      _jumlahCtrl.text = master.defaultJumlah;
+      _frekuensiCtrl.text = master.defaultFrekuensi;
+      _durasiCtrl.text = master.defaultDurasi;
+      _instruksiCtrl.text = master.aturanPakaiUmum;
+      if (_caraPenggunaanOptions.contains(master.defaultWaktuPenggunaan)) {
+        _selectedCaraPenggunaan = master.defaultWaktuPenggunaan;
+      } else {
+        _selectedCaraPenggunaan = 'Sesudah Makan';
+      }
+    }
+
+    // 2. Cek apakah ada data inventaris live Apotek di database Supabase
     final liveObat = _liveObatCatalog[name];
     if (liveObat != null) {
       final dbDosis = (liveObat['dosis'] ?? '').toString().trim();
-      final dbAturan = (liveObat['aturan_pakai_umum'] ?? '').toString().trim();
-      if (_dosisCtrl.text.isEmpty && dbDosis.isNotEmpty) _dosisCtrl.text = dbDosis;
-      if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '10 Tablet';
-      if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
-      if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '10 hari';
-      if (_instruksiCtrl.text.isEmpty && dbAturan.isNotEmpty) _instruksiCtrl.text = dbAturan;
-      _selectedCaraPenggunaan ??= 'Sesudah Makan';
-      setState(() {});
-      return;
+      final dbAturan = (liveObat['aturan_pakai_umum'] ?? liveObat['aturan_pakai'] ?? '').toString().trim();
+      if (dbDosis.isNotEmpty) _dosisCtrl.text = dbDosis;
+      if (dbAturan.isNotEmpty) _instruksiCtrl.text = dbAturan;
     }
 
-    // Auto-fill sensible defaults for known medicines if empty
-    if (name.contains('Candesartan 8mg')) {
-      if (_dosisCtrl.text.isEmpty) _dosisCtrl.text = '8mg';
-      if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '10 Tablet';
-      if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
-      if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '10 hari';
-      _selectedCaraPenggunaan ??= 'Sesudah Makan';
-    } else if (name.contains('Furosemide 40mg')) {
-      if (_dosisCtrl.text.isEmpty) _dosisCtrl.text = '40mg';
-      if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '5 Tablet';
-      if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
-      if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '5 hari';
-      _selectedCaraPenggunaan ??= 'Pagi hari, Sesudah Makan';
-    } else if (name.contains('Amlodipine 5mg')) {
-      if (_dosisCtrl.text.isEmpty) _dosisCtrl.text = '5mg';
-      if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '10 Tablet';
-      if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
-      if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '10 hari';
-      _selectedCaraPenggunaan ??= 'Sesudah Makan';
-    }
+    // 3. Fallback jika ada yang belum terisi
+    if (_dosisCtrl.text.isEmpty) _dosisCtrl.text = '500mg';
+    if (_jumlahCtrl.text.isEmpty) _jumlahCtrl.text = '10 Tablet';
+    if (_frekuensiCtrl.text.isEmpty) _frekuensiCtrl.text = '1 x 1 hari';
+    if (_durasiCtrl.text.isEmpty) _durasiCtrl.text = '10 hari';
+    _selectedCaraPenggunaan ??= 'Sesudah Makan';
+
     setState(() {});
   }
 
@@ -229,6 +219,72 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
                             ),
                           ),
 
+                          const SizedBox(height: 10),
+
+                          // Pilihan Cepat Resep Ginjal & Hipertensi
+                          Row(
+                            children: [
+                              const Icon(Icons.auto_awesome, size: 14, color: _darkGreen),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Rekomendasi Cepat Resep Ginjal:',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                'Ketosteril Tab',
+                                'Calos 500mg',
+                                'Natrium Bikarbonat 500mg',
+                                'Candesartan 8mg',
+                                'Furosemide 40mg',
+                                'Amlodipine 5mg',
+                                'Renalvit Tab',
+                                'Paracetamol 500mg',
+                              ].map((name) {
+                                final isAvailable = _liveObatCatalog.containsKey(name);
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: ActionChip(
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    backgroundColor: isAvailable ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: BorderSide(
+                                        color: isAvailable ? const Color(0xFFA7F3D0) : const Color(0xFFBFDBFE),
+                                      ),
+                                    ),
+                                    avatar: isAvailable
+                                        ? const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF059669))
+                                        : null,
+                                    label: Text(
+                                      name,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: isAvailable ? const Color(0xFF065A37) : const Color(0xFF1E40AF),
+                                      ),
+                                    ),
+                                    onPressed: () {
+                                      _onMedicineSelected(name);
+                                    },
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+
                           const SizedBox(height: 12),
 
                           // ── Search Field: Cari Obat.... ──
@@ -236,7 +292,7 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
                             initialValue: TextEditingValue(text: _namaObatCtrl.text),
                             optionsBuilder: (textEditingValue) {
                               if (textEditingValue.text.isEmpty) {
-                                return _suggestedMedicines;
+                                return _suggestedMedicines.take(8);
                               }
                               return _suggestedMedicines.where(
                                 (item) => item.toLowerCase().contains(textEditingValue.text.toLowerCase()),
@@ -244,6 +300,106 @@ class _DokterTambahObatScreenState extends State<DokterTambahObatScreen> {
                             },
                             onSelected: (String selection) {
                               _onMedicineSelected(selection);
+                            },
+                            optionsViewBuilder: (context, onSelected, options) {
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  elevation: 6,
+                                  borderRadius: BorderRadius.circular(14),
+                                  color: Colors.white,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxHeight: 260,
+                                      maxWidth: MediaQuery.of(context).size.width - 32,
+                                    ),
+                                    child: ListView.separated(
+                                      padding: const EdgeInsets.symmetric(vertical: 6),
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                      itemBuilder: (context, index) {
+                                        final opt = options.elementAt(index);
+                                        final master = MasterObatCatalog.findByName(opt);
+                                        final isApotekStocked = _liveObatCatalog.containsKey(opt);
+
+                                        return InkWell(
+                                          onTap: () => onSelected(opt),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 34,
+                                                  height: 34,
+                                                  decoration: BoxDecoration(
+                                                    color: isApotekStocked ? const Color(0xFFECFDF5) : const Color(0xFFF0FDF4),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(
+                                                      color: isApotekStocked ? const Color(0xFFA7F3D0) : const Color(0xFFBBF7D0),
+                                                    ),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.medication_rounded,
+                                                    size: 18,
+                                                    color: isApotekStocked ? const Color(0xFF059669) : _darkGreen,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        opt,
+                                                        style: GoogleFonts.inter(
+                                                          fontSize: 13.5,
+                                                          fontWeight: FontWeight.w700,
+                                                          color: const Color(0xFF0F172A),
+                                                        ),
+                                                      ),
+                                                      if (master != null) ...[
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          '${master.kategori} • ${master.dosis} • ${master.satuanKemasan}',
+                                                          style: GoogleFonts.inter(
+                                                            fontSize: 11,
+                                                            color: const Color(0xFF64748B),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: isApotekStocked ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(
+                                                      color: isApotekStocked ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0),
+                                                      width: 0.8,
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    isApotekStocked ? '✓ Stok Apotek' : 'Standar GIAT',
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 10.5,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: isApotekStocked ? const Color(0xFF059669) : const Color(0xFF475569),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              );
                             },
                             fieldViewBuilder: (context, fieldTextEditingController, fieldFocusNode, onFieldSubmitted) {
                               fieldTextEditingController.addListener(() {
