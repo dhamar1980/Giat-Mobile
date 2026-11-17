@@ -25,7 +25,6 @@ class _ApotekRiwayatAktivitasScreenState
   static const _bgColor = Color(0xFFF7FAF8);
   static const _border = Color(0xFFE2E8F0);
 
-  int _selectedFilter = 0; // 0: Semua, 1: Hari ini, 2: Minggu ini, 3: Kemarin & Sebelumnya
   bool _isLoading = false;
   List<ApotekActivity> _realActivities = [];
 
@@ -56,21 +55,7 @@ class _ApotekRiwayatAktivitasScreenState
   }
 
   List<ApotekActivity> _getFilteredActivities() {
-    final source = _isTest ? ApotekMockData.activities : _realActivities;
-    if (_selectedFilter == 0 || _isTest) return source;
-    final now = DateTime.now();
-    return source.where((act) {
-      final dt = act.createdAt;
-      if (dt == null) return true;
-      final diffDays = now.difference(dt).inDays;
-      if (_selectedFilter == 1) {
-        return dt.year == now.year && dt.month == now.month && dt.day == now.day;
-      } else if (_selectedFilter == 2) {
-        return diffDays <= 7;
-      } else {
-        return diffDays >= 1;
-      }
-    }).toList();
+    return _isTest ? ApotekMockData.activities : _realActivities;
   }
 
   void _showActivityDetail(ApotekActivity act) {
@@ -742,29 +727,7 @@ class _ApotekRiwayatAktivitasScreenState
                   ),
                 ),
 
-                // Tabs (Semua, Hari ini, Minggu ini, Kemarin & Sebelumnya)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 6,
-                  ),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildTab(0, 'Semua'),
-                        const SizedBox(width: 8),
-                        _buildTab(1, 'Hari ini'),
-                        const SizedBox(width: 8),
-                        _buildTab(2, 'Minggu ini'),
-                        const SizedBox(width: 8),
-                        _buildTab(3, 'Kemarin & Sebelumnya'),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
 
                 // Activity List
                 Expanded(
@@ -772,7 +735,17 @@ class _ApotekRiwayatAktivitasScreenState
                       ? const Center(
                           child: CircularProgressIndicator(color: _darkGreen),
                         )
-                      : ListView.separated(
+                      : acts.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Belum ada riwayat aktivitas tercatat.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: const Color(0xFF94A3B8),
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(
                       parent: BouncingScrollPhysics(),
                     ),
@@ -898,31 +871,6 @@ class _ApotekRiwayatAktivitasScreenState
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTab(int index, String label) {
-    final isSelected = _selectedFilter == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? _darkGreen : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? _darkGreen : _border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12.5,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected ? Colors.white : const Color(0xFF64748B),
-          ),
-        ),
       ),
     );
   }

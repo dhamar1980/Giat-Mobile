@@ -146,16 +146,18 @@ class _ApotekObatScreenState extends State<ApotekObatScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ApotekTambahObatScreen(
-          onMedicineAdded: () {
+          onMedicineAdded: ([newMed]) {
+            if (newMed != null && mounted) {
+              setState(() {
+                _realMedicines.removeWhere((m) => m.id == newMed.id || (m.dbId != null && m.dbId == newMed.dbId));
+                _realMedicines.insert(0, newMed);
+              });
+            }
             _fetchLiveObat();
-            setState(() {});
           },
         ),
       ),
-    ).then((_) {
-      _fetchLiveObat();
-      if (mounted) setState(() {});
-    });
+    );
   }
 
   void _handleOpenProfile() {

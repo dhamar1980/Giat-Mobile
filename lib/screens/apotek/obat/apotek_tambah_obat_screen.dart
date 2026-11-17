@@ -12,7 +12,7 @@ import '../../../services/apotek_api_service.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ApotekTambahObatScreen extends StatefulWidget {
-  final VoidCallback? onMedicineAdded;
+  final void Function([ApotekMedicine? newMedicine])? onMedicineAdded;
   final VoidCallback? onOpenProfile;
 
   const ApotekTambahObatScreen({
@@ -449,12 +449,37 @@ class _ApotekTambahObatScreenState extends State<ApotekTambahObatScreen> {
         return;
       }
 
-      widget.onMedicineAdded?.call();
-
-      final createdId = res.data?['id']?.toString() ?? newId;
+      final createdId = res.data?['id_obat']?.toString() ?? res.data?['id']?.toString() ?? newId;
       final displayCode = createdId.length >= 4 && !createdId.startsWith('#')
           ? '#MED-${createdId.substring(0, 4).toUpperCase()}'
           : newId;
+
+      final newMed = ApotekMedicine(
+        dbId: createdId,
+        id: displayCode,
+        name: name,
+        category: category,
+        form: _selectedForm,
+        dose: dose,
+        packageUnit: package,
+        stock: stock,
+        stockUnit: _selectedForm,
+        buyPrice: buy,
+        sellPrice: sell,
+        expDate: exp,
+        imagePath: imageToSave,
+        usageRule: notes.isNotEmpty ? notes : null,
+        batches: [
+          ApotekMedicineBatch(
+            batchNo: batchNo,
+            qtyText: '$stock $_selectedForm',
+            expDate: exp,
+            status: stock <= 0 ? 'Habis' : (stock <= 10 ? 'Stok Menipis' : 'Tersedia'),
+          ),
+        ],
+      );
+
+      widget.onMedicineAdded?.call(newMed);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

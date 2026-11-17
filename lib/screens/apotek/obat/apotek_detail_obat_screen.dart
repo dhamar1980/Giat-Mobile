@@ -187,6 +187,62 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
     );
   }
 
+  Widget _buildMedicineImage(String? path) {
+    if (path == null || path.isEmpty) {
+      return _buildFallbackImage();
+    }
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          path,
+          width: 58,
+          height: 58,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackImage(),
+        ),
+      );
+    }
+    final file = File(path);
+    if (file.existsSync()) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.file(
+          file,
+          width: 58,
+          height: 58,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackImage(),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.asset(
+        path,
+        width: 58,
+        height: 58,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackImage(),
+      ),
+    );
+  }
+
+  Widget _buildFallbackImage() {
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: const Color(0xFFDCFCE7),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF86EFAC)),
+      ),
+      child: const Center(
+        child: Icon(Icons.medication_rounded, size: 30, color: _darkGreen),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final med = widget.medicine;
@@ -303,47 +359,27 @@ class _ApotekDetailObatScreenState extends State<ApotekDetailObatScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Green square container with composite clipboard-prescription icon
-                        Container(
-                          width: 58,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            color: _darkGreen,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Center(
-                            child: _DetailPrescriptionSquareIcon(size: 32, color: Colors.white),
-                          ),
-                        ),
+                        _buildMedicineImage(med.imagePath),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                med.id,
+                                med.name,
                                 style: GoogleFonts.inter(
-                                  fontSize: 14,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFF0F172A),
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                med.name,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                              ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 4),
                               Text(
                                 'Stok: ${med.stock} ${med.stockUnit}',
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF0F172A),
+                                  color: const Color(0xFF065A37),
                                 ),
                               ),
                             ],

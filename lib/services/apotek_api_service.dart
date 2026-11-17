@@ -222,7 +222,11 @@ class ApotekApiService {
             data: sbDetail,
           );
         }
-      } catch (_) {}
+        return ApiResponse.error(message: 'Pesanan tidak ditemukan di database.');
+      } catch (e) {
+        debugPrint('⚠️ Supabase fetchDetailPesanan note: $e');
+        return ApiResponse.error(message: 'Gagal memuat rincian pesanan: $e');
+      }
     }
 
     try {
@@ -246,13 +250,14 @@ class ApotekApiService {
           newStatus: 'menunggu_konfirmasi',
           progressStep: 2,
         );
-        if (sbRes != null) {
-          return ApiResponse.success(
-            message: 'Pesanan berhasil diterima.',
-            data: sbRes,
-          );
-        }
-      } catch (_) {}
+        return ApiResponse.success(
+          message: 'Pesanan berhasil diterima.',
+          data: sbRes ?? {},
+        );
+      } catch (e) {
+        debugPrint('⚠️ Supabase terimaPesanan note: $e');
+        return ApiResponse.error(message: 'Gagal menerima pesanan: $e');
+      }
     }
 
     try {
@@ -276,13 +281,14 @@ class ApotekApiService {
           newStatus: 'diproses',
           progressStep: 4,
         );
-        if (sbRes != null) {
-          return ApiResponse.success(
-            message: 'Pesanan sedang disiapkan.',
-            data: sbRes,
-          );
-        }
-      } catch (_) {}
+        return ApiResponse.success(
+          message: 'Pesanan sedang disiapkan.',
+          data: sbRes ?? {},
+        );
+      } catch (e) {
+        debugPrint('⚠️ Supabase prosesPesanan note: $e');
+        return ApiResponse.error(message: 'Gagal memproses pesanan: $e');
+      }
     }
 
     try {
@@ -306,13 +312,14 @@ class ApotekApiService {
           newStatus: 'selesai',
           progressStep: 5,
         );
-        if (sbRes != null) {
-          return ApiResponse.success(
-            message: 'Pesanan obat telah diselesaikan.',
-            data: sbRes,
-          );
-        }
-      } catch (_) {}
+        return ApiResponse.success(
+          message: 'Pesanan obat telah diselesaikan.',
+          data: sbRes ?? {},
+        );
+      } catch (e) {
+        debugPrint('⚠️ Supabase selesaikanPesanan note: $e');
+        return ApiResponse.error(message: 'Gagal menyelesaikan pesanan: $e');
+      }
     }
 
     try {
@@ -336,13 +343,14 @@ class ApotekApiService {
           newStatus: 'ditolak',
           alasanPenolakan: alasan ?? 'Stok obat tidak mencukupi atau kedaluwarsa',
         );
-        if (sbRes != null) {
-          return ApiResponse.success(
-            message: 'Pesanan berhasil ditolak.',
-            data: sbRes,
-          );
-        }
-      } catch (_) {}
+        return ApiResponse.success(
+          message: 'Pesanan berhasil ditolak.',
+          data: sbRes ?? {},
+        );
+      } catch (e) {
+        debugPrint('⚠️ Supabase tolakPesanan note: $e');
+        return ApiResponse.error(message: 'Gagal menolak pesanan: $e');
+      }
     }
 
     try {
@@ -415,14 +423,13 @@ class ApotekApiService {
           apotekId: apotekId,
           apotekName: apotekName,
         );
-        if (sbRes != null) {
-          return ApiResponse.success(
-            message: 'Resep berhasil divalidasi dan diterima.',
-            data: sbRes,
-          );
-        }
+        return ApiResponse.success(
+          message: 'Resep berhasil divalidasi dan diterima.',
+          data: sbRes ?? {},
+        );
       } catch (e) {
         debugPrint('⚠️ Supabase acceptApotekResep note: $e');
+        return ApiResponse.error(message: 'Gagal memvalidasi resep: $e');
       }
     }
 
@@ -541,6 +548,7 @@ class ApotekApiService {
             data: sbRes,
           );
         }
+        return ApiResponse.error(message: 'Gagal mendaftarkan obat: Apotek ID tidak ditemukan.');
       } catch (e) {
         debugPrint('⚠️ Supabase addApotekObat note: $e');
         return ApiResponse.error(message: 'Gagal mendaftarkan obat: $e');
@@ -578,6 +586,7 @@ class ApotekApiService {
             data: sbRes,
           );
         }
+        return ApiResponse.error(message: 'Gagal menyesuaikan stok: Data apotek tidak ditemukan.');
       } catch (e) {
         debugPrint('⚠️ Supabase addApotekStockBatch note: $e');
         return ApiResponse.error(message: 'Gagal menyesuaikan stok: $e');
@@ -617,7 +626,11 @@ class ApotekApiService {
             data: sbProfile,
           );
         }
-      } catch (_) {}
+        return ApiResponse.error(message: 'Data profil apotek tidak ditemukan di Supabase.');
+      } catch (e) {
+        debugPrint('⚠️ Supabase fetchApotekProfileFull note: $e');
+        return ApiResponse.error(message: 'Gagal memuat profil apotek: $e');
+      }
     }
 
     try {
@@ -637,13 +650,14 @@ class ApotekApiService {
     if (!_isTest) {
       try {
         final sbUpdated = await SupabaseAdminService.instance.updateApotekProfileFull(data);
-        if (sbUpdated != null) {
-          return ApiResponse.success(
-            message: 'Profil apotek berhasil diperbarui.',
-            data: sbUpdated,
-          );
-        }
-      } catch (_) {}
+        return ApiResponse.success(
+          message: 'Profil apotek berhasil diperbarui di Supabase.',
+          data: sbUpdated ?? data,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Supabase updateApotekProfileFull note: $e');
+        return ApiResponse.error(message: 'Gagal memperbarui profil: $e');
+      }
     }
 
     try {
@@ -675,7 +689,10 @@ class ApotekApiService {
           message: 'Kata sandi apotek berhasil diperbarui.',
           data: {'updated': true},
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('⚠️ Supabase updateApotekPassword note: $e');
+        return ApiResponse.error(message: 'Gagal memperbarui kata sandi: $e');
+      }
     }
 
     try {
@@ -701,13 +718,17 @@ class ApotekApiService {
           apotekId: apotekId,
           apotekName: apotekName,
         );
-        if (sbList.isNotEmpty) {
-          return ApiResponse.success(
-            message: 'Berhasil memuat jadwal jam operasional dari Supabase.',
-            data: sbList,
-          );
-        }
-      } catch (_) {}
+        return ApiResponse.success(
+          message: 'Berhasil memuat jadwal jam operasional dari Supabase.',
+          data: sbList,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Supabase fetchApotekJamOperasional note: $e');
+        return ApiResponse.success(
+          message: 'Berhasil memuat jadwal jam operasional.',
+          data: [],
+        );
+      }
     }
 
     try {
@@ -740,7 +761,11 @@ class ApotekApiService {
             data: {'schedules': updated},
           );
         }
-      } catch (_) {}
+        return ApiResponse.success(message: 'Jadwal operasional berhasil disimpan.');
+      } catch (e) {
+        debugPrint('⚠️ Supabase updateApotekJamOperasional note: $e');
+        return ApiResponse.error(message: 'Gagal memperbarui jam operasional: $e');
+      }
     }
 
     try {
@@ -766,13 +791,17 @@ class ApotekApiService {
           apotekId: apotekId,
           apotekName: apotekName,
         );
-        if (sbList.isNotEmpty) {
-          return ApiResponse.success(
-            message: 'Berhasil memuat daftar area layanan dari Supabase.',
-            data: sbList,
-          );
-        }
-      } catch (_) {}
+        return ApiResponse.success(
+          message: 'Berhasil memuat daftar area layanan dari Supabase.',
+          data: sbList,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Supabase fetchApotekAreaLayanan note: $e');
+        return ApiResponse.success(
+          message: 'Berhasil memuat daftar area layanan.',
+          data: [],
+        );
+      }
     }
 
     try {
@@ -805,7 +834,11 @@ class ApotekApiService {
             data: {'areas': updated},
           );
         }
-      } catch (_) {}
+        return ApiResponse.success(message: 'Cakupan area layanan berhasil diperbarui.');
+      } catch (e) {
+        debugPrint('⚠️ Supabase updateApotekAreaLayanan note: $e');
+        return ApiResponse.error(message: 'Gagal memperbarui area layanan: $e');
+      }
     }
 
     try {
@@ -830,13 +863,14 @@ class ApotekApiService {
         final sbRes = await SupabaseAdminService.instance.toggleApotekStatusLayanan(
           isActive: isActive,
         );
-        if (sbRes != null) {
-          return ApiResponse.success(
-            message: 'Status layanan apotek berhasil diubah.',
-            data: sbRes,
-          );
-        }
-      } catch (_) {}
+        return ApiResponse.success(
+          message: 'Status layanan apotek berhasil diubah.',
+          data: sbRes ?? {'status_layanan': isActive ?? true},
+        );
+      } catch (e) {
+        debugPrint('⚠️ Supabase toggleApotekStatusLayanan note: $e');
+        return ApiResponse.error(message: 'Gagal mengubah status layanan: $e');
+      }
     }
 
     try {
@@ -866,7 +900,13 @@ class ApotekApiService {
           message: 'Berhasil memuat riwayat aktivitas dari Supabase.',
           data: sbList,
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('⚠️ Supabase fetchApotekRiwayatAktivitas note: $e');
+        return ApiResponse.success(
+          message: 'Berhasil memuat riwayat aktivitas.',
+          data: [],
+        );
+      }
     }
 
     try {

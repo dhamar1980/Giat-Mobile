@@ -3798,13 +3798,25 @@ class SupabaseAdminService {
   // MODUL APOTEK: NOTIFIKASI REAL SUPABASE
   // ===========================================================================
 
+  String? _cachedCurrentApotekId;
+
+  /// Membersihkan cache id apotek saat logout / ganti akun
+  void clearApotekCache() {
+    _cachedCurrentApotekId = null;
+  }
+
   /// Menentukan ID Apotek (`id_apotek` / `user.id`) yang sedang login di Supabase
   Future<String?> resolveCurrentApotekId({
     String? overrideApotekId,
     String? apotekName,
   }) async {
     if (overrideApotekId != null && overrideApotekId.trim().length >= 30) {
-      return overrideApotekId.trim();
+      _cachedCurrentApotekId = overrideApotekId.trim();
+      return _cachedCurrentApotekId;
+    }
+
+    if (overrideApotekId == null && apotekName == null && _cachedCurrentApotekId != null) {
+      return _cachedCurrentApotekId;
     }
 
     final user = await StorageService().getUser();
@@ -3816,6 +3828,7 @@ class SupabaseAdminService {
           parameters: {'id': rawId},
         );
         if (check.isNotEmpty) {
+          _cachedCurrentApotekId = rawId;
           return rawId;
         }
       }
@@ -3834,7 +3847,10 @@ class SupabaseAdminService {
         );
         if (byEmail.isNotEmpty) {
           final id = byEmail.first.toColumnMap()['id']?.toString().trim();
-          if (id != null && id.isNotEmpty) return id;
+          if (id != null && id.isNotEmpty) {
+            _cachedCurrentApotekId = id;
+            return id;
+          }
         }
       }
 
@@ -3852,7 +3868,10 @@ class SupabaseAdminService {
         );
         if (byNama.isNotEmpty) {
           final id = byNama.first.toColumnMap()['id']?.toString().trim();
-          if (id != null && id.isNotEmpty) return id;
+          if (id != null && id.isNotEmpty) {
+            _cachedCurrentApotekId = id;
+            return id;
+          }
         }
       }
     }
@@ -3870,7 +3889,10 @@ class SupabaseAdminService {
       );
       if (byFallbackName.isNotEmpty) {
         final id = byFallbackName.first.toColumnMap()['id']?.toString().trim();
-        if (id != null && id.isNotEmpty) return id;
+        if (id != null && id.isNotEmpty) {
+          _cachedCurrentApotekId = id;
+          return id;
+        }
       }
     }
 
@@ -3879,7 +3901,9 @@ class SupabaseAdminService {
       'SELECT TRIM(id_apotek) AS id FROM apotek ORDER BY created_at ASC LIMIT 1',
     );
     if (firstApotek.isNotEmpty) {
-      return firstApotek.first.toColumnMap()['id']?.toString().trim();
+      final id = firstApotek.first.toColumnMap()['id']?.toString().trim();
+      _cachedCurrentApotekId = id;
+      return id;
     }
     return null;
   }
@@ -4552,7 +4576,7 @@ class SupabaseAdminService {
         COALESCE(a.status_layanan, true) AS status_layanan,
         a.foto_profile,
         u.email,
-        u.nama AS nama_user
+        a.penanggung_jawab AS nama_user
       FROM apotek a
       LEFT JOIN "user" u ON TRIM(u.id) = TRIM(a.id_apotek)
       WHERE TRIM(a.id_apotek) = @aptId
@@ -5591,26 +5615,37 @@ class SupabaseAdminService {
       parameters: params,
     );
 
+    final batchRows = await _exec(
+      '''
+      SELECT
+        TRIM(id) AS id,
+        TRIM(id_obat) AS id_obat,
+        no_batch,
+        COALESCE(stok_batch, 0) AS stok_batch,
+        tanggal_kadaluwarsa::text AS tanggal_kadaluwarsa,
+        COALESCE(status, 'tersedia') AS status,
+        created_at
+      FROM obat_batches
+      WHERE TRIM(id_apotek) = @aptId
+      ORDER BY created_at DESC
+      ''',
+      parameters: {'aptId': aptId},
+    );
+
+    final Map<String, List<Map<String, dynamic>>> batchMap = {};
+    for (final br in batchRows) {
+      final bm = _normalizeMap(br.toColumnMap());
+      final oId = bm['id_obat']?.toString().trim() ?? '';
+      if (oId.isNotEmpty) {
+        batchMap.putIfAbsent(oId, () => []).add(bm);
+      }
+    }
+
     final List<Map<String, dynamic>> result = [];
     for (final r in rows) {
       final m = _normalizeMap(r.toColumnMap());
       final idObat = m['id_obat']?.toString().trim() ?? '';
-      final batchRows = await _exec(
-        '''
-        SELECT
-          TRIM(id) AS id,
-          no_batch,
-          COALESCE(stok_batch, 0) AS stok_batch,
-          tanggal_kadaluwarsa::text AS tanggal_kadaluwarsa,
-          COALESCE(status, 'tersedia') AS status,
-          created_at
-        FROM obat_batches
-        WHERE TRIM(id_obat) = @idObat
-        ORDER BY created_at DESC
-        ''',
-        parameters: {'idObat': idObat},
-      );
-      m['batches'] = batchRows.map((br) => _normalizeMap(br.toColumnMap())).toList();
+      m['batches'] = batchMap[idObat] ?? [];
       result.add(m);
     }
 
@@ -5661,9 +5696,6 @@ class SupabaseAdminService {
     );
     if (aptId == null) return null;
 
-    final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
-    final newObatId = uuidRes.first.toColumnMap()['id'].toString().trim();
-
     final namaObat = (data['nama_obat'] ?? data['name'] ?? '').toString().trim();
     final kategori = (data['kategori'] ?? data['category'] ?? 'Obat Ginjal').toString().trim();
     final bentukSediaan = (data['bentuk_sediaan'] ?? data['form'] ?? 'Tablet').toString().trim();
@@ -5678,20 +5710,20 @@ class SupabaseAdminService {
     final expDate = _parseIndonesianOrIsoDate(rawExp);
     final expDateStr = '${expDate.year}-${expDate.month.toString().padLeft(2, '0')}-${expDate.day.toString().padLeft(2, '0')}';
 
-    await _exec(
+    final insertRes = await _exec(
       '''
       INSERT INTO obat (
         id_obat, id_apotek, nama_obat, kategori, bentuk_sediaan, dosis,
         satuan_kemasan, stok_total, harga_beli, harga_jual, aturan_pakai_umum,
         foto_obat, created_at, updated_at
       ) VALUES (
-        @idObat, @aptId, @namaObat, @kategori, @bentukSediaan, @dosis,
+        gen_random_uuid()::text, @aptId, @namaObat, @kategori, @bentukSediaan, @dosis,
         @satuanKemasan, @stokTotal, @hargaBeli, @hargaJual, @aturanPakai,
         @fotoObat, NOW(), NOW()
       )
+      RETURNING TRIM(id_obat) AS id_obat
       ''',
       parameters: {
-        'idObat': newObatId,
         'aptId': aptId,
         'namaObat': namaObat,
         'kategori': kategori,
@@ -5705,6 +5737,8 @@ class SupabaseAdminService {
         'fotoObat': (fotoObat != null && fotoObat.isNotEmpty) ? fotoObat : null,
       },
     );
+
+    final newObatId = insertRes.first.toColumnMap()['id_obat'].toString().trim();
 
     final batchNo = (data['no_batch'] ?? 'BATCH-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch % 10000}').toString().trim();
     await _exec(
