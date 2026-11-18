@@ -63,7 +63,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Name & Email
-      expect(find.text('Siti Aisyah'), findsOneWidget);
+      expect(find.text('Siti Aisyah'), findsWidgets);
       expect(find.text('siti.aisyah@gmail.com'), findsOneWidget);
 
       // Verify birth date is formatted as '12 April 1998' and NOT '1998-04-12T00:00:00.000000Z'

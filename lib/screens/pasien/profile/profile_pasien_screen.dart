@@ -7,6 +7,8 @@ import '../../../models/user_model.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/pasien_api_service.dart';
+import '../../../services/jember_location_service.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 import '../../../syarat_ketentuan_screen.dart';
 import '../../../kebijakan_privasi_screen.dart';
 import 'kata_sandi_keamanan_screen.dart';
@@ -312,7 +314,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
       // Synchronize changes to backend API: PUT /pasien/profile
       final dbBirthDate = TimeUtils.toDbDate(_tanggalLahir);
       final dbGender = _jenisKelamin == 'Perempuan' ? 'P' : (_jenisKelamin == 'Laki-laki' ? 'L' : _jenisKelamin);
-      PasienApiService().updateProfile({
+      await PasienApiService().updateProfile({
         'nama': _nama,
         'alamat': _alamat,
         'jenis_kelamin': dbGender,
@@ -353,7 +355,7 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Informasi pribadi & kesehatan berhasil disimpan ke server!',
+            'Informasi pribadi & lokasi berhasil disimpan!',
             style: GoogleFonts.inter(fontWeight: FontWeight.w600),
           ),
           backgroundColor: _darkGreen,
@@ -361,6 +363,54 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
+        ),
+      );
+    } else if (mounted) {
+      // Jika user mengubah titik lokasi di modal peta lalu menekan Kembali, sinkronkan alamatnya
+      final savedCoord = JemberLocationService.instance.getSavedRoleCoordinate('pasien');
+      if (savedCoord != null && savedCoord.address.isNotEmpty && savedCoord.address != _alamat) {
+        setState(() => _alamat = savedCoord.address);
+      }
+    }
+  }
+
+  Future<void> _openDirectLocationPicker() async {
+    final currentCoord = JemberLocationService.instance
+        .resolveAddressToJemberCoordinate(_alamat);
+    final picked = await showJemberLocationPickerModal(
+      context,
+      title: 'Tentukan Lokasi Domisili Pasien (Jember)',
+      initialAddress: _alamat,
+      initialLat: currentCoord.latitude,
+      initialLng: currentCoord.longitude,
+      role: 'pasien',
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _alamat = picked.address;
+      });
+      try {
+        final currentUser = await StorageService().getUser();
+        if (currentUser != null) {
+          await StorageService().saveUser(
+            currentUser.copyWith(alamat: picked.address),
+          );
+        }
+      } catch (_) {}
+      await PasienApiService().updateProfile({
+        'nama': _nama,
+        'alamat': picked.address,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Lokasi domisili Anda di Jember (${picked.formattedLatLng}) berhasil disimpan & dikunci!',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12.5),
+          ),
+          backgroundColor: _darkGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -1382,6 +1432,64 @@ class _ProfilePasienScreenState extends State<ProfilePasienScreen> {
                   icon: Icons.home_rounded,
                   label: 'Alamat',
                   value: _alamat.isNotEmpty ? _alamat : '-',
+                ),
+                const SizedBox(height: 12),
+                Builder(
+                  builder: (ctx) {
+                    final coord = JemberLocationService.instance
+                        .resolveAddressToJemberCoordinate(_alamat);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GiatRealMapWidget(
+                          centerLat: coord.latitude,
+                          centerLng: coord.longitude,
+                          initialZoom: 14.8,
+                          height: 185,
+                          interactive: false,
+                          showControls: false,
+                          markers: [
+                            GiatMapMarker(
+                              id: 'pasien_profile_pin',
+                              title: _nama.isNotEmpty ? _nama : 'Lokasi Pasien',
+                              subtitle: coord.address,
+                              latitude: coord.latitude,
+                              longitude: coord.longitude,
+                              type: GiatMapMarkerType.pasien,
+                              isSelected: true,
+                              isPulsing: true,
+                            ),
+                          ],
+                          topBadgeText: 'Lokasi Domisili • Kota Jember',
+                          bottomBannerTitle: coord.areaName,
+                          bottomBannerSubtitle: 'Koordinat: ${coord.formattedLatLng}',
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _openDirectLocationPicker,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _darkGreen,
+                              side: const BorderSide(color: _darkGreen, width: 1.2),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.edit_location_alt_rounded, size: 16),
+                            label: Text(
+                              'Tentukan / Ubah Lokasi di Peta Jember',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 InkWell(

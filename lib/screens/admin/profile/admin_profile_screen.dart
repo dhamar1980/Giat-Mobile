@@ -33,6 +33,14 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   @override
   void initState() {
     super.initState();
+    final savedCoord = JemberLocationService.instance.getSavedRoleCoordinate('admin');
+    if (savedCoord != null) {
+      _adminLat = savedCoord.latitude;
+      _adminLng = savedCoord.longitude;
+      if (savedCoord.address.isNotEmpty) {
+        _adminAddress = savedCoord.address;
+      }
+    }
     AdminStore.instance.fetchProfile();
   }
 
@@ -692,7 +700,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             centerLat: _adminLat,
             centerLng: _adminLng,
             initialZoom: 13.8,
-            height: 220,
+            height: 225,
+            interactive: false,
+            showControls: false,
             markers: markers,
             topBadgeText: 'Monitoring Lokasi Real • Kota Jember',
             bottomBannerTitle: 'Kantor Admin Pusat GIAT Jember',
@@ -706,10 +716,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
               onPressed: () async {
                 final picked = await showJemberLocationPickerModal(
                   context,
-                  title: 'Atur Titik Lokasi Admin GIAT (Kota Jember)',
+                  title: 'Tentukan Lokasi Kantor Admin GIAT (Kota Jember)',
                   initialAddress: _adminAddress,
                   initialLat: _adminLat,
                   initialLng: _adminLng,
+                  role: 'admin',
                 );
                 if (picked != null && mounted) {
                   setState(() {
@@ -717,7 +728,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     _adminLng = picked.longitude;
                     _adminAddress = picked.address;
                   });
-                  _showSnack('Titik lokasi GPS Admin Jember berhasil diperbarui!');
+                  _showSnack(
+                    'Titik lokasi Kantor Admin Jember (${picked.formattedLatLng}) berhasil disimpan & dikunci!',
+                  );
                 }
               },
               style: OutlinedButton.styleFrom(
@@ -728,7 +741,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              icon: const Icon(Icons.my_location_rounded, size: 16),
+              icon: const Icon(Icons.edit_location_alt_rounded, size: 16),
               label: Text(
                 'Hidupkan GPS / Atur Lokasi Kantor Admin Jember',
                 style: GoogleFonts.inter(

@@ -651,7 +651,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                       ),
                     ),
 
-                    // Map Preview Card Real Rumah Sakit Kota Jember
+                    // Map Preview Card Real Rumah Sakit Kota Jember (TERKUNCI saat pratinjau)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       child: Builder(
@@ -662,21 +662,30 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                             address: profileState.practiceAddress,
                             doctorName: profileState.doctorName,
                           );
+                          final displayLat = profileState.hasCustomCoordinates
+                              ? profileState.latitude
+                              : hospital.latitude;
+                          final displayLng = profileState.hasCustomCoordinates
+                              ? profileState.longitude
+                              : hospital.longitude;
+
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               GiatRealMapWidget(
-                                centerLat: hospital.latitude,
-                                centerLng: hospital.longitude,
-                                initialZoom: 14.5,
-                                height: 195,
+                                centerLat: displayLat,
+                                centerLng: displayLng,
+                                initialZoom: 14.8,
+                                height: 205,
+                                interactive: false,
+                                showControls: false,
                                 markers: [
                                   GiatMapMarker(
                                     id: 'rs_dokter_jember',
                                     title: profileState.institution,
                                     subtitle: profileState.practiceAddress,
-                                    latitude: hospital.latitude,
-                                    longitude: hospital.longitude,
+                                    latitude: displayLat,
+                                    longitude: displayLng,
                                     type: GiatMapMarkerType.dokter,
                                     isSelected: true,
                                     isPulsing: true,
@@ -685,7 +694,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                                 topBadgeText: 'Lokasi Praktik RS • Kota Jember',
                                 bottomBannerTitle: profileState.institution,
                                 bottomBannerSubtitle:
-                                    '${profileState.practiceAddress} (${hospital.latitude.toStringAsFixed(4)}, ${hospital.longitude.toStringAsFixed(4)})',
+                                    '${profileState.practiceAddress} (${displayLat.toStringAsFixed(4)}, ${displayLng.toStringAsFixed(4)})',
                               ),
                               const SizedBox(height: 8),
                               SizedBox(
@@ -694,16 +703,45 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                                   onPressed: () async {
                                     final picked = await showJemberLocationPickerModal(
                                       context,
-                                      title: 'Atur Lokasi Praktik RS di Kota Jember',
+                                      title: 'Tentukan Lokasi Praktik RS di Kota Jember',
                                       initialAddress: profileState.practiceAddress,
-                                      initialLat: hospital.latitude,
-                                      initialLng: hospital.longitude,
+                                      initialLat: displayLat,
+                                      initialLng: displayLng,
+                                      role: 'dokter',
                                     );
                                     if (picked != null && mounted) {
                                       profileState.updatePracticeCoordinates(
                                         lat: picked.latitude,
                                         lng: picked.longitude,
                                         address: picked.address,
+                                      );
+                                      await DokterApiService().updateProfile(
+                                        {
+                                          'nama': profileState.doctorName,
+                                          'spesialisasi': profileState.specialty,
+                                          'no_str': profileState.strNumber,
+                                          'no_sip': profileState.sipNumber,
+                                          'institusi': profileState.institution,
+                                          'alamat_praktik': picked.address,
+                                          'jadwal_praktik': profileState.practiceSchedule,
+                                          'latitude': picked.latitude,
+                                          'longitude': picked.longitude,
+                                        },
+                                        doctorName: profileState.doctorName,
+                                      );
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Lokasi praktik dokter (${picked.formattedLatLng}) berhasil disimpan & dikunci!',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          backgroundColor: _darkGreen,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
                                       );
                                     }
                                   },
@@ -715,7 +753,7 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  icon: const Icon(Icons.my_location_rounded, size: 16),
+                                  icon: const Icon(Icons.edit_location_alt_rounded, size: 16),
                                   label: Text(
                                     'Atur Lokasi Praktik RS di Jember (GPS / Peta)',
                                     style: GoogleFonts.inter(

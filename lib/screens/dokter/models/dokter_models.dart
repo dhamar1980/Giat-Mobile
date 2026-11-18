@@ -593,9 +593,11 @@ class DokterProfileState extends ChangeNotifier {
   String _practiceSchedule = 'Senin - Jumat, 09:00 - 17:00';
   double _latitude = -8.1518;
   double _longitude = 113.7153;
+  bool _hasCustomCoordinates = false;
 
   double get latitude => _latitude;
   double get longitude => _longitude;
+  bool get hasCustomCoordinates => _hasCustomCoordinates;
 
   void updatePracticeCoordinates({
     required double lat,
@@ -605,6 +607,7 @@ class DokterProfileState extends ChangeNotifier {
   }) {
     _latitude = lat;
     _longitude = lng;
+    _hasCustomCoordinates = true;
     if (address != null && address.trim().isNotEmpty) {
       _practiceAddress = address.trim();
     }
@@ -761,6 +764,13 @@ class DokterProfileState extends ChangeNotifier {
         final fetchedAlamat = docObj['alamat_praktik'] ?? docObj['alamat'] ?? fetchedInst;
         final fetchedJadwal = docObj['jadwal_praktik'] ?? docObj['jam_operasional'];
         final fetchedAvatar = userObj?['foto_profile'] ?? userObj?['foto_profil'] ?? docObj['foto_profile'] ?? docObj['foto_profil'];
+        final fetchedLat = double.tryParse((docObj['latitude'] ?? '').toString());
+        final fetchedLng = double.tryParse((docObj['longitude'] ?? '').toString());
+
+        if (!_hasCustomCoordinates && fetchedLat != null && fetchedLng != null) {
+          _latitude = fetchedLat;
+          _longitude = fetchedLng;
+        }
 
         syncFromUser(
           name: fetchedName?.toString(),
@@ -768,7 +778,7 @@ class DokterProfileState extends ChangeNotifier {
           str: fetchedStr?.toString(),
           sip: fetchedSip?.toString(),
           inst: fetchedInst?.toString(),
-          address: fetchedAlamat?.toString(),
+          address: _hasCustomCoordinates ? _practiceAddress : fetchedAlamat?.toString(),
           schedule: fetchedJadwal?.toString(),
           avatar: fetchedAvatar?.toString(),
         );

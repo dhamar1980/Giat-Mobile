@@ -97,6 +97,8 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         final fetchedFoto = apotekObj['foto_profile'] ?? apotekObj['foto_profil'];
         final fetchedJam = apotekObj['jam_operasional_ringkas'] ?? d['jam_operasional_ringkas'];
         final fetchedArea = apotekObj['area_layanan_ringkas'] ?? d['area_layanan_ringkas'];
+        final fetchedAlamat = apotekObj['alamat'] ?? d['alamat'];
+        final fetchedLatLng = apotekObj['lokasi_lat_long'] ?? d['lokasi_lat_long'];
         if (fetchedName != null && fetchedName.toString().isNotEmpty) {
           setState(() => _nama = fetchedName.toString());
         }
@@ -111,6 +113,25 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
         }
         if (fetchedArea != null && fetchedArea.toString().isNotEmpty) {
           setState(() => _areaLayananRingkas = fetchedArea.toString());
+        }
+        if (fetchedAlamat != null && fetchedAlamat.toString().isNotEmpty) {
+          setState(() => _alamatApotek = fetchedAlamat.toString());
+        }
+        if (fetchedLatLng != null && fetchedLatLng.toString().contains(',')) {
+          final parts = fetchedLatLng.toString().split(',');
+          final lat = double.tryParse(parts[0].trim());
+          final lng = double.tryParse(parts[1].trim());
+          if (lat != null && lng != null) {
+            setState(() {
+              _apotekLat = lat;
+              _apotekLng = lng;
+            });
+            ApotekProfileState.instance.updateApotekCoordinates(
+              lat: lat,
+              lng: lng,
+              address: _alamatApotek,
+            );
+          }
         }
         if (fetchedFoto != null && fetchedFoto.toString().isNotEmpty) {
           final resolved = ApiConfig.resolveImageUrl(fetchedFoto.toString());
@@ -892,12 +913,27 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 27),
+                  child: Text(
+                    _alamatApotek,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.2,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF475569),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 GiatRealMapWidget(
                   centerLat: _apotekLat,
                   centerLng: _apotekLng,
-                  initialZoom: 14.5,
-                  height: 175,
+                  initialZoom: 14.8,
+                  height: 190,
+                  interactive: false,
+                  showControls: false,
                   markers: [
                     GiatMapMarker(
                       id: 'apotek_profile_pin',
@@ -922,10 +958,11 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                     onPressed: () async {
                       final picked = await showJemberLocationPickerModal(
                         context,
-                        title: 'Atur Titik GPS Apotek di Kota Jember',
+                        title: 'Tentukan Titik GPS Apotek di Kota Jember',
                         initialAddress: _alamatApotek,
                         initialLat: _apotekLat,
                         initialLng: _apotekLng,
+                        role: 'apotek',
                       );
                       if (picked != null && mounted) {
                         setState(() {
@@ -938,17 +975,36 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                           lng: picked.longitude,
                           address: picked.address,
                         );
+                        await ApotekApiService().updateProfile({
+                          'nama_apotek': ApotekProfileState.instance.apotekName,
+                          'alamat': picked.address,
+                          'lokasi_lat_long': '${picked.latitude},${picked.longitude}',
+                        });
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Lokasi Apotek (${picked.formattedLatLng}) berhasil disimpan & dikunci!',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            backgroundColor: _darkGreen,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
                       }
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _darkGreen,
                       side: const BorderSide(color: _darkGreen, width: 1.2),
-                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Icons.my_location_rounded, size: 15),
+                    icon: const Icon(Icons.edit_location_alt_rounded, size: 16),
                     label: Text(
                       'Perbarui Titik GPS Apotek Jember',
                       style: GoogleFonts.inter(

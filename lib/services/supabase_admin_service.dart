@@ -4701,17 +4701,15 @@ class SupabaseAdminService {
     await _exec(
       '''
       UPDATE "user"
-      SET nama = @namaApotek,
-          email = CASE WHEN @email = '' THEN email ELSE LOWER(@email) END,
-          no_hp = CASE WHEN @noHp = '' THEN no_hp ELSE @noHp END,
+      SET email = CASE WHEN @email = '' THEN email ELSE LOWER(@email) END,
+          keterangan = CASE WHEN @alamat = '' THEN keterangan ELSE @alamat END,
           updated_at = NOW()
       WHERE TRIM(id) = @aptId
       ''',
       parameters: {
         'aptId': aptId,
-        'namaApotek': namaApotek,
         'email': email,
-        'noHp': noHp,
+        'alamat': alamat,
       },
     );
 
