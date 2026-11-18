@@ -111,12 +111,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
       );
 
-      final otp = result['otp']?.toString();
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => VerificationCodeScreen(
             email: email,
-            initialOtp: otp,
           ),
         ),
       );

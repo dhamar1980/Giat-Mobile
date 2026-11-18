@@ -39,7 +39,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
 
   // Resend Timer
   Timer? _resendTimer;
-  int _countdownSeconds = 20;
+  int _countdownSeconds = 15;
   bool _canResend = false;
   bool _isLoading = false;
 
@@ -49,6 +49,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
   static const _bubbleDarkGreen = Color(0xFF065A37);
   static const _buttonDarkGreen = Color(0xFF044E2F);
   static const _linkMintGreen = Color(0xFF34D399);
+  static const _accentRed = Color(0xFFFF4D4D); // Warna merah jelas & kontras di atas kartu hijau
 
   @override
   void initState() {
@@ -96,7 +97,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
 
   void _startCountdown() {
     setState(() {
-      _countdownSeconds = 20;
+      _countdownSeconds = 15;
       _canResend = false;
     });
     _resendTimer?.cancel();
@@ -119,14 +120,6 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
     _startCountdown();
     final res = await AuthService().resendOtp(widget.email);
     if (!mounted) return;
-    if (res['success'] == true && res['otp'] != null) {
-      final newOtp = res['otp'].toString();
-      if (newOtp.length == 4) {
-        for (int i = 0; i < 4; i++) {
-          _otpControllers[i].text = newOtp[i];
-        }
-      }
-    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(res['message'] ?? 'Kode baru telah dikirimkan ke ${widget.email}'),
@@ -546,20 +539,23 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
                     child: RichText(
                       textAlign: TextAlign.center,
                       text: TextSpan(
-                        text: 'Kirim ulang kode dalam ',
+                        text: _canResend
+                            ? 'Belum menerima kode? '
+                            : 'Kirim ulang kode dalam ',
                         style: GoogleFonts.inter(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.white.withValues(alpha: 0.95),
                         ),
                         children: [
                           if (!_canResend)
                             TextSpan(
-                              text: '0:${_countdownSeconds.toString().padLeft(2, '0')}',
+                              text:
+                                  '0:${_countdownSeconds.toString().padLeft(2, '0')}',
                               style: GoogleFonts.inter(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: _accentRed,
                               ),
                             )
                           else
@@ -572,8 +568,9 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen>
                                   style: GoogleFonts.inter(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
-                                    color: _linkMintGreen,
+                                    color: _accentRed,
                                     decoration: TextDecoration.underline,
+                                    decorationColor: _accentRed,
                                   ),
                                 ),
                               ),
