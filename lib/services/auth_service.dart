@@ -19,6 +19,7 @@ class AuthService {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    serverClientId: '70382229628-7ts87a49jme8g2u8o5p47eq0h3kqjgnh.apps.googleusercontent.com',
   );
 
   /// 1. Masuk dengan Google (Google Sign-In -> kirim idToken ke Backend)

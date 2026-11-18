@@ -1,40 +1,45 @@
 {
   "project_info": {
-    "project_number": "100000000000",
-    "project_id": "giat-3ac67",
+    "project_number": "70382229628",
     "firebase_url": "https://giat-3ac67-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "giat-3ac67",
     "storage_bucket": "giat-3ac67.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:100000000000:android:giatmobileapp3ac67",
+        "mobilesdk_app_id": "1:70382229628:android:4fc27f3b12e690449551f9",
         "android_client_info": {
           "package_name": "com.example.giat"
         }
       },
       "oauth_client": [
         {
-          "client_id": "100000000000-android.apps.googleusercontent.com",
+          "client_id": "70382229628-6oo1136r0mjjm352ql0rtj6oedo7v25m.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.giat",
-            "certificate_hash": ""
+            "certificate_hash": "d1bcae5f2e9bef520c46b3aaff4be7bfc9e1a1c8"
           }
         },
         {
-          "client_id": "100000000000-web.apps.googleusercontent.com",
+          "client_id": "70382229628-7ts87a49jme8g2u8o5p47eq0h3kqjgnh.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBhJvTnhT_z-7zjD9ZEvteNb3cfdb2Sb84"
+          "current_key": "AIzaSyB7_Heo2KL4e9L_9PFk8PQH9QWtmulx9Ok"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "70382229628-7ts87a49jme8g2u8o5p47eq0h3kqjgnh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

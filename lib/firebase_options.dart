@@ -42,9 +42,9 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBhJvTnhT_z-7zjD9ZEvteNb3cfdb2Sb84',
-    appId: '1:100000000000:android:giatmobileapp3ac67',
-    messagingSenderId: '100000000000',
+    apiKey: 'AIzaSyB7_Heo2KL4e9L_9PFk8PQH9QWtmulx9Ok',
+    appId: '1:70382229628:android:4fc27f3b12e690449551f9',
+    messagingSenderId: '70382229628',
     projectId: 'giat-3ac67',
     storageBucket: 'giat-3ac67.firebasestorage.app',
     databaseURL: 'https://giat-3ac67-default-rtdb.asia-southeast1.firebasedatabase.app',
