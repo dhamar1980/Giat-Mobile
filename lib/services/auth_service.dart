@@ -100,9 +100,18 @@ class AuthService {
       }
     } catch (e) {
       debugPrint('Google Sign-In Error: $e');
+      final errStr = e.toString().toLowerCase();
+      String message = ApiClient.getErrorMessage(e);
+      if (errStr.contains('10') ||
+          errStr.contains('sign_in_failed') ||
+          errStr.contains('apiexception') ||
+          errStr.contains('12500')) {
+        message =
+            'Google Sign-In belum terhubung ke Firebase (SHA-1 fingerprint belum terdaftar). Silakan masuk menggunakan Email dan Kata Sandi Anda.';
+      }
       return AuthResult(
         success: false,
-        message: ApiClient.getErrorMessage(e),
+        message: message,
       );
     }
   }
