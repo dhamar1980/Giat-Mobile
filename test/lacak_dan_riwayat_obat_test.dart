@@ -102,10 +102,21 @@ void main() {
 
     expect(find.text('Pesanan Obat Pasien'), findsOneWidget);
     expect(find.text('ORD-LSW9MIAVE5'), findsNothing);
+    expect(find.text('LIVE GPS TRACKING JEMBER'), findsOneWidget);
+    expect(find.text('Posisi Paket Obat Saat Ini (Real-Time)'), findsOneWidget);
+    expect(find.text('Pantau Live Kurir'), findsOneWidget);
+    expect(find.text('Hidupkan GPS Saya'), findsOneWidget);
     expect(find.text('Aktivitas Pengiriman'), findsOneWidget);
     expect(find.text('Alamat Tujuan Pengiriman'), findsOneWidget);
     expect(find.text('Siti Aisyah • 0812-3456-7891'), findsOneWidget);
     expect(find.text('Ketosteril Tab'), findsOneWidget);
+
+    // Tap Pantau Live Kurir to verify live courier movement in Jember
+    await tester.ensureVisible(find.text('Pantau Live Kurir'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pantau Live Kurir'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dalam Pengiriman'), findsWidgets);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump();

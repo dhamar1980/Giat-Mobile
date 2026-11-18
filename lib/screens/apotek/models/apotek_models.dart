@@ -855,13 +855,13 @@ class ApotekMockData {
   ];
 
   static final List<ApotekCoverageArea> areas = [
-    ApotekCoverageArea(name: 'Kota Malang', details: '5 Kecamatan • 57 Kelurahan', isActive: true),
-    ApotekCoverageArea(name: 'Kabupaten Malang', details: '33 Kecamatan • Radius Utama', isActive: true),
-    ApotekCoverageArea(name: 'Kota Batu', details: '3 Kecamatan • Akses Prioritas', isActive: true),
-    ApotekCoverageArea(name: 'Kabupaten Pasuruan', details: '24 Kecamatan • Pengiriman Ekspres', isActive: false),
-    ApotekCoverageArea(name: 'Kota Blitar', details: '3 Kecamatan • Hub Pengiriman Selatan', isActive: false),
-    ApotekCoverageArea(name: 'Kabupaten Blitar', details: '22 Kecamatan • Jalur Kurir Reguler', isActive: false),
-    ApotekCoverageArea(name: 'Kota Kediri', details: '3 Kecamatan • Distribusi Obat Siaga', isActive: false),
+    ApotekCoverageArea(name: 'Kec. Sumbersari (Kota Jember)', details: '7 Kelurahan • Kawasan Kampus UNEJ & Mastrip', isActive: true),
+    ApotekCoverageArea(name: 'Kec. Kaliwates (Kota Jember)', details: '7 Kelurahan • Koridor Jl. Gajah Mada & Hayam Wuruk', isActive: true),
+    ApotekCoverageArea(name: 'Kec. Patrang (Kota Jember)', details: '8 Kelurahan • Kawasan RSD dr. Soebandi & Alun-Alun', isActive: true),
+    ApotekCoverageArea(name: 'Kec. Ajung (Kabupaten Jember)', details: '7 Desa • Pengiriman Ekspres Jember Selatan', isActive: true),
+    ApotekCoverageArea(name: 'Kec. Pakusari (Kabupaten Jember)', details: '7 Desa • Koridor Timur Jember', isActive: false),
+    ApotekCoverageArea(name: 'Kec. Rambipuji (Kabupaten Jember)', details: '8 Desa • Jalur Kurir Jember Barat', isActive: false),
+    ApotekCoverageArea(name: 'Kec. Balung (Kabupaten Jember)', details: '8 Desa • Distribusi Obat Siaga RSD Balung', isActive: false),
   ];
 
   static final List<ApotekNotification> notifications = [
@@ -1219,13 +1219,33 @@ class ApotekProfileState extends ChangeNotifier {
 
   String _apotekerName = '';
   String _apotekName = '';
-  String _sipaNumber = 'SIPA-3273/1990/440/2022';
-  String _siaNumber = 'SIA-3273/1990/440/2022';
+  String _sipaNumber = '19910412/SIPA-35.09/2024';
+  String _siaNumber = 'SIA-3509/JBR/440/2024';
   String _jamOperasionalRingkas = '08.00 - 22.00 WIB';
-  String _areaLayananRingkas = 'Kota Bandung dan Sekitarnya, Kabupaten Bandung, Kota Cimahi';
+  String _areaLayananRingkas = 'Kabupaten & Kota Jember (Sumbersari, Kaliwates, Patrang)';
+  String _apotekAddress = 'Jl. Gajah Mada No. 175, Kaliwates, Kabupaten Jember, Jawa Timur 68131';
+  double _latitude = -8.1747;
+  double _longitude = 113.6882;
   bool _isServiceActive = true;
   String _avatarType = 'default'; // 'asset', 'network', 'file', 'default'
   String _avatarPath = '';
+
+  String get apotekAddress => _apotekAddress;
+  double get latitude => _latitude;
+  double get longitude => _longitude;
+
+  void updateApotekCoordinates({
+    required double lat,
+    required double lng,
+    String? address,
+  }) {
+    _latitude = lat;
+    _longitude = lng;
+    if (address != null && address.trim().isNotEmpty) {
+      _apotekAddress = address.trim();
+    }
+    notifyListeners();
+  }
 
   String get apotekerName =>
       _apotekerName.isNotEmpty ? _apotekerName : 'apt. Farhan Ramadhan, S.Farm';
@@ -1237,7 +1257,7 @@ class ApotekProfileState extends ChangeNotifier {
   }
 
   String get apotekName =>
-      _apotekName.isNotEmpty ? _apotekName : 'Apotek Kimia Farma Dago';
+      _apotekName.isNotEmpty ? _apotekName : 'Apotek Kimia Farma Jember';
   set apotekName(String val) {
     if (_apotekName != val) {
       _apotekName = val;

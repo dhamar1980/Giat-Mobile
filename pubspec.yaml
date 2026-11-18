@@ -49,6 +49,7 @@ dependencies:
   postgres: ^3.5.20
   image_picker: ^1.2.4
   webview_flutter: ^4.14.1
+  geolocator: ^14.1.2
 
 dev_dependencies:
   flutter_test:

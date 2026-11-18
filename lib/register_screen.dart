@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'master_layout.dart';
 import 'services/auth_service.dart';
 import 'widgets/giat_auth_background.dart';
+import 'widgets/giat_real_map_widget.dart';
 import 'syarat_ketentuan_screen.dart';
 import 'kebijakan_privasi_screen.dart';
 
@@ -913,7 +914,49 @@ class _RegisterScreenState extends State<RegisterScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ── Field: Alamat ──
-            _buildFieldLabel('Alamat'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildFieldLabel('Alamat'),
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showJemberLocationPickerModal(
+                      context,
+                      title: 'Pilih Titik Domisili di Kota Jember',
+                      initialAddress: _addressCtrl.text,
+                    );
+                    if (picked != null && mounted) {
+                      setState(() {
+                        _addressCtrl.text = picked.address;
+                      });
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.my_location_rounded, size: 13, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Pilih di Peta Jember / GPS',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 7),
             TextFormField(
               controller: _addressCtrl,
@@ -925,13 +968,24 @@ class _RegisterScreenState extends State<RegisterScreen>
                 color: const Color(0xFF1E293B),
                 fontWeight: FontWeight.w500,
               ),
-              decoration: _inputDecoration(hint: 'Masukkan alamat lengkap'),
+              decoration: _inputDecoration(
+                hint: 'Contoh: Jl. Kalimantan No. 37, Sumbersari, Jember',
+              ),
               validator: (val) {
                 if (val == null || val.trim().isEmpty) {
                   return 'Alamat tidak boleh kosong';
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Alamat registrasi ini otomatis menjadi lokasi awal pengiriman obat di Kota Jember sebelum GPS dinyalakan.',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.88),
+                height: 1.3,
+              ),
             ),
 
             const SizedBox(height: 16),

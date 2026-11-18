@@ -343,10 +343,10 @@ void main() {
     expect(find.text('No. STR'), findsOneWidget);
     expect(find.text('No. SIP'), findsOneWidget);
     expect(find.text('Institusi'), findsOneWidget);
-    expect(find.text('RS Medika Utama'), findsOneWidget);
+    expect(find.text('RSD dr. Soebandi Jember'), findsWidgets);
     expect(find.text('Praktik'), findsOneWidget);
     expect(find.text('Alamat Praktik'), findsOneWidget);
-    expect(find.text('Jl. Sehat No. 12, Jember'), findsOneWidget);
+    expect(find.text('Jl. Dr. Soebandi No. 124, Patrang, Jember'), findsWidgets);
     expect(find.text('Jadwal Praktik'), findsOneWidget);
 
     // Tap Avatar / Foto Profil untuk memicu modal ganti foto profil

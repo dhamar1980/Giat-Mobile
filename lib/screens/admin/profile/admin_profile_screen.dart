@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../onboarding_screen.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/jember_location_service.dart';
 import '../../../widgets/giat_header_style.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 import '../models/admin_models.dart';
 import '../widgets/admin_header.dart';
 
@@ -23,6 +25,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   static const _buttonDarkGreen = Color(0xFF044E2F);
   static const _bgColor = Color(0xFFF7FAF8);
   static const _border = Color(0xFFE2E8F0);
+
+  String _adminAddress = 'Jl. PB Sudirman No. 42, Jemberlor, Patrang, Kabupaten Jember, Jawa Timur 68118';
+  double _adminLat = JemberLocationService.jemberCenterLat;
+  double _adminLng = JemberLocationService.jemberCenterLng;
 
   @override
   void initState() {
@@ -570,6 +576,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
                           const SizedBox(height: 22),
 
+                          _buildSectionTitle('Peta Lokasi Real Ekosistem GIAT Kota Jember'),
+                          const SizedBox(height: 8),
+                          _buildJemberEcosystemMapCard(store),
+
+                          const SizedBox(height: 22),
+
                           _buildSectionTitle('Pengaturan Profil Admin'),
                           const SizedBox(height: 8),
                           Container(
@@ -631,6 +643,103 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildJemberEcosystemMapCard(AdminStore store) {
+    final markers = <GiatMapMarker>[
+      GiatMapMarker(
+        id: 'admin_jember_hq',
+        title: 'Pusat Admin GIAT Jember (${store.adminNama})',
+        subtitle: _adminAddress,
+        latitude: _adminLat,
+        longitude: _adminLng,
+        type: GiatMapMarkerType.admin,
+        isSelected: true,
+        isPulsing: true,
+      ),
+      for (final apt in JemberLocationService.defaultApotekJemberList)
+        GiatMapMarker(
+          id: 'apt_${apt.id}',
+          title: apt.namaApotek,
+          subtitle: apt.alamat,
+          latitude: apt.latitude,
+          longitude: apt.longitude,
+          type: GiatMapMarkerType.apotek,
+        ),
+      for (final rs in JemberLocationService.rumahSakitJemberList)
+        GiatMapMarker(
+          id: 'rs_${rs.namaRs}',
+          title: rs.namaRs,
+          subtitle: rs.alamat,
+          latitude: rs.latitude,
+          longitude: rs.longitude,
+          type: GiatMapMarkerType.dokter,
+        ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GiatRealMapWidget(
+            centerLat: _adminLat,
+            centerLng: _adminLng,
+            initialZoom: 13.8,
+            height: 220,
+            markers: markers,
+            topBadgeText: 'Monitoring Lokasi Real • Kota Jember',
+            bottomBannerTitle: 'Kantor Admin Pusat GIAT Jember',
+            bottomBannerSubtitle:
+                '$_adminAddress (${_adminLat.toStringAsFixed(4)}, ${_adminLng.toStringAsFixed(4)})',
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final picked = await showJemberLocationPickerModal(
+                  context,
+                  title: 'Atur Titik Lokasi Admin GIAT (Kota Jember)',
+                  initialAddress: _adminAddress,
+                  initialLat: _adminLat,
+                  initialLng: _adminLng,
+                );
+                if (picked != null && mounted) {
+                  setState(() {
+                    _adminLat = picked.latitude;
+                    _adminLng = picked.longitude;
+                    _adminAddress = picked.address;
+                  });
+                  _showSnack('Titik lokasi GPS Admin Jember berhasil diperbarui!');
+                }
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _darkGreen,
+                side: const BorderSide(color: _darkGreen, width: 1.2),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.my_location_rounded, size: 16),
+              label: Text(
+                'Hidupkan GPS / Atur Lokasi Kantor Admin Jember',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

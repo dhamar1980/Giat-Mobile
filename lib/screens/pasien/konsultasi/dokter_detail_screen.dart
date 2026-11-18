@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'jadwalkan_konsultasi_screen.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/konsultasi_api_service.dart';
+import '../../../services/jember_location_service.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 import '../../../config/api_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -909,53 +911,104 @@ class _DokterDetailScreenState extends State<DokterDetailScreen> {
 
               const SizedBox(height: 16),
 
-              // Row 2: Informasi Praktik
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFDCFCE7)),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.medical_information_outlined,
-                        color: _primaryGreen,
-                        size: 22,
+              // Row 2: Informasi Praktik & Lokasi RS di Kota Jember
+              Builder(
+                builder: (ctx) {
+                  final rawInst = (widget.doctor['hospital'] ??
+                          widget.doctor['institusi'] ??
+                          widget.doctor['instansi'] ??
+                          '')
+                      .toString();
+                  final hospital = JemberLocationService.instance
+                      .resolveDoctorHospitalInJember(
+                    institution: rawInst,
+                    doctorName: _doctorName,
+                  );
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFDCFCE7)),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.medical_information_outlined,
+                                color: _primaryGreen,
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Informasi Praktik',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Layanan Telemedice Video & Chat • ${hospital.namaRs}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF475569),
+                                    height: 1.35,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  hospital.alamat,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w400,
+                                    color: const Color(0xFF64748B),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Informasi Praktik',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
+                      const SizedBox(height: 12),
+                      GiatRealMapWidget(
+                        centerLat: hospital.latitude,
+                        centerLng: hospital.longitude,
+                        initialZoom: 14.4,
+                        height: 175,
+                        markers: [
+                          GiatMapMarker(
+                            id: 'rs_dokter_detail',
+                            title: hospital.namaRs,
+                            subtitle: 'Praktik $_doctorName • ${hospital.kecamatan}',
+                            latitude: hospital.latitude,
+                            longitude: hospital.longitude,
+                            type: GiatMapMarkerType.dokter,
+                            isSelected: true,
+                            isPulsing: true,
                           ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Layanan Telemedice Video & Chat',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w400,
-                            color: const Color(0xFF475569),
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                        ],
+                        topBadgeText: 'Lokasi Rumah Sakit • Kota Jember',
+                        bottomBannerTitle: hospital.namaRs,
+                        bottomBannerSubtitle: hospital.alamat,
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),

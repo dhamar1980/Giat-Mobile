@@ -43,6 +43,21 @@ class KonsultasiApiService {
 
   /// GET /konsultasi/dokter (Bisa kirim query ?spesialisasi=... atau ?search=... atau ?kategori=...)
   Future<ApiResponse<List<dynamic>>> getDokterList({String? kategori, String? spesialisasi, String? search}) async {
+    if (!_isTest) {
+      try {
+        final sbDoctors = await SupabaseAdminService.instance.fetchAllDokterJemberList(
+          search: search,
+          spesialisasi: spesialisasi ?? kategori,
+        );
+        if (sbDoctors.isNotEmpty) {
+          return ApiResponse.success(
+            message: 'Berhasil memuat daftar dokter Rumah Sakit Jember dari Supabase.',
+            data: sbDoctors,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
     try {
       final Map<String, dynamic> qParams = {};
       final spec = spesialisasi ?? (kategori != 'Semua' ? kategori : null);

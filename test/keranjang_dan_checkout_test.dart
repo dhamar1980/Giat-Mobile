@@ -101,4 +101,34 @@ void main() {
     // Quantity should now show 2 for that item
     expect(find.text('2'), findsOneWidget);
   });
+
+  testWidgets('CheckoutResepScreen auto-selects nearest Jember Apotek and allows patient to freely switch Apotek', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(500, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: CheckoutResepScreen(userName: 'Siti Aisyah'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify Jember pharmacy list and automatic nearest badge
+    expect(find.text('Apotek Mitra GIAT'), findsOneWidget);
+    expect(find.text('Otomatis Terdekat • Jember'), findsOneWidget);
+    expect(find.textContaining('Terdekat •'), findsWidgets);
+    expect(find.text('Apotek K-24 Sumbersari Jember'), findsWidgets);
+    expect(find.text('Apotek Kimia Farma Jember'), findsWidgets);
+    expect(find.text('Apotek Sehat Ginjal Sentosa Jember'), findsWidgets);
+
+    // Patient freely switches to Apotek Kimia Farma Jember
+    final kfFinder = find.text('Apotek Kimia Farma Jember').first;
+    await tester.ensureVisible(kfFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(kfFinder);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('apt. Farhan Ramadhan, S.Farm'), findsOneWidget);
+  });
 }

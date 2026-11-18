@@ -424,6 +424,18 @@ class PasienApiService {
 
   /// GET /pasien/profile
   Future<ApiResponse<Map<String, dynamic>>> getProfile() async {
+    if (!_isTest) {
+      try {
+        final pgProfile = await SupabaseAdminService.instance.fetchPasienProfile();
+        if (pgProfile != null) {
+          return ApiResponse.success(
+            message: 'Berhasil memuat profil pasien dari Supabase.',
+            data: pgProfile,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
     try {
       final response = await _client.dio.get('/pasien/profile');
       return ApiResponse.success(
@@ -438,6 +450,18 @@ class PasienApiService {
 
   /// PUT /pasien/profile
   Future<ApiResponse<Map<String, dynamic>>> updateProfile(Map<String, dynamic> data) async {
+    if (!_isTest) {
+      try {
+        final pgUpdated = await SupabaseAdminService.instance.updatePasienProfile(data);
+        if (pgUpdated != null) {
+          return ApiResponse.success(
+            message: 'Profil & lokasi berhasil diperbarui di database Supabase.',
+            data: pgUpdated,
+            statusCode: 200,
+          );
+        }
+      } catch (_) {}
+    }
     try {
       final response = await _client.dio.put('/pasien/profile', data: data);
       return ApiResponse.success(
@@ -447,6 +471,20 @@ class PasienApiService {
       );
     } catch (e) {
       return ApiResponse.error(message: ApiClient.getErrorMessage(e));
+    }
+  }
+
+  /// Mengambil daftar seluruh Apotek Mitra GIAT di Kota Jember beserta titik koordinat GPS
+  Future<ApiResponse<List<Map<String, dynamic>>>> getApotekJemberList() async {
+    try {
+      final list = await SupabaseAdminService.instance.fetchAllApotekJemberList();
+      return ApiResponse.success(
+        message: 'Berhasil memuat daftar Apotek Mitra GIAT Kota Jember.',
+        data: list,
+        statusCode: 200,
+      );
+    } catch (e) {
+      return ApiResponse.error(message: e.toString());
     }
   }
 

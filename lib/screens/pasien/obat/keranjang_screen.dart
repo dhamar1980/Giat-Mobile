@@ -398,12 +398,15 @@ class _KeranjangScreenState extends State<KeranjangScreen> {
             children: [
               const Icon(Icons.storefront_rounded, size: 16, color: _darkGreen),
               const SizedBox(width: 6),
-              Text(
-                'Apotek Kimia Farma - Veteran Surabaya',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF475569),
+              Expanded(
+                child: Text(
+                  'Apotek Mitra GIAT Terdekat - Kota Jember',
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF475569),
+                  ),
                 ),
               ),
             ],

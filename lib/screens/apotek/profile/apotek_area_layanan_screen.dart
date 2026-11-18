@@ -44,8 +44,8 @@ class _ApotekAreaLayananScreenState extends State<ApotekAreaLayananScreen> {
         final parsed = res.data!.whereType<Map>().map((e) {
           final m = Map<String, dynamic>.from(e);
           return ApotekCoverageArea(
-            name: (m['nama_area'] ?? 'Kota Bandung').toString(),
-            details: (m['detail'] ?? 'Layanan pengantaran obat kurir farmasi').toString(),
+            name: (m['nama_area'] ?? 'Kota Jember').toString(),
+            details: (m['detail'] ?? 'Layanan pengantaran obat kurir farmasi Jember').toString(),
             isActive: m['is_active'] == true,
           );
         }).toList();
@@ -207,9 +207,7 @@ class _ApotekAreaLayananScreenState extends State<ApotekAreaLayananScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    _isTest
-                                        ? 'Cakupan Wilayah Jawa Timur Raya'
-                                        : 'Cakupan Wilayah Bandung Raya & Jawa Barat',
+                                    'Cakupan Wilayah Kabupaten & Kota Jember',
                                     style: GoogleFonts.inter(
                                       fontSize: 12,
                                       color: const Color(0xFF64748B),

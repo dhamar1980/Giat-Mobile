@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:giat/widgets/giat_background.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,7 +10,9 @@ import '../../../constants/api_constants.dart';
 import '../../../services/pasien_api_service.dart';
 import '../../../services/supabase_admin_service.dart';
 import '../../../services/storage_service.dart';
+import '../../../services/jember_location_service.dart';
 import '../../../widgets/app_top_action_pill.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN LACAK OBAT (Figma Node: 977:10969)
@@ -53,8 +57,41 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
   String _recipientName = 'Pasien';
   String _recipientPhone = '0812-3456-7891';
   String _recipientAddress = 'Jl. Kalimantan No. 37, Sumbersari, Jember, Jawa Timur 68121';
-  String _namaApotek = 'Apotek Mitra GIAT';
+  String _namaApotek = 'Apotek Kimia Farma Jember';
+  String _alamatApotek = 'Jl. Gajah Mada No. 175, Kaliwates, Jember';
   List<Map<String, dynamic>> _orderItems = [];
+
+  // ── Real-Time Jember Live Map & Courier Telemetry State ──
+  JemberCoordinate _apotekCoord = const JemberCoordinate(
+    latitude: -8.1747,
+    longitude: 113.6882,
+    address: 'Jl. Gajah Mada No. 175, Kaliwates, Jember',
+    areaName: 'Apotek Kimia Farma Jember',
+  );
+  JemberCoordinate _patientCoord = const JemberCoordinate(
+    latitude: -8.1668,
+    longitude: 113.7162,
+    address: 'Jl. Kalimantan No. 37, Sumbersari, Jember',
+    areaName: 'Sumbersari, Jember',
+  );
+  JemberCoordinate _courierCoord = const JemberCoordinate(
+    latitude: -8.1716,
+    longitude: 113.7015,
+    address: 'Jl. Gajah Mada, Kaliwates, Jember',
+    areaName: 'Kurir GIAT Express',
+  );
+  List<JemberCoordinate> _routePoints = [];
+  double _routeProgress = 0.45;
+  double _totalDistanceKm = 2.8;
+  double _remainingKm = 1.5;
+  int _etaMinutes = 8;
+  String _currentStreet = 'Kawasan Jl. Gajah Mada, Kaliwates, Jember';
+  String _courierName = 'Rahmat Setiawan';
+  String _courierPlate = 'P 4921 QV (Jember)';
+  bool _isSimulatingLive = false;
+  bool _isActivatingGps = false;
+  Timer? _liveSimTimer;
+  Timer? _firebasePollTimer;
 
   @override
   void initState() {
@@ -87,14 +124,283 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
       _recipientAddress = widget.orderData!.recipientAddress;
     }
 
+    if (widget.orderData?.apotekName != null &&
+        widget.orderData!.apotekName.isNotEmpty) {
+      _namaApotek = widget.orderData!.apotekName;
+    }
+    if (widget.orderData?.apotekAddress != null &&
+        widget.orderData!.apotekAddress.isNotEmpty) {
+      _alamatApotek = widget.orderData!.apotekAddress;
+    }
+
     if (widget.orderData?.items != null && widget.orderData!.items!.isNotEmpty) {
       _orderItems = List<Map<String, dynamic>>.from(widget.orderData!.items!);
     }
 
+    _initializeJemberMapAndRoute();
     _loadInitialUserData();
 
     if (_pesananUuid != null && _pesananUuid!.isNotEmpty) {
       _syncPaymentAndTrackingStatus(silent: true);
+    }
+
+    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+      _firebasePollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+        _pullLiveTrackingFromFirebase();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _liveSimTimer?.cancel();
+    _firebasePollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _initializeJemberMapAndRoute() {
+    // 1. Resolve titik koordinat pasien dari orderData atau alamat registrasi Jember
+    if (widget.orderData?.patientLat != null &&
+        widget.orderData?.patientLng != null) {
+      _patientCoord = JemberCoordinate(
+        latitude: widget.orderData!.patientLat!,
+        longitude: widget.orderData!.patientLng!,
+        address: _recipientAddress,
+        areaName: 'Lokasi Tujuan Pasien',
+      );
+    } else {
+      _patientCoord = JemberLocationService.instance
+          .resolveAddressToJemberCoordinate(_recipientAddress);
+    }
+
+    // 2. Resolve titik koordinat Apotek Jember (dari orderData atau apotek terdekat)
+    if (widget.orderData?.apotekLat != null &&
+        widget.orderData?.apotekLng != null) {
+      _apotekCoord = JemberCoordinate(
+        latitude: widget.orderData!.apotekLat!,
+        longitude: widget.orderData!.apotekLng!,
+        address: _alamatApotek,
+        areaName: _namaApotek,
+      );
+    } else {
+      final ranked = JemberLocationService.instance.rankApoteksByDistance(
+        patientLat: _patientCoord.latitude,
+        patientLng: _patientCoord.longitude,
+      );
+      final matchedApotek = ranked.firstWhere(
+        (a) => a.namaApotek.toLowerCase() == _namaApotek.toLowerCase(),
+        orElse: () => ranked.first,
+      );
+      _namaApotek = matchedApotek.namaApotek;
+      _alamatApotek = matchedApotek.alamat;
+      _apotekCoord = JemberCoordinate(
+        latitude: matchedApotek.latitude,
+        longitude: matchedApotek.longitude,
+        address: matchedApotek.alamat,
+        areaName: matchedApotek.namaApotek,
+      );
+    }
+
+    // 3. Tentukan progress awal berdasarkan status pesanan
+    final s = _displayStatusPesanan.toLowerCase();
+    if (s.contains('selesai') || s.contains('terima')) {
+      _routeProgress = 1.0;
+    } else if (s.contains('kirim') || s.contains('antar')) {
+      _routeProgress = 0.62;
+    } else if (s.contains('proses') || s.contains('racik') || s.contains('kemas')) {
+      _routeProgress = 0.35;
+    } else {
+      _routeProgress = 0.12;
+    }
+
+    // 4. Bangun rute jalan Jember & posisi kurir
+    _routePoints = JemberLocationService.instance.buildJemberArterialRoadPoints(
+      startLat: _apotekCoord.latitude,
+      startLng: _apotekCoord.longitude,
+      endLat: _patientCoord.latitude,
+      endLng: _patientCoord.longitude,
+    );
+    _recalculateCourierTelemetry(_routeProgress);
+
+    // 5. Jika online, perhalus rute dengan OSRM road geometry
+    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+      JemberLocationService.instance
+          .buildRoadRoute(
+        startLat: _apotekCoord.latitude,
+        startLng: _apotekCoord.longitude,
+        endLat: _patientCoord.latitude,
+        endLng: _patientCoord.longitude,
+      )
+          .then((pts) {
+        if (!mounted || pts.length < 2) return;
+        setState(() {
+          _routePoints = pts;
+          _recalculateCourierTelemetry(_routeProgress);
+        });
+      });
+    }
+  }
+
+  void _recalculateCourierTelemetry(double progress) {
+    final p = progress.clamp(0.0, 1.0);
+    _routeProgress = p;
+    _totalDistanceKm = JemberLocationService.calculateDistanceKm(
+      _apotekCoord.latitude,
+      _apotekCoord.longitude,
+      _patientCoord.latitude,
+      _patientCoord.longitude,
+    );
+    if (_totalDistanceKm < 0.3) _totalDistanceKm = 1.4;
+
+    _courierCoord = JemberLocationService.instance.interpolateCourierOnRoute(
+      _routePoints,
+      p,
+    );
+    _currentStreet = JemberLocationService.instance.resolveStreetNameOnRoute(
+      _courierCoord.latitude,
+      _courierCoord.longitude,
+    );
+    _remainingKm = double.parse((_totalDistanceKm * (1.0 - p)).toStringAsFixed(2));
+    _etaMinutes = p >= 0.98
+        ? 0
+        : (_remainingKm * 4.5 + 2).round().clamp(1, 45);
+  }
+
+  Future<void> _pullLiveTrackingFromFirebase() async {
+    final trackKey = _pesananUuid ?? _displayOrderNo;
+    final raw = await JemberLocationService.instance
+        .fetchCourierTrackingFromFirebase(trackKey);
+    if (raw != null && mounted && !_isSimulatingLive) {
+      final p = double.tryParse((raw['progress_ratio'] ?? '').toString());
+      final cLat = double.tryParse((raw['courier_lat'] ?? '').toString());
+      final cLng = double.tryParse((raw['courier_lng'] ?? '').toString());
+      final street = raw['current_street']?.toString();
+      final remKm = double.tryParse((raw['remaining_km'] ?? '').toString());
+      final eta = int.tryParse((raw['eta_minutes'] ?? '').toString());
+      final stage = (raw['status_pesanan'] ?? '').toString().toLowerCase();
+
+      setState(() {
+        if (p != null) {
+          _recalculateCourierTelemetry(p);
+        }
+        if (cLat != null && cLng != null) {
+          _courierCoord = JemberCoordinate(
+            latitude: cLat,
+            longitude: cLng,
+            address: street ?? _currentStreet,
+            isFromGps: true,
+          );
+        }
+        if (street != null && street.isNotEmpty) {
+          _currentStreet = street;
+        }
+        if (remKm != null) _remainingKm = remKm;
+        if (eta != null) _etaMinutes = eta;
+        if (stage.contains('kirim')) {
+          _displayStatusPesanan = 'Dalam Pengiriman';
+        } else if (stage.contains('selesai')) {
+          _displayStatusPesanan = 'Pesanan Selesai';
+        }
+      });
+    }
+  }
+
+  void _toggleLiveCourierSimulation() {
+    if (_isSimulatingLive) {
+      _liveSimTimer?.cancel();
+      setState(() => _isSimulatingLive = false);
+      return;
+    }
+
+    setState(() {
+      _isSimulatingLive = true;
+      if (_routeProgress >= 0.98) {
+        _routeProgress = 0.08;
+      }
+      _displayStatusPesanan = 'Dalam Pengiriman';
+      _recalculateCourierTelemetry(_routeProgress);
+    });
+
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      setState(() {
+        _recalculateCourierTelemetry((_routeProgress + 0.25).clamp(0.0, 1.0));
+        _isSimulatingLive = false;
+      });
+      return;
+    }
+
+    _liveSimTimer?.cancel();
+    _liveSimTimer = Timer.periodic(const Duration(milliseconds: 900), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final nextProgress = _routeProgress + 0.06;
+      if (nextProgress >= 1.0) {
+        timer.cancel();
+        setState(() {
+          _isSimulatingLive = false;
+          _displayStatusPesanan = 'Pesanan Selesai';
+          _recalculateCourierTelemetry(1.0);
+        });
+        _broadcastCurrentTrackingToFirebase('selesai');
+      } else {
+        setState(() {
+          _displayStatusPesanan = 'Dalam Pengiriman';
+          _recalculateCourierTelemetry(nextProgress);
+        });
+        _broadcastCurrentTrackingToFirebase('dikirim');
+      }
+    });
+  }
+
+  Future<void> _broadcastCurrentTrackingToFirebase(String stage) async {
+    final trackKey = _pesananUuid ?? _displayOrderNo;
+    await JemberLocationService.instance.pushCourierTrackingToFirebase(
+      orderId: trackKey,
+      courierLat: _courierCoord.latitude,
+      courierLng: _courierCoord.longitude,
+      progressRatio: _routeProgress,
+      statusPesanan: stage,
+      currentStreet: _currentStreet,
+      remainingKm: _remainingKm,
+      etaMinutes: _etaMinutes,
+      courierName: _courierName,
+      courierPlate: _courierPlate,
+    );
+  }
+
+  Future<void> _activateRealPatientGpsOnTrack() async {
+    setState(() => _isActivatingGps = true);
+    try {
+      final gpsCoord = await JemberLocationService.instance
+          .requestAndFetchRealGpsLocation(currentAddressHint: _recipientAddress);
+      if (!mounted) return;
+      setState(() {
+        _patientCoord = gpsCoord;
+        if (gpsCoord.address.isNotEmpty) {
+          _recipientAddress = gpsCoord.address;
+        }
+        _routePoints = JemberLocationService.instance.buildJemberArterialRoadPoints(
+          startLat: _apotekCoord.latitude,
+          startLng: _apotekCoord.longitude,
+          endLat: _patientCoord.latitude,
+          endLng: _patientCoord.longitude,
+        );
+        _recalculateCourierTelemetry(_routeProgress);
+        _isActivatingGps = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Titik GPS Real-Time diperbarui (${_patientCoord.latitude.toStringAsFixed(5)}, ${_patientCoord.longitude.toStringAsFixed(5)}) — Rute kurir Jember disesuaikan!',
+            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: _darkGreen,
+        ),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _isActivatingGps = false);
     }
   }
 
@@ -109,8 +415,19 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           if (user.noHp != null && user.noHp!.isNotEmpty) {
             _recipientPhone = user.noHp!;
           }
-          if (user.alamat != null && user.alamat!.isNotEmpty) {
+          if (user.alamat != null &&
+              user.alamat!.isNotEmpty &&
+              widget.orderData?.recipientAddress == null) {
             _recipientAddress = user.alamat!;
+            _patientCoord = JemberLocationService.instance
+                .resolveAddressToJemberCoordinate(_recipientAddress);
+            _routePoints = JemberLocationService.instance.buildJemberArterialRoadPoints(
+              startLat: _apotekCoord.latitude,
+              startLng: _apotekCoord.longitude,
+              endLat: _patientCoord.latitude,
+              endLng: _patientCoord.longitude,
+            );
+            _recalculateCourierTelemetry(_routeProgress);
           }
         });
       }
@@ -368,22 +685,32 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
 
                         const SizedBox(height: 16),
 
-                        // ── 4. Timeline Pelacakan Pengiriman ──
+                        // ── 4. Peta Live Tracking Pengiriman Obat Kota Jember ──
+                        _buildLiveMapTrackingCard(),
+
+                        const SizedBox(height: 16),
+
+                        // ── 5. Telemetri Pergerakan Kurir Real-Time & Kontrol ──
+                        _buildLiveCourierTelemetryCard(),
+
+                        const SizedBox(height: 16),
+
+                        // ── 6. Timeline Pelacakan Pengiriman ──
                         _buildTimelineCard(),
 
                         const SizedBox(height: 16),
 
-                        // ── 5. Kurir & Apotek Mitra Card ──
+                        // ── 7. Kurir & Apotek Mitra Card ──
                         _buildKurirApotekCard(),
 
                         const SizedBox(height: 16),
 
-                        // ── 6. Alamat Pengiriman Card ──
+                        // ── 8. Alamat Pengiriman Card ──
                         _buildAlamatPengirimanCard(),
 
                         const SizedBox(height: 16),
 
-                        // ── 7. Rincian Obat yang Dikirim Card ──
+                        // ── 9. Rincian Obat yang Dikirim Card ──
                         _buildRincianObatCard(),
                       ],
                     ),
@@ -394,6 +721,358 @@ class _LacakObatScreenState extends State<LacakObatScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 2A. LIVE MAP TRACKING PENGIRIMAN OBAT REAL-TIME (KOTA JEMBER)
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildLiveMapTrackingCard() {
+    final midLat = (_apotekCoord.latitude + _patientCoord.latitude) / 2.0;
+    final midLng = (_apotekCoord.longitude + _patientCoord.longitude) / 2.0;
+
+    final markers = <GiatMapMarker>[
+      GiatMapMarker(
+        id: 'apotek_jember',
+        title: _namaApotek,
+        subtitle: _alamatApotek,
+        latitude: _apotekCoord.latitude,
+        longitude: _apotekCoord.longitude,
+        type: GiatMapMarkerType.apotek,
+      ),
+      GiatMapMarker(
+        id: 'pasien_jember',
+        title: 'Rumah $_recipientName',
+        subtitle: _recipientAddress,
+        latitude: _patientCoord.latitude,
+        longitude: _patientCoord.longitude,
+        type: GiatMapMarkerType.pasien,
+      ),
+      GiatMapMarker(
+        id: 'kurir_giat',
+        title: 'Kurir: $_courierName ($_courierPlate)',
+        subtitle: 'Melintasi $_currentStreet',
+        latitude: _courierCoord.latitude,
+        longitude: _courierCoord.longitude,
+        type: GiatMapMarkerType.kurir,
+        isSelected: true,
+        isPulsing: true,
+      ),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF16A34A),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'LIVE GPS TRACKING JEMBER',
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: _darkGreen,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${(_routeProgress * 100).round()}% Perjalanan',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _darkGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          GiatRealMapWidget(
+            centerLat: midLat,
+            centerLng: midLng,
+            initialZoom: 14.3,
+            height: 255,
+            markers: markers,
+            routePoints: _routePoints,
+            routeProgress: _routeProgress,
+            topBadgeText: 'Peta Live Kurir Obat • Kota Jember',
+            bottomBannerTitle: 'Posisi Kurir: $_currentStreet',
+            bottomBannerSubtitle:
+                'Dari $_namaApotek → $_recipientAddress ($_remainingKm km lagi • ~$_etaMinutes mnt)',
+            onRequestGps: _activateRealPatientGpsOnTrack,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 2B. TELEMETRI PERGERAKAN KURIR REAL-TIME & SIMULASI / GPS KONTROL
+  // ───────────────────────────────────────────────────────────────────────────
+  Widget _buildLiveCourierTelemetryCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.delivery_dining_rounded,
+                  color: _darkGreen,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Posisi Paket Obat Saat Ini (Real-Time)',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                    Text(
+                      _currentStreet,
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Bar Statistik Jarak, Sisa Jarak, & ETA
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildTelemetryMetric(
+                  label: 'Total Rute',
+                  value: '${_totalDistanceKm.toStringAsFixed(1)} km',
+                  icon: Icons.route_outlined,
+                ),
+                Container(width: 1, height: 28, color: const Color(0xFFE2E8F0)),
+                _buildTelemetryMetric(
+                  label: 'Sisa Jarak',
+                  value: '$_remainingKm km lagi',
+                  icon: Icons.social_distance_rounded,
+                ),
+                Container(width: 1, height: 28, color: const Color(0xFFE2E8F0)),
+                _buildTelemetryMetric(
+                  label: 'Estimasi Tiba',
+                  value: _etaMinutes == 0 ? 'Tiba di Tujuan' : '~$_etaMinutes menit',
+                  icon: Icons.timer_outlined,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Progress bar visual rute Apotek -> Rumah Pasien
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: _routeProgress.clamp(0.0, 1.0),
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE2E8F0),
+              valueColor: const AlwaysStoppedAnimation<Color>(_darkGreen),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  '🏥 $_namaApotek',
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF475569),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  '🏠 Tujuan: $_recipientName (Jember)',
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _darkGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Tombol Interaktif: Simulasi Live Pergerakan Kurir & Perbarui GPS Pasien
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isActivatingGps ? null : _activateRealPatientGpsOnTrack,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _darkGreen,
+                    side: const BorderSide(color: _darkGreen, width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.my_location_rounded, size: 15),
+                  label: Text(
+                    'Hidupkan GPS Saya',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _toggleLiveCourierSimulation,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isSimulatingLive
+                        ? const Color(0xFFDC2626)
+                        : _darkGreen,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: Icon(
+                    _isSimulatingLive
+                        ? Icons.pause_circle_outline_rounded
+                        : Icons.play_circle_outline_rounded,
+                    size: 16,
+                  ),
+                  label: Text(
+                    _isSimulatingLive ? 'Hentikan Live' : 'Pantau Live Kurir',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTelemetryMetric({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: _darkGreen),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
+      ],
     );
   }
 

@@ -671,22 +671,31 @@ class _ResepDokterScreenState extends State<ResepDokterScreen> {
 
   Widget _buildMedicationPreviewRow(String label, String value) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF0F172A),
+        Flexible(
+          flex: 5,
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
           ),
         ),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF0F172A),
+        const SizedBox(width: 8),
+        Flexible(
+          flex: 6,
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF334155),
+            ),
           ),
         ),
       ],

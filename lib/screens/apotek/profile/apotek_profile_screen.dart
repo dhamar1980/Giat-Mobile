@@ -9,6 +9,8 @@ import '../../../onboarding_screen.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/apotek_api_service.dart';
+import '../../../services/jember_location_service.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 import '../../../config/api_config.dart';
 import '../models/apotek_models.dart';
 import 'apotek_status_layanan_screen.dart';
@@ -42,10 +44,13 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
   static const _border = Color(0xFFE2E8F0);
 
   late String _nama;
-  String _email = 'apotek.dago@kimiafarma.co.id';
-  String _noHp = '0222501234';
+  String _email = 'apotek.kimiafarma.jember@gmail.com';
+  String _noHp = '0331484321';
   String _jamOperasionalRingkas = '08.00 - 22.00 WIB';
-  String _areaLayananRingkas = 'Kota Bandung dan Sekitarnya';
+  String _areaLayananRingkas = 'Kabupaten & Kota Jember, Jawa Timur';
+  String _alamatApotek = 'Jl. Gajah Mada No. 175, Kaliwates, Kabupaten Jember, Jawa Timur 68131';
+  double _apotekLat = -8.1747;
+  double _apotekLng = 113.6882;
   File? _avatarFile;
   String _avatarType = 'asset'; // 'asset', 'network', 'file', 'default'
   String _avatarPath = 'assets/images/dokter_apoteker.jpg';
@@ -884,6 +889,72 @@ class _ApotekProfileScreenState extends State<ApotekProfileScreen> {
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: _darkGreen,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GiatRealMapWidget(
+                  centerLat: _apotekLat,
+                  centerLng: _apotekLng,
+                  initialZoom: 14.5,
+                  height: 175,
+                  markers: [
+                    GiatMapMarker(
+                      id: 'apotek_profile_pin',
+                      title: ApotekProfileState.instance.apotekName,
+                      subtitle: _alamatApotek,
+                      latitude: _apotekLat,
+                      longitude: _apotekLng,
+                      type: GiatMapMarkerType.apotek,
+                      isSelected: true,
+                      isPulsing: true,
+                    ),
+                  ],
+                  topBadgeText: 'Lokasi Apotek Mitra • Kota Jember',
+                  bottomBannerTitle: ApotekProfileState.instance.apotekName,
+                  bottomBannerSubtitle:
+                      '$_alamatApotek (${_apotekLat.toStringAsFixed(4)}, ${_apotekLng.toStringAsFixed(4)})',
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final picked = await showJemberLocationPickerModal(
+                        context,
+                        title: 'Atur Titik GPS Apotek di Kota Jember',
+                        initialAddress: _alamatApotek,
+                        initialLat: _apotekLat,
+                        initialLng: _apotekLng,
+                      );
+                      if (picked != null && mounted) {
+                        setState(() {
+                          _apotekLat = picked.latitude;
+                          _apotekLng = picked.longitude;
+                          _alamatApotek = picked.address;
+                        });
+                        ApotekProfileState.instance.updateApotekCoordinates(
+                          lat: picked.latitude,
+                          lng: picked.longitude,
+                          address: picked.address,
+                        );
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _darkGreen,
+                      side: const BorderSide(color: _darkGreen, width: 1.2),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.my_location_rounded, size: 15),
+                    label: Text(
+                      'Perbarui Titik GPS Apotek Jember',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),

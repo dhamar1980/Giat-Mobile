@@ -80,7 +80,7 @@ class ApiClient {
                     'user': {
                       'id': isDokter ? 2 : (isApotek ? 3 : 1),
                       'nama': name,
-                      'email': email.isNotEmpty ? email : (isDokter ? 'dr.budi@gmail.com' : (isApotek ? 'aminah@giat.id' : 'test@giat.id')),
+                      'email': email.isNotEmpty ? email : (isDokter ? 'dr.budi@gmail.com' : (isApotek ? 'apotek.kimiafarma.jember@gmail.com' : 'siti.aisyah@gmail.com')),
                       'role': role,
                       'spesialisasi': spec,
                     },
@@ -91,8 +91,8 @@ class ApiClient {
                             'spesialisasi': spec ?? 'Spesialis Penyakit Dalam / Ginjal',
                             'no_str': '1234567890123456',
                             'no_sip': 'SIP/123/456/2023',
-                            'instansi': 'RS Medika Utama',
-                            'alamat_praktik': 'Jl. Sehat No. 12, Jember',
+                            'instansi': 'RSD dr. Soebandi Jember',
+                            'alamat_praktik': 'Jl. Dr. Soebandi No. 124, Patrang, Jember',
                             'jadwal_praktik': 'Senin - Jumat, 09:00 - 17:00',
                           }
                         : null,

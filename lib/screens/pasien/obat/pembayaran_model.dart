@@ -22,6 +22,14 @@ class OrderCheckoutData {
   final String statusPembayaran;
   final String statusPesanan;
   final List<Map<String, dynamic>>? items;
+  final String? apotekId;
+  final String apotekName;
+  final String apotekAddress;
+  final double? apotekLat;
+  final double? apotekLng;
+  final double? patientLat;
+  final double? patientLng;
+  final double? distanceKm;
 
   const OrderCheckoutData({
     this.idPesanan,
@@ -43,6 +51,14 @@ class OrderCheckoutData {
     this.statusPembayaran = 'menunggu_pembayaran',
     this.statusPesanan = 'menunggu_konfirmasi',
     this.items,
+    this.apotekId,
+    this.apotekName = 'Apotek K-24 Sumbersari Jember',
+    this.apotekAddress = 'Jl. Kalimantan No. 42, Sumbersari, Kabupaten Jember, Jawa Timur 68121',
+    this.apotekLat,
+    this.apotekLng,
+    this.patientLat,
+    this.patientLng,
+    this.distanceKm,
   });
 
   OrderCheckoutData copyWith({
@@ -65,6 +81,14 @@ class OrderCheckoutData {
     String? statusPembayaran,
     String? statusPesanan,
     List<Map<String, dynamic>>? items,
+    String? apotekId,
+    String? apotekName,
+    String? apotekAddress,
+    double? apotekLat,
+    double? apotekLng,
+    double? patientLat,
+    double? patientLng,
+    double? distanceKm,
   }) {
     return OrderCheckoutData(
       idPesanan: idPesanan ?? this.idPesanan,
@@ -86,6 +110,14 @@ class OrderCheckoutData {
       statusPembayaran: statusPembayaran ?? this.statusPembayaran,
       statusPesanan: statusPesanan ?? this.statusPesanan,
       items: items ?? this.items,
+      apotekId: apotekId ?? this.apotekId,
+      apotekName: apotekName ?? this.apotekName,
+      apotekAddress: apotekAddress ?? this.apotekAddress,
+      apotekLat: apotekLat ?? this.apotekLat,
+      apotekLng: apotekLng ?? this.apotekLng,
+      patientLat: patientLat ?? this.patientLat,
+      patientLng: patientLng ?? this.patientLng,
+      distanceKm: distanceKm ?? this.distanceKm,
     );
   }
 }

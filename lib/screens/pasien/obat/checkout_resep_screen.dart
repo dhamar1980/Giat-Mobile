@@ -13,8 +13,10 @@ import '../../../services/pasien_api_service.dart';
 import '../../../services/supabase_admin_service.dart';
 import '../../../services/cart_service.dart';
 import '../../../services/storage_service.dart';
+import '../../../services/jember_location_service.dart';
 import '../../../utils/time_utils.dart';
 import '../../../widgets/app_top_action_pill.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALAMAN CHECKOUT RESEP DOKTER (Sesuai Desain Figma / 3 Screenshot Checkout)
@@ -55,10 +57,20 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
   String? _activeSnapToken;
   String? _activeRedirectUrl;
 
-  // Patient address state
+  // Patient address & Real GPS Jember state
   String _recipientName = 'Pasien';
   String _recipientPhone = '0812-3456-7891';
   String _recipientAddress = 'Jl. Kalimantan No. 37, Sumbersari, Jember, Jawa Timur 68121';
+  late JemberCoordinate _patientCoord;
+  bool _isGpsActive = false;
+  bool _isFetchingGps = false;
+
+  // Daftar Apotek Mitra GIAT di Kota Jember (Otomatis pilih terdekat + bebas pilih manual)
+  List<Map<String, dynamic>> _rawSupabaseApoteks = [];
+  List<ApotekJemberPoint> _rankedApoteks = [];
+  late ApotekJemberPoint _selectedApotek;
+  bool _hasManualApotekOverride = false;
+  List<JemberCoordinate> _previewRoute = [];
 
   @override
   void initState() {
@@ -66,7 +78,116 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
     if (widget.userName.isNotEmpty && widget.userName != 'Pasien') {
       _recipientName = widget.userName;
     }
+    _patientCoord = JemberLocationService.instance
+        .resolveAddressToJemberCoordinate(_recipientAddress);
+    _rankedApoteks = JemberLocationService.instance.rankApoteksByDistance(
+      patientLat: _patientCoord.latitude,
+      patientLng: _patientCoord.longitude,
+    );
+    _selectedApotek = _rankedApoteks.first;
+    _previewRoute = JemberLocationService.instance.buildJemberArterialRoadPoints(
+      startLat: _selectedApotek.latitude,
+      startLng: _selectedApotek.longitude,
+      endLat: _patientCoord.latitude,
+      endLng: _patientCoord.longitude,
+    );
     _loadUserProfile();
+  }
+
+  void _recalculateNearestApotek({bool autoSelectNearest = true}) {
+    final ranked = JemberLocationService.instance.rankApoteksByDistance(
+      patientLat: _patientCoord.latitude,
+      patientLng: _patientCoord.longitude,
+      rawSupabaseApoteks: _rawSupabaseApoteks.isNotEmpty ? _rawSupabaseApoteks : null,
+    );
+    _rankedApoteks = ranked;
+    if (autoSelectNearest || !_hasManualApotekOverride) {
+      _selectedApotek = ranked.first;
+    } else {
+      _selectedApotek = ranked.firstWhere(
+        (a) => a.id == _selectedApotek.id || a.namaApotek == _selectedApotek.namaApotek,
+        orElse: () => ranked.first,
+      );
+    }
+    _previewRoute = JemberLocationService.instance.buildJemberArterialRoadPoints(
+      startLat: _selectedApotek.latitude,
+      startLng: _selectedApotek.longitude,
+      endLat: _patientCoord.latitude,
+      endLng: _patientCoord.longitude,
+    );
+    _fetchRealOsrmRoute();
+  }
+
+  void _fetchRealOsrmRoute() {
+    JemberLocationService.instance
+        .buildRoadRoute(
+      startLat: _selectedApotek.latitude,
+      startLng: _selectedApotek.longitude,
+      endLat: _patientCoord.latitude,
+      endLng: _patientCoord.longitude,
+    )
+        .then((pts) {
+      if (!mounted || pts.length < 2) return;
+      setState(() {
+        _previewRoute = pts;
+      });
+    });
+  }
+
+  Future<void> _activateRealGpsLocation() async {
+    if (_isFetchingGps) return;
+    setState(() => _isFetchingGps = true);
+    try {
+      final gpsCoord = await JemberLocationService.instance.requestAndFetchRealGpsLocation(
+        currentAddressHint: _recipientAddress,
+      );
+      if (!mounted) return;
+      setState(() {
+        _patientCoord = gpsCoord;
+        _recipientAddress = gpsCoord.address;
+        _isGpsActive = true;
+        _hasManualApotekOverride = false;
+        _recalculateNearestApotek(autoSelectNearest: true);
+      });
+      await _persistPatientAddress(_recipientAddress, gpsCoord);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'GPS Aktif (${gpsCoord.formattedLatLng})! Apotek terdekat dipilih otomatis: ${_selectedApotek.namaApotek} (${_selectedApotek.formattedDistance}).',
+            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: _darkGreen,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isGpsActive = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceAll('Exception: ', ''),
+            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingGps = false);
+      }
+    }
+  }
+
+  Future<void> _persistPatientAddress(String address, JemberCoordinate coord) async {
+    JemberLocationService.instance.cacheCoordinateForAddress(coord, role: 'pasien');
+    try {
+      final user = await StorageService().getUser();
+      if (user != null) {
+        await StorageService().saveUser(user.copyWith(alamat: address));
+      }
+    } catch (_) {}
+    await PasienApiService().updateProfile({'alamat': address});
   }
 
   Future<void> _loadUserProfile() async {
@@ -76,7 +197,19 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
         setState(() {
           if (user.nama.isNotEmpty) _recipientName = user.nama;
           if (user.noHp != null && user.noHp!.isNotEmpty) _recipientPhone = user.noHp!;
-          if (user.alamat != null && user.alamat!.isNotEmpty) _recipientAddress = user.alamat!;
+          if (user.alamat != null && user.alamat!.isNotEmpty) {
+            _recipientAddress = user.alamat!;
+            _patientCoord = JemberLocationService.instance
+                .resolveAddressToJemberCoordinate(_recipientAddress);
+            _recalculateNearestApotek(autoSelectNearest: true);
+          }
+        });
+      }
+      final apotekRes = await PasienApiService().getApotekJemberList();
+      if (apotekRes.success && apotekRes.data != null && apotekRes.data!.isNotEmpty && mounted) {
+        setState(() {
+          _rawSupabaseApoteks = apotekRes.data!;
+          _recalculateNearestApotek(autoSelectNearest: true);
         });
       }
       final profileRes = await PasienApiService().getProfile();
@@ -89,8 +222,11 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
           if (d['no_hp'] != null && d['no_hp'].toString().isNotEmpty) {
             _recipientPhone = d['no_hp'].toString();
           }
-          if (d['alamat'] != null && d['alamat'].toString().isNotEmpty) {
+          if (!_isGpsActive && d['alamat'] != null && d['alamat'].toString().isNotEmpty) {
             _recipientAddress = d['alamat'].toString();
+            _patientCoord = JemberLocationService.instance
+                .resolveAddressToJemberCoordinate(_recipientAddress);
+            _recalculateNearestApotek(autoSelectNearest: true);
           }
         });
       }
@@ -191,7 +327,7 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
 
                   const SizedBox(height: 20),
 
-                  // ── 3. Resep Digital Terverifikasi Title ──
+                  // ── 3. Resep Digital Terverifikasi Title & Card ──
                   Text(
                     'Resep Digital Terverifikasi',
                     style: GoogleFonts.inter(
@@ -209,6 +345,8 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                       color: const Color(0xFF64748B),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  _buildVerifiedResepCard(),
 
                   const SizedBox(height: 18),
 
@@ -296,6 +434,105 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
     );
   }
 
+  Widget _buildVerifiedResepCard() {
+    final rxNo = widget.resepData?.rxNumber ?? 'No. RX-2026-GIAT';
+    final docName = widget.resepData?.doctorName ?? 'dr. Andi Wijaya, Sp.PD-KGH';
+    final docSpec = widget.resepData?.doctorSpecialty ?? 'Spesialis Ginjal & Hipertensi • RSD dr. Soebandi Jember';
+    final tgl = widget.resepData?.tanggalTerbit ?? 'Hari ini';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBBF7D0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCFCE7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.verified_rounded,
+              color: _darkGreen,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        rxNo,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _darkGreen,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Terverifikasi',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  docName,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: _darkGreen,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '$docSpec • Diterbitkan $tgl',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.2,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ───────────────────────────────────────────────────────────────────────────
   // SECTION 4: METODE PENGAMBILAN
   // ───────────────────────────────────────────────────────────────────────────
@@ -371,7 +608,7 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                   ],
                 ),
 
-                // Address Container Box (shown if Antar ke Alamat)
+                // Address & Real GPS Container Box (shown if Antar ke Alamat)
                 if (isAntar) ...[
                   const SizedBox(height: 14),
                   Container(
@@ -386,31 +623,56 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                       children: [
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDBEAFE),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Rumah',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1E40AF),
+                            Flexible(
+                              flex: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: _isGpsActive
+                                      ? const Color(0xFFDCFCE7)
+                                      : const Color(0xFFDBEAFE),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _isGpsActive
+                                          ? Icons.my_location_rounded
+                                          : Icons.home_rounded,
+                                      size: 11,
+                                      color: _isGpsActive
+                                          ? _darkGreen
+                                          : const Color(0xFF1E40AF),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      _isGpsActive ? 'GPS Aktif' : 'Register',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: _isGpsActive
+                                            ? _darkGreen
+                                            : const Color(0xFF1E40AF),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _recipientName,
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0F172A),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _recipientName,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF0F172A),
+                                ),
                               ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 4),
                             GestureDetector(
                               onTap: () => _showUbahAlamatModal(context),
                               child: Row(
@@ -419,15 +681,15 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                                   Text(
                                     'Ubah Alamat',
                                     style: GoogleFonts.inter(
-                                      fontSize: 12,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
                                       color: const Color(0xFF0F172A),
                                     ),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 3),
                                   const Icon(
                                     Icons.arrow_circle_right_outlined,
-                                    size: 15,
+                                    size: 14,
                                     color: Color(0xFF0F172A),
                                   ),
                                 ],
@@ -453,6 +715,153 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                             color: const Color(0xFF334155),
                             height: 1.35,
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.pin_drop_rounded, size: 14, color: _darkGreen),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Koordinat: ${_patientCoord.formattedLatLng} • Jarak Apotek: ${_selectedApotek.formattedDistance}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: _darkGreen,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 40,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isFetchingGps ? null : _activateRealGpsLocation,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _darkGreen,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  icon: _isFetchingGps
+                                      ? const SizedBox(
+                                          width: 13,
+                                          height: 13,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.my_location_rounded, size: 15),
+                                  label: Text(
+                                    _isGpsActive ? 'Perbarui GPS' : 'Hidupkan GPS',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SizedBox(
+                                height: 40,
+                                child: OutlinedButton.icon(
+                                  onPressed: () async {
+                                    final picked = await showJemberLocationPickerModal(
+                                      context,
+                                      title: 'Tentukan Titik Lokasi Pengiriman (Jember)',
+                                      initialAddress: _recipientAddress,
+                                      initialLat: _patientCoord.latitude,
+                                      initialLng: _patientCoord.longitude,
+                                      role: 'pasien',
+                                    );
+                                    if (picked != null && mounted) {
+                                      setState(() {
+                                        _patientCoord = picked;
+                                        _recipientAddress = picked.address;
+                                        _isGpsActive = true;
+                                        _hasManualApotekOverride = false;
+                                        _recalculateNearestApotek(autoSelectNearest: true);
+                                      });
+                                      await _persistPatientAddress(_recipientAddress, picked);
+                                    }
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: _darkGreen,
+                                    side: const BorderSide(color: _darkGreen, width: 1.2),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.map_outlined, size: 15),
+                                  label: Text(
+                                    'Tentukan di Peta',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Peta Rute Pengiriman (TERKUNCI agar tidak bergeser saat scroll)
+                        GiatRealMapWidget(
+                          height: 215,
+                          centerLat: (_patientCoord.latitude + _selectedApotek.latitude) / 2.0,
+                          centerLng: (_patientCoord.longitude + _selectedApotek.longitude) / 2.0,
+                          initialZoom: 14.0,
+                          interactive: false,
+                          showControls: false,
+                          topBadgeText: 'Rute Pengiriman • ${_selectedApotek.formattedDistance}',
+                          bottomBannerTitle: '${_selectedApotek.namaApotek} → $_recipientName',
+                          bottomBannerSubtitle: 'Estimasi waktu tempuh kurir: ~${_selectedApotek.estimatedMinutes} menit',
+                          routePoints: _previewRoute,
+                          routeProgress: 1.0,
+                          markers: [
+                            GiatMapMarker(
+                              id: 'apotek_pin',
+                              title: _selectedApotek.namaApotek,
+                              latitude: _selectedApotek.latitude,
+                              longitude: _selectedApotek.longitude,
+                              type: GiatMapMarkerType.apotek,
+                              isSelected: true,
+                            ),
+                            GiatMapMarker(
+                              id: 'pasien_pin',
+                              title: _recipientName,
+                              latitude: _patientCoord.latitude,
+                              longitude: _patientCoord.longitude,
+                              type: GiatMapMarkerType.pasien,
+                              isSelected: true,
+                              isPulsing: true,
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -671,14 +1080,18 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      name,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                    Expanded(
+                      child: Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
@@ -726,12 +1139,16 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                         ),
                       ),
                     ),
-                    Text(
-                      priceStr,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        priceStr,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
                       ),
                     ),
                   ],
@@ -745,143 +1162,256 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // SECTION 6: APOTEK MITRA GIAT
+  // SECTION 6: APOTEK MITRA GIAT (OTOMATIS TERDEKAT + BEBAS PILIH DI JEMBER)
   // ───────────────────────────────────────────────────────────────────────────
   Widget _buildApotekMitraSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Apotek Mitra GIAT',
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _cardBorderColor),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildRadioIcon(selected: true),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Apotek Mitra GIAT - Jember Farma (Pusat)',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Farmasi Mitra GIAT Terakreditasi Standar Kemenkes',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'SIPA: 19850412/SIPA-35.09/2023',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 14),
-
-              // Checklist Information Box
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Apotek Mitra GIAT',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
                 ),
-                child: Column(
+              ),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.check, size: 16, color: Color(0xFF059669)),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Menerima pesanan obat',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF065A37),
-                          ),
+                    const Icon(Icons.near_me_rounded, size: 12, color: _darkGreen),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        'Otomatis Terdekat • Jember',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: _darkGreen,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.check, size: 16, color: Color(0xFF059669)),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Diproses oleh apoteker berizin',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF065A37),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF475569)),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Estimasi proses: 1–2 hari kerja',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF334155),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Sistem otomatis memilih apotek terdekat dari titik lokasi Anda. Anda juga bebas memilih apotek mitra lainnya di Jember:',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: const Color(0xFF64748B),
+            height: 1.35,
           ),
         ),
+        const SizedBox(height: 12),
+
+        ...List.generate(_rankedApoteks.length, (idx) {
+          final apt = _rankedApoteks[idx];
+          final isSelected = apt.id == _selectedApotek.id ||
+              apt.namaApotek == _selectedApotek.namaApotek;
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: idx == _rankedApoteks.length - 1 ? 0 : 10),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedApotek = apt;
+                  _hasManualApotekOverride = true;
+                  _previewRoute = JemberLocationService.instance.buildJemberArterialRoadPoints(
+                    startLat: apt.latitude,
+                    startLng: apt.longitude,
+                    endLat: _patientCoord.latitude,
+                    endLng: _patientCoord.longitude,
+                  );
+                });
+                _fetchRealOsrmRoute();
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isSelected
+                        ? _darkGreen.withValues(alpha: 0.55)
+                        : _cardBorderColor,
+                    width: isSelected ? 1.6 : 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildRadioIcon(selected: isSelected),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      apt.namaApotek,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: apt.isNearest
+                                          ? _darkGreen
+                                          : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      apt.isNearest
+                                          ? 'Terdekat • ${apt.formattedDistance}'
+                                          : apt.formattedDistance,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: apt.isNearest
+                                            ? Colors.white
+                                            : const Color(0xFF334155),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                apt.alamat,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.8,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF475569),
+                                  height: 1.3,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'SIPA: ${apt.noSipa} • Estimasi tiba ~${apt.estimatedMinutes} menit',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.2,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.check, size: 16, color: Color(0xFF059669)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Menerima pesanan obat',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF065A37),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.check, size: 16, color: Color(0xFF059669)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Diproses oleh apoteker berizin (${apt.penanggungJawab})',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF065A37),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF475569)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Estimasi pengantaran Jember: ${apt.estimatedMinutes} menit (${apt.formattedDistance})',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.8,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF334155),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
       ],
     );
   }
@@ -896,14 +1426,18 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Metode Pembayaran',
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+            Expanded(
+              child: Text(
+                'Metode Pembayaran',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
               ),
             ),
+            const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 9,
@@ -969,12 +1503,15 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
           children: [
             const Icon(Icons.receipt_long_rounded, color: _darkGreen, size: 20),
             const SizedBox(width: 8),
-            Text(
-              'Ringkasan Pembayaran',
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+            Expanded(
+              child: Text(
+                'Ringkasan Pembayaran',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
               ),
             ),
           ],
@@ -1026,20 +1563,27 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Total Pembayaran',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
+                  Expanded(
+                    child: Text(
+                      'Total Pembayaran',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
                     ),
                   ),
-                  Text(
-                    _formatCurrency(_totalPembayaran),
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      _formatCurrency(_totalPembayaran),
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                 ],
@@ -1055,20 +1599,27 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF475569),
+        Expanded(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF475569),
+            ),
           ),
         ),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
           ),
         ),
       ],
@@ -1271,7 +1822,12 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
                       _recipientName = nameCtrl.text.trim();
                       _recipientPhone = phoneCtrl.text.trim();
                       _recipientAddress = addressCtrl.text.trim();
+                      _patientCoord = JemberLocationService.instance
+                          .resolveAddressToJemberCoordinate(_recipientAddress);
+                      _hasManualApotekOverride = false;
+                      _recalculateNearestApotek(autoSelectNearest: true);
                     });
+                    PasienApiService().updateProfile({'alamat': _recipientAddress});
                     Navigator.pop(ctx);
                   },
                   style: ElevatedButton.styleFrom(
@@ -1314,13 +1870,13 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
     try {
       // 1. Jika belum punya pesanan yang dibuat pada sesi checkout ini, buat pesanan baru dengan mode: "snap"
       if (idPesanan == null || idPesanan.isEmpty) {
-        String? validApotekId;
+        String? validApotekId = _selectedApotek.id;
         List<Map<String, dynamic>> resolvedItems = [];
 
         // Ambil katalog obat dari backend untuk memastikan id_obat dan id_apotek valid (UUID)
         final katalogRes = await PasienApiService().getObatList();
         final katalogList = katalogRes.data ?? [];
-        if (katalogList.isNotEmpty) {
+        if ((validApotekId == null || validApotekId.isEmpty) && katalogList.isNotEmpty) {
           final firstObat = katalogList.first;
           if (firstObat is Map) {
             validApotekId = (firstObat['id_apotek'] ??
@@ -1556,11 +2112,19 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
       recipientName: _recipientName,
       recipientPhone: _recipientPhone,
       recipientAddress: _recipientAddress,
-      estimatedArrival: 'Hari ini, 16:30 - 17:00 ${TimeUtils.getTimeZoneName()}',
+      estimatedArrival: 'Hari ini (~${_selectedApotek.estimatedMinutes} menit • ${_selectedApotek.formattedDistance})',
       snapToken: snapToken,
       redirectUrl: resolvedUrl,
       statusPembayaran: 'menunggu_pembayaran',
       items: orderItemsList,
+      apotekId: _selectedApotek.id,
+      apotekName: _selectedApotek.namaApotek,
+      apotekAddress: _selectedApotek.alamat,
+      apotekLat: _selectedApotek.latitude,
+      apotekLng: _selectedApotek.longitude,
+      patientLat: _patientCoord.latitude,
+      patientLng: _patientCoord.longitude,
+      distanceKm: _selectedApotek.distanceKm,
     );
 
     // 3. Jika redirect_url Midtrans Snap tersedia, buka MidtransPaymentWebViewPage
@@ -1643,6 +2207,7 @@ class _CheckoutResepScreenState extends State<CheckoutResepScreen> {
           idResep: widget.resepData?.id,
           noResep: rxNumber,
           patientName: widget.userName,
+          idApotek: _selectedApotek.id,
           metodePengambilan: _metodePengambilan,
           namaPenerima: _recipientName,
           noHpPenerima: _recipientPhone,

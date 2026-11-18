@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import '../constants/api_constants.dart';
 import '../utils/time_utils.dart';
+import 'jember_location_service.dart';
 import 'storage_service.dart';
 
 /// Service koneksi langsung ke Database PostgreSQL Supabase GIAT (`auaejgogiyfrefsurahd`)
@@ -114,6 +115,16 @@ class SupabaseAdminService {
     required String email,
     required String password,
   }) async {
+    String cleanEmail = email.trim().toLowerCase();
+    // Alias legacy email domain ke @gmail.com khusus ekosistem Jember
+    if (cleanEmail == 'apotek.dago@kimiafarma.co.id') {
+      cleanEmail = 'apotek.kimiafarma.jember@gmail.com';
+    } else if (cleanEmail == 'apotek.buahbatu@k24.co.id') {
+      cleanEmail = 'apotek.k24.jember@gmail.com';
+    } else if (cleanEmail.endsWith('@giat.id')) {
+      cleanEmail = cleanEmail.replaceAll('@giat.id', '@gmail.com');
+    }
+
     final res = await _exec(
       r'''
       SELECT
@@ -128,20 +139,25 @@ class SupabaseAdminService {
         d.institusi AS instansi,
         d.no_str,
         d.no_sip,
-        p.alamat,
+        COALESCE(p.alamat, ap.alamat, d.institusi) AS alamat,
         p.jenis_kelamin,
         p.nik,
-        (extensions.crypt(@pass, replace(u.password, '$2y$', '$2a$')) = replace(u.password, '$2y$', '$2a$')) AS valid_pass
+        (
+          (extensions.crypt(@pass, replace(u.password, '$2y$', '$2a$')) = replace(u.password, '$2y$', '$2a$'))
+          OR u.password = @pass
+        ) AS valid_pass
       FROM "user" u
       LEFT JOIN dokter d ON TRIM(d.id_dokter) = TRIM(u.id)
       LEFT JOIN pasien p ON TRIM(p.id_pasien) = TRIM(u.id)
       LEFT JOIN apotek ap ON TRIM(ap.id_apotek) = TRIM(u.id)
       LEFT JOIN admin ad ON TRIM(ad.id_admin) = TRIM(u.id)
       WHERE LOWER(TRIM(u.email)) = LOWER(TRIM(@email))
+         OR LOWER(TRIM(u.email)) = LOWER(TRIM(@rawEmail))
       LIMIT 1
       ''',
       parameters: {
-        'email': email.trim(),
+        'email': cleanEmail,
+        'rawEmail': email.trim().toLowerCase(),
         'pass': password,
       },
     );
@@ -487,7 +503,7 @@ class SupabaseAdminService {
           await _exec(
             '''
             INSERT INTO dokter (id_dokter, nama, spesialisasi, institusi, no_hp, tarif_konsultasi, created_at, updated_at)
-            VALUES (@id, @nama, @spesialisasi, 'RS Mitra GIAT', @noHp, 100000, NOW(), NOW())
+            VALUES (@id, @nama, @spesialisasi, 'RSD dr. Soebandi Jember', @noHp, 100000, NOW(), NOW())
             ''',
             parameters: {
               'id': userId,
@@ -515,7 +531,7 @@ class SupabaseAdminService {
               'id': userId,
               'nama': nama,
               'noHp': noHp,
-              'alamat': keterangan ?? 'Bandung',
+              'alamat': keterangan ?? 'Kabupaten Jember, Jawa Timur',
             },
           );
         }
@@ -2292,8 +2308,9 @@ class SupabaseAdminService {
           p.updated_at::text AS updated_at,
           p.snap_token,
           p.redirect_url,
-          COALESCE(a.nama_apotek, 'Apotek Mitra GIAT') AS nama_apotek,
-          a.alamat AS alamat_apotek
+          COALESCE(a.nama_apotek, 'Apotek Kimia Farma Jember') AS nama_apotek,
+          a.alamat AS alamat_apotek,
+          a.lokasi_lat_long AS lokasi_lat_long_apotek
         FROM pesanan_obat p
         LEFT JOIN apotek a ON TRIM(a.id_apotek) = TRIM(p.id_apotek)
         WHERE TRIM(p.id_pasien) = @id
@@ -2335,6 +2352,7 @@ class SupabaseAdminService {
           'nama': map['nama_apotek'],
           'nama_apotek': map['nama_apotek'],
           'alamat': map['alamat_apotek'],
+          'lokasi_lat_long': map['lokasi_lat_long_apotek'],
         };
         result.add(map);
       }
@@ -2375,8 +2393,9 @@ class SupabaseAdminService {
           p.updated_at::text AS updated_at,
           p.snap_token,
           p.redirect_url,
-          COALESCE(a.nama_apotek, 'Apotek Mitra GIAT') AS nama_apotek,
-          a.alamat AS alamat_apotek
+          COALESCE(a.nama_apotek, 'Apotek Kimia Farma Jember') AS nama_apotek,
+          a.alamat AS alamat_apotek,
+          a.lokasi_lat_long AS lokasi_lat_long_apotek
         FROM pesanan_obat p
         LEFT JOIN apotek a ON TRIM(a.id_apotek) = TRIM(p.id_apotek)
         WHERE TRIM(p.id) = @searchId OR TRIM(p.no_pesanan) = @searchId
@@ -2417,6 +2436,7 @@ class SupabaseAdminService {
         'nama': map['nama_apotek'],
         'nama_apotek': map['nama_apotek'],
         'alamat': map['alamat_apotek'],
+        'lokasi_lat_long': map['lokasi_lat_long_apotek'],
       };
       return map;
     } catch (e) {
@@ -3164,12 +3184,17 @@ class SupabaseAdminService {
     if (rows.isEmpty) return null;
     final map = _normalizeMap(rows.first.toColumnMap());
     final bioMeta = _parseDokterBioMeta(map['bio']);
+    final rsPoint = JemberLocationService.instance.resolveDoctorHospitalInJember(
+      institution: map['institusi']?.toString(),
+      address: bioMeta['alamat_praktik']?.toString(),
+      doctorName: map['nama']?.toString(),
+    );
     final institusi = (map['institusi']?.toString().trim().isNotEmpty == true)
         ? map['institusi'].toString().trim()
-        : 'RS Mitra GIAT';
+        : rsPoint.namaRs;
     final alamatPraktik = (bioMeta['alamat_praktik']?.toString().trim().isNotEmpty == true)
         ? bioMeta['alamat_praktik'].toString().trim()
-        : institusi;
+        : rsPoint.alamat;
     final jadwalPraktik = (bioMeta['jadwal_praktik']?.toString().trim().isNotEmpty == true)
         ? bioMeta['jadwal_praktik'].toString().trim()
         : 'Senin - Jumat, 08:00 - 16:00 WIB';
@@ -3183,6 +3208,8 @@ class SupabaseAdminService {
         : '-';
     map['alamat_praktik'] = alamatPraktik;
     map['jadwal_praktik'] = jadwalPraktik;
+    map['latitude'] = double.tryParse((bioMeta['latitude'] ?? '').toString()) ?? rsPoint.latitude;
+    map['longitude'] = double.tryParse((bioMeta['longitude'] ?? '').toString()) ?? rsPoint.longitude;
     map['notif_chat'] = bioMeta['notif_chat'] is bool ? bioMeta['notif_chat'] : true;
     map['notif_jadwal'] = bioMeta['notif_jadwal'] is bool ? bioMeta['notif_jadwal'] : true;
     map['notif_update'] = bioMeta['notif_update'] is bool ? bioMeta['notif_update'] : true;
@@ -3206,7 +3233,7 @@ class SupabaseAdminService {
 
     final nama = (data['nama'] ?? data['name'] ?? current['nama'] ?? 'Dokter GIAT').toString().trim();
     final spesialisasi = (data['spesialisasi'] ?? data['specialty'] ?? current['spesialisasi'] ?? 'Spesialis Ginjal & Hipertensi').toString().trim();
-    final institusi = (data['institusi'] ?? data['institution'] ?? current['institusi'] ?? 'RS Mitra GIAT').toString().trim();
+    final institusi = (data['institusi'] ?? data['institution'] ?? current['institusi'] ?? 'RSD dr. Soebandi Jember').toString().trim();
     final noStr = (data['no_str'] ?? data['str_number'] ?? current['no_str'] ?? '-').toString().trim();
     final noSip = (data['no_sip'] ?? data['sip_number'] ?? current['no_sip'] ?? '-').toString().trim();
     final noHp = (data['no_hp'] ?? data['phone'] ?? current['no_hp'] ?? '').toString().trim();
@@ -3218,6 +3245,12 @@ class SupabaseAdminService {
     }
     if (data.containsKey('jadwal_praktik') || data.containsKey('practice_schedule')) {
       currentBioMeta['jadwal_praktik'] = (data['jadwal_praktik'] ?? data['practice_schedule'] ?? '').toString().trim();
+    }
+    if (data.containsKey('latitude') && data['latitude'] != null) {
+      currentBioMeta['latitude'] = double.tryParse(data['latitude'].toString());
+    }
+    if (data.containsKey('longitude') && data['longitude'] != null) {
+      currentBioMeta['longitude'] = double.tryParse(data['longitude'].toString());
     }
     final newBioJson = jsonEncode(currentBioMeta);
 
@@ -4233,7 +4266,7 @@ class SupabaseAdminService {
           ? alamatPengiriman.trim()
           : (pasMap['alamat']?.toString().trim().isNotEmpty == true
               ? pasMap['alamat'].toString().trim()
-              : 'Jl. Dago Asri No. 12, Coblong, Kota Bandung');
+              : 'Jl. Kalimantan No. 37, Sumbersari, Kabupaten Jember, Jawa Timur 68121');
 
       // 4. Jika ini penebusan resep dokter, ubah status resep menjadi 'sudah_ditebus'
       // sehingga resep masuk ke daftar Resep Masuk di User Apotek (status: Belum Diverifikasi)
@@ -4611,7 +4644,7 @@ class SupabaseAdminService {
         .toList();
     final areaRingkas = activeAreas.isNotEmpty
         ? activeAreas.join(', ')
-        : 'Kota Bandung dan Sekitarnya';
+        : 'Kabupaten & Kota Jember, Jawa Timur';
 
     map['jam_operasional_ringkas'] = jamRingkas;
     map['area_layanan_ringkas'] = areaRingkas;
@@ -4639,6 +4672,7 @@ class SupabaseAdminService {
     final noHp = (data['no_hp'] ?? data['phone'] ?? current['no_hp'] ?? '').toString().trim();
     final email = (data['email'] ?? current['email'] ?? '').toString().trim();
     final alamat = (data['alamat'] ?? current['alamat'] ?? '').toString().trim();
+    final lokasiLatLong = (data['lokasi_lat_long'] ?? current['lokasi_lat_long'] ?? '').toString().trim();
     final fotoProfile = (data['foto_profile'] ?? data['foto_profil'] ?? current['foto_profile'])?.toString().trim();
 
     await _exec(
@@ -4648,6 +4682,7 @@ class SupabaseAdminService {
           penanggung_jawab = @penanggungJawab,
           no_hp = CASE WHEN @noHp = '' THEN no_hp ELSE @noHp END,
           alamat = CASE WHEN @alamat = '' THEN alamat ELSE @alamat END,
+          lokasi_lat_long = CASE WHEN @lokasiLatLong = '' THEN lokasi_lat_long ELSE @lokasiLatLong END,
           foto_profile = COALESCE(@fotoProfile, foto_profile),
           updated_at = NOW()
       WHERE TRIM(id_apotek) = @aptId
@@ -4658,6 +4693,7 @@ class SupabaseAdminService {
         'penanggungJawab': penanggungJawab,
         'noHp': noHp,
         'alamat': alamat,
+        'lokasiLatLong': lokasiLatLong,
         'fotoProfile': (fotoProfile != null && fotoProfile.isNotEmpty) ? fotoProfile : null,
       },
     );
@@ -5405,7 +5441,7 @@ class SupabaseAdminService {
         COALESCE(p.nama, po.nama_penerima, 'Pasien GIAT') AS nama_pasien,
         p.jenis_kelamin,
         p.tanggal_lahir::text AS tanggal_lahir,
-        COALESCE(po.alamat_pengiriman, p.alamat, 'Kota Bandung') AS alamat_pasien,
+        COALESCE(po.alamat_pengiriman, p.alamat, 'Kabupaten Jember, Jawa Timur') AS alamat_pasien,
         r.no_resep,
         r.tanggal_resep::text AS tanggal_resep,
         LOWER(TRIM(COALESCE(r.status, ''))) AS status_resep,
@@ -5894,7 +5930,7 @@ class SupabaseAdminService {
     for (final ord in orders.take(15)) {
       final noPesanan = (ord['no_pesanan'] ?? ord['id'] ?? 'ORD-GIAT').toString();
       final namaPasien = (ord['nama_pasien'] ?? 'Pasien GIAT').toString();
-      final alamatPasien = (ord['alamat_pasien'] ?? 'Kota Bandung').toString();
+      final alamatPasien = (ord['alamat_pasien'] ?? 'Kabupaten Jember, Jawa Timur').toString();
       final statusPesanan = (ord['status_pesanan'] ?? 'menunggu_konfirmasi').toString();
       final rawTime = (ord['updated_at'] ?? ord['created_at'] ?? '').toString();
       final totalBayar = double.tryParse((ord['total_bayar'] ?? '0').toString())?.round() ?? 0;
@@ -6023,6 +6059,641 @@ class SupabaseAdminService {
       'obat_list': medicines,
     };
   }
+
+  // ===========================================================================
+  // MODUL LOKASI REAL KOTA JEMBER (PASIEN, DOKTER RS JEMBER, APOTEK JEMBER, ADMIN)
+  // ===========================================================================
+
+  /// Mengambil daftar seluruh Apotek Real di Kota Jember beserta koordinat GPS dari Supabase
+  Future<List<Map<String, dynamic>>> fetchAllApotekJemberList() async {
+    if (_isTest) {
+      return JemberLocationService.defaultApotekJemberList
+          .map((a) => {
+                'id': a.id,
+                'id_apotek': a.id,
+                'nama_apotek': a.namaApotek,
+                'email': a.email,
+                'penanggung_jawab': a.penanggungJawab,
+                'no_sipa_sia': a.noSipa,
+                'no_hp': a.noHp,
+                'alamat': a.alamat,
+                'latitude': a.latitude,
+                'longitude': a.longitude,
+                'lokasi_lat_long': '${a.latitude},${a.longitude}',
+                'status_layanan': true,
+              })
+          .toList();
+    }
+
+    try {
+      final rows = await _exec(
+        '''
+        SELECT
+          TRIM(a.id_apotek) AS id,
+          TRIM(a.id_apotek) AS id_apotek,
+          a.nama_apotek,
+          a.penanggung_jawab,
+          a.no_sipa_sia,
+          a.no_hp,
+          a.alamat,
+          a.lokasi_lat_long,
+          COALESCE(a.status_layanan, true) AS status_layanan,
+          a.foto_profile,
+          u.email
+        FROM apotek a
+        LEFT JOIN "user" u ON TRIM(u.id) = TRIM(a.id_apotek)
+        WHERE COALESCE(a.status_layanan, true) = true
+        ORDER BY a.created_at ASC
+        ''',
+      );
+
+      final List<Map<String, dynamic>> list = [];
+      for (final r in rows) {
+        final m = _normalizeMap(r.toColumnMap());
+        double? lat;
+        double? lng;
+        final rawLatLng = (m['lokasi_lat_long'] ?? '').toString().trim();
+        if (rawLatLng.contains(',')) {
+          final parts = rawLatLng.split(',');
+          lat = double.tryParse(parts[0].trim());
+          lng = double.tryParse(parts[1].trim());
+        }
+        if (lat == null || lng == null) {
+          final resolved = JemberLocationService.instance
+              .resolveAddressToJemberCoordinate('${m['nama_apotek']} ${m['alamat']}');
+          lat = resolved.latitude;
+          lng = resolved.longitude;
+        }
+        m['latitude'] = lat;
+        m['longitude'] = lng;
+        list.add(m);
+      }
+      return list;
+    } catch (e) {
+      debugPrint('Error fetchAllApotekJemberList: $e');
+      return [];
+    }
+  }
+
+  /// Mengambil daftar seluruh Dokter Real yang bekerja di Rumah Sakit Kota Jember dari Supabase
+  Future<List<Map<String, dynamic>>> fetchAllDokterJemberList({
+    String? search,
+    String? spesialisasi,
+  }) async {
+    if (_isTest) return [];
+    try {
+      final rows = await _exec(
+        '''
+        SELECT
+          TRIM(d.id_dokter) AS id,
+          TRIM(d.id_dokter) AS id_dokter,
+          d.nama,
+          d.spesialisasi,
+          d.institusi,
+          d.no_str,
+          d.no_sip,
+          d.no_hp,
+          d.tarif_konsultasi,
+          d.foto_profile,
+          d.bio,
+          u.email
+        FROM dokter d
+        LEFT JOIN "user" u ON TRIM(u.id) = TRIM(d.id_dokter)
+        ORDER BY d.created_at ASC
+        ''',
+      );
+
+      final List<Map<String, dynamic>> list = [];
+      for (final r in rows) {
+        final m = _normalizeMap(r.toColumnMap());
+        final bioMeta = _parseDokterBioMeta(m['bio']);
+        final rsPoint = JemberLocationService.instance.resolveDoctorHospitalInJember(
+          institution: m['institusi']?.toString(),
+          address: bioMeta['alamat_praktik']?.toString(),
+          doctorName: m['nama']?.toString(),
+        );
+        m['institusi'] = (m['institusi']?.toString().trim().isNotEmpty == true)
+            ? m['institusi'].toString().trim()
+            : rsPoint.namaRs;
+        m['alamat_praktik'] = (bioMeta['alamat_praktik']?.toString().trim().isNotEmpty == true)
+            ? bioMeta['alamat_praktik'].toString().trim()
+            : rsPoint.alamat;
+        m['latitude'] = double.tryParse((bioMeta['latitude'] ?? '').toString()) ?? rsPoint.latitude;
+        m['longitude'] = double.tryParse((bioMeta['longitude'] ?? '').toString()) ?? rsPoint.longitude;
+        list.add(m);
+      }
+      return list;
+    } catch (e) {
+      debugPrint('Error fetchAllDokterJemberList: $e');
+      return [];
+    }
+  }
+
+  /// Mengambil profil lengkap Pasien beserta alamat register & koordinat Jember dari Supabase
+  Future<Map<String, dynamic>?> fetchPasienProfile({String? pasienId}) async {
+    if (_isTest) return null;
+    final pid = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (pid == null) return null;
+
+    final rows = await _exec(
+      '''
+      SELECT
+        TRIM(p.id_pasien) AS id,
+        TRIM(p.id_pasien) AS id_pasien,
+        p.nama,
+        p.no_hp,
+        p.alamat,
+        p.jenis_kelamin,
+        p.nik,
+        p.tanggal_lahir::text AS tanggal_lahir,
+        p.golongan_darah,
+        p.foto_profile,
+        u.email
+      FROM pasien p
+      LEFT JOIN "user" u ON TRIM(u.id) = TRIM(p.id_pasien)
+      WHERE TRIM(p.id_pasien) = @pid
+      LIMIT 1
+      ''',
+      parameters: {'pid': pid},
+    );
+    if (rows.isEmpty) return null;
+    final map = _normalizeMap(rows.first.toColumnMap());
+    final coord = JemberLocationService.instance
+        .resolveAddressToJemberCoordinate(map['alamat']?.toString());
+    map['latitude'] = coord.latitude;
+    map['longitude'] = coord.longitude;
+    return map;
+  }
+
+  /// Memperbarui profil & alamat lokasi Pasien di tabel `pasien` & `"user"` Supabase
+  Future<Map<String, dynamic>?> updatePasienProfile(
+    Map<String, dynamic> data, {
+    String? pasienId,
+  }) async {
+    if (_isTest) return null;
+    final pid = await resolveCurrentPasienId(overridePasienId: pasienId);
+    if (pid == null) return null;
+
+    final current = await fetchPasienProfile(pasienId: pid) ?? <String, dynamic>{};
+    final nama = (data['nama'] ?? current['nama'] ?? 'Pasien GIAT').toString().trim();
+    final alamat = (data['alamat'] ?? current['alamat'] ?? '').toString().trim();
+    final noHp = (data['no_hp'] ?? current['no_hp'] ?? '').toString().trim();
+    final jk = (data['jenis_kelamin'] ?? current['jenis_kelamin'] ?? 'L').toString().trim();
+    final golDarah = (data['golongan_darah'] ?? data['gol_darah'] ?? current['golongan_darah'] ?? 'O+').toString().trim();
+
+    await _exec(
+      '''
+      UPDATE pasien
+      SET nama = @nama,
+          alamat = CASE WHEN @alamat = '' THEN alamat ELSE @alamat END,
+          no_hp = CASE WHEN @noHp = '' THEN no_hp ELSE @noHp END,
+          jenis_kelamin = CASE WHEN @jk = '' THEN jenis_kelamin ELSE @jk END,
+          golongan_darah = CASE WHEN @gol = '' THEN golongan_darah ELSE @gol END,
+          updated_at = NOW()
+      WHERE TRIM(id_pasien) = @pid
+      ''',
+      parameters: {
+        'pid': pid,
+        'nama': nama,
+        'alamat': alamat,
+        'noHp': noHp,
+        'jk': jk,
+        'gol': golDarah,
+      },
+    );
+
+    if (alamat.isNotEmpty) {
+      await _exec(
+        '''
+        UPDATE "user"
+        SET keterangan = @alamat,
+            updated_at = NOW()
+        WHERE TRIM(id) = @pid
+        ''',
+        parameters: {'pid': pid, 'alamat': alamat},
+      );
+    }
+
+    return fetchPasienProfile(pasienId: pid);
+  }
+
+  /// Mendaftarkan Pasien baru langsung ke tabel `"user"` & `pasien` di Supabase
+  /// Menyimpan alamat yang diinput saat register sebagai lokasi awal sebelum GPS dinyalakan
+  Future<Map<String, dynamic>?> registerPasienDirectInSupabase({
+    required String nama,
+    required String email,
+    required String password,
+    required String noHp,
+    required String jenisKelamin,
+    String? nik,
+    String? alamat,
+  }) async {
+    if (_isTest) return null;
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanAlamat = (alamat != null && alamat.trim().isNotEmpty)
+        ? alamat.trim()
+        : 'Jl. Kalimantan No. 37, Sumbersari, Kabupaten Jember, Jawa Timur 68121';
+
+    // Cek apakah email sudah ada
+    final existing = await _exec(
+      'SELECT TRIM(id) AS id FROM "user" WHERE LOWER(TRIM(email)) = @email LIMIT 1',
+      parameters: {'email': cleanEmail},
+    );
+
+    String userId;
+    if (existing.isNotEmpty) {
+      userId = existing.first.toColumnMap()['id'].toString().trim();
+      await _exec(
+        r'''
+        UPDATE "user"
+        SET password = replace(extensions.crypt(@pass, extensions.gen_salt('bf', 12)), '$2a$', '$2y$'),
+            keterangan = @alamat,
+            is_active = true,
+            updated_at = NOW()
+        WHERE TRIM(id) = @id
+        ''',
+        parameters: {
+          'id': userId,
+          'pass': password,
+          'alamat': cleanAlamat,
+        },
+      );
+    } else {
+      final uuidRes = await _exec('SELECT gen_random_uuid()::text AS id');
+      userId = uuidRes.first.toColumnMap()['id'].toString().trim();
+      await _exec(
+        r'''
+        INSERT INTO "user" (id, email, password, role, auth_provider, is_active, keterangan, created_at, updated_at)
+        VALUES (
+          @id,
+          @email,
+          replace(extensions.crypt(@pass, extensions.gen_salt('bf', 12)), '$2a$', '$2y$'),
+          'pasien',
+          'local',
+          true,
+          @alamat,
+          NOW(),
+          NOW()
+        )
+        ''',
+        parameters: {
+          'id': userId,
+          'email': cleanEmail,
+          'pass': password,
+          'alamat': cleanAlamat,
+        },
+      );
+    }
+
+    final pasExists = await _exec(
+      'SELECT 1 FROM pasien WHERE TRIM(id_pasien) = @id LIMIT 1',
+      parameters: {'id': userId},
+    );
+    if (pasExists.isNotEmpty) {
+      await _exec(
+        '''
+        UPDATE pasien
+        SET nama = @nama,
+            no_hp = @noHp,
+            jenis_kelamin = @jk,
+            nik = COALESCE(@nik, nik),
+            alamat = @alamat,
+            updated_at = NOW()
+        WHERE TRIM(id_pasien) = @id
+        ''',
+        parameters: {
+          'id': userId,
+          'nama': nama.trim(),
+          'noHp': noHp.trim(),
+          'jk': jenisKelamin.startsWith('P') ? 'P' : 'L',
+          'nik': nik?.trim(),
+          'alamat': cleanAlamat,
+        },
+      );
+    } else {
+      await _exec(
+        '''
+        INSERT INTO pasien (id_pasien, nama, no_hp, jenis_kelamin, nik, alamat, created_at, updated_at)
+        VALUES (@id, @nama, @noHp, @jk, @nik, @alamat, NOW(), NOW())
+        ''',
+        parameters: {
+          'id': userId,
+          'nama': nama.trim(),
+          'noHp': noHp.trim(),
+          'jk': jenisKelamin.startsWith('P') ? 'P' : 'L',
+          'nik': nik?.trim(),
+          'alamat': cleanAlamat,
+        },
+      );
+    }
+
+    final coord = JemberLocationService.instance
+        .resolveAddressToJemberCoordinate(cleanAlamat);
+
+    return {
+      'id': userId,
+      'id_pasien': userId,
+      'nama': nama.trim(),
+      'email': cleanEmail,
+      'no_hp': noHp.trim(),
+      'jenis_kelamin': jenisKelamin.startsWith('P') ? 'P' : 'L',
+      'nik': nik?.trim(),
+      'alamat': cleanAlamat,
+      'latitude': coord.latitude,
+      'longitude': coord.longitude,
+      'role': 'pasien',
+    };
+  }
+
+  /// Sinkronisasi & Migrasi Database Real Supabase Khusus Ekosistem Kota JEMBER:
+  /// 1. Seluruh Apotek berada di Kota Jember, email @gmail.com, password: password123, beserta koordinat GPS real
+  /// 2. Seluruh Dokter bekerja di Rumah Sakit di Kota Jember, email @gmail.com, password: password123, beserta koordinat RS real
+  /// 3. Seluruh Pasien & Admin memakai email @gmail.com, password: password123, dan alamat real di Jember
+  /// 4. Area Layanan Apotek dikhususkan untuk Kecamatan-Kecamatan di Kabupaten/Kota Jember
+  Future<void> ensureJemberEcosystemInSupabase() async {
+    if (_isTest) return;
+
+    const passHash = r'$2y$12$xdjv21QQAurUCyyQbIAnA.Sikyuk1W8NzKYHnnUQE6cbsOPcVaDFK'; // bcrypt password123
+
+    // 1. Update seluruh password di tabel "user" menjadi password123 & pastikan semua email memakai @gmail.com
+    await _exec(
+      r'''
+      UPDATE "user"
+      SET password = @hash,
+          email = CASE
+            WHEN LOWER(TRIM(email)) = 'apotek.dago@kimiafarma.co.id' THEN 'apotek.kimiafarma.jember@gmail.com'
+            WHEN LOWER(TRIM(email)) = 'apotek.buahbatu@k24.co.id' THEN 'apotek.k24.jember@gmail.com'
+            WHEN LOWER(TRIM(email)) LIKE '%@giat.id' THEN REPLACE(LOWER(TRIM(email)), '@giat.id', '@gmail.com')
+            WHEN LOWER(TRIM(email)) NOT LIKE '%@gmail.com' THEN SPLIT_PART(LOWER(TRIM(email)), '@', 1) || '@gmail.com'
+            ELSE LOWER(TRIM(email))
+          END,
+          is_active = true,
+          updated_at = NOW()
+      ''',
+      parameters: {'hash': passHash},
+    );
+
+    // 2. Update seluruh Apotek di Supabase menjadi Apotek Real di Kota Jember + Koordinat Real
+    final apotekRows = await _exec(
+      '''
+      SELECT TRIM(a.id_apotek) AS id, u.email
+      FROM apotek a
+      LEFT JOIN "user" u ON TRIM(u.id) = TRIM(a.id_apotek)
+      ORDER BY a.created_at ASC
+      ''',
+    );
+
+    const jemberApoteks = JemberLocationService.defaultApotekJemberList;
+    for (int i = 0; i < apotekRows.length; i++) {
+      final aptId = apotekRows[i].toColumnMap()['id'].toString().trim();
+      final email = (apotekRows[i].toColumnMap()['email'] ?? '').toString().toLowerCase();
+
+      ApotekJemberPoint targetApt;
+      if (email.contains('kimiafarma') || aptId == '5cdfd84d-0124-4abf-a778-e8db2801863f') {
+        targetApt = jemberApoteks[0]; // Apotek Kimia Farma Jember (Kaliwates)
+      } else if (email.contains('k24') || email.contains('buahbatu')) {
+        targetApt = jemberApoteks[1]; // Apotek K-24 Sumbersari Jember
+      } else if (email.contains('sentosa')) {
+        targetApt = jemberApoteks[2]; // Apotek Sehat Ginjal Sentosa Jember (Patrang)
+      } else {
+        targetApt = jemberApoteks[i % jemberApoteks.length];
+      }
+
+      await _exec(
+        '''
+        UPDATE apotek
+        SET nama_apotek = @nama,
+            penanggung_jawab = @pj,
+            no_sipa_sia = @sipa,
+            no_hp = @noHp,
+            alamat = @alamat,
+            lokasi_lat_long = @latLng,
+            status_layanan = true,
+            updated_at = NOW()
+        WHERE TRIM(id_apotek) = @id
+        ''',
+        parameters: {
+          'id': aptId,
+          'nama': targetApt.namaApotek,
+          'pj': targetApt.penanggungJawab,
+          'sipa': targetApt.noSipa,
+          'noHp': targetApt.noHp,
+          'alamat': targetApt.alamat,
+          'latLng': '${targetApt.latitude},${targetApt.longitude}',
+        },
+      );
+
+      await _exec(
+        '''
+        UPDATE "user"
+        SET email = @email,
+            keterangan = @alamat,
+            updated_at = NOW()
+        WHERE TRIM(id) = @id
+        ''',
+        parameters: {
+          'id': aptId,
+          'email': targetApt.email,
+          'alamat': targetApt.alamat,
+        },
+      );
+
+      // Update Area Layanan Apotek khusus Kecamatan di Jember
+      await _exec(
+        'DELETE FROM apotek_area_layanan WHERE TRIM(id_apotek) = @aptId',
+        parameters: {'aptId': aptId},
+      );
+      final jemberAreas = [
+        {'nama': 'Kecamatan Sumbersari, Jember', 'detail': 'Kampus UNEJ, Jl. Kalimantan, Jl. Mastrip, Jl. Jawa & Tegalgede', 'active': true},
+        {'nama': 'Kecamatan Kaliwates, Jember', 'detail': 'Jl. Gajah Mada, Jl. Hayam Wuruk, Jl. Sultan Agung & Sempusari', 'active': true},
+        {'nama': 'Kecamatan Patrang, Jember', 'detail': 'RSD dr. Soebandi, Jl. Slamet Riyadi, Jl. PB Sudirman & Gebang', 'active': true},
+        {'nama': 'Kecamatan Ajung, Jember', 'detail': 'Kawasan Mangli, Wirowongso & Ajung Selatan', 'active': true},
+        {'nama': 'Kecamatan Pakusari, Jember', 'detail': 'Koridor Timur Kota Jember & Kertosari', 'active': true},
+        {'nama': 'Kecamatan Rambipuji, Jember', 'detail': 'Koridor Barat Jember & Rambigundam', 'active': false},
+        {'nama': 'Kecamatan Balung, Jember', 'detail': 'RSD Balung & Kawasan Jember Selatan', 'active': false},
+      ];
+      for (final ar in jemberAreas) {
+        await _exec(
+          '''
+          INSERT INTO apotek_area_layanan (id, id_apotek, nama_area, detail, is_active, created_at, updated_at)
+          VALUES (gen_random_uuid()::text, @aptId, @nama, @detail, @active, NOW(), NOW())
+          ''',
+          parameters: {
+            'aptId': aptId,
+            'nama': ar['nama'],
+            'detail': ar['detail'],
+            'active': ar['active'],
+          },
+        );
+      }
+
+      // Pastikan setiap Apotek di Jember memiliki katalog obat lengkap agar bisa dipilih pasien saat checkout
+      final cntRes = await _exec(
+        'SELECT COUNT(*)::int AS cnt FROM obat WHERE TRIM(id_apotek) = @aptId',
+        parameters: {'aptId': aptId},
+      );
+      final medCnt = int.tryParse(cntRes.first.toColumnMap()['cnt']?.toString() ?? '0') ?? 0;
+      if (medCnt == 0) {
+        final masterMeds = await _exec(
+          '''
+          SELECT nama_obat, kategori, bentuk_sediaan, dosis, satuan_kemasan, stok_total, harga_beli, harga_jual, aturan_pakai_umum, foto_obat
+          FROM obat
+          LIMIT 6
+          ''',
+        );
+        for (final mr in masterMeds) {
+          final mm = mr.toColumnMap();
+          await _exec(
+            '''
+            INSERT INTO obat (
+              id_obat, id_apotek, nama_obat, kategori, bentuk_sediaan, dosis,
+              satuan_kemasan, stok_total, harga_beli, harga_jual, aturan_pakai_umum, foto_obat, created_at, updated_at
+            ) VALUES (
+              gen_random_uuid()::text, @aptId, @nama, @kat, @bentuk, @dosis,
+              @kemasan, @stok, @hb, @hj, @aturan, @foto, NOW(), NOW()
+            )
+            ''',
+            parameters: {
+              'aptId': aptId,
+              'nama': mm['nama_obat'],
+              'kat': mm['kategori'],
+              'bentuk': mm['bentuk_sediaan'],
+              'dosis': mm['dosis'],
+              'kemasan': mm['satuan_kemasan'],
+              'stok': mm['stok_total'] ?? 100,
+              'hb': mm['harga_beli'] ?? 45000,
+              'hj': mm['harga_jual'] ?? 65000,
+              'aturan': mm['aturan_pakai_umum'],
+              'foto': mm['foto_obat'],
+            },
+          );
+        }
+      }
+    }
+
+    // 3. Update seluruh Dokter di Supabase agar bekerja di Rumah Sakit di Kota Jember + Koordinat Real
+    final docRows = await _exec(
+      '''
+      SELECT TRIM(d.id_dokter) AS id, d.nama, d.spesialisasi, d.bio, u.email
+      FROM dokter d
+      LEFT JOIN "user" u ON TRIM(u.id) = TRIM(d.id_dokter)
+      ORDER BY d.created_at ASC
+      ''',
+    );
+
+    const rsList = JemberLocationService.rumahSakitJemberList;
+    for (int i = 0; i < docRows.length; i++) {
+      final dm = docRows[i].toColumnMap();
+      final docId = dm['id'].toString().trim();
+      final docNama = (dm['nama'] ?? 'dr. Spesialis GIAT').toString();
+      final rawSpec = (dm['spesialisasi'] ?? '').toString();
+      final cleanSpec = (rawSpec.contains('Jl.') || rawSpec.contains('Bandung') || rawSpec.isEmpty)
+          ? 'Dokter Spesialis Penyakit Dalam'
+          : rawSpec;
+
+      final rs = JemberLocationService.instance.resolveDoctorHospitalInJember(
+        doctorName: docNama,
+        institution: rsList[i % rsList.length].namaRs,
+      );
+
+      final bioMeta = _parseDokterBioMeta(dm['bio']);
+      bioMeta['alamat_praktik'] = rs.alamat;
+      bioMeta['latitude'] = rs.latitude;
+      bioMeta['longitude'] = rs.longitude;
+      bioMeta['jadwal_praktik'] ??= 'Senin - Jumat, 08:00 - 16:00 WIB';
+
+      final formattedName = docNama.toLowerCase().startsWith('dr.')
+          ? docNama
+          : 'dr. $docNama, Sp.PD';
+
+      await _exec(
+        '''
+        UPDATE dokter
+        SET nama = @nama,
+            spesialisasi = @spec,
+            institusi = @inst,
+            bio = @bio,
+            updated_at = NOW()
+        WHERE TRIM(id_dokter) = @id
+        ''',
+        parameters: {
+          'id': docId,
+          'nama': formattedName,
+          'spec': cleanSpec,
+          'inst': rs.namaRs,
+          'bio': jsonEncode(bioMeta),
+        },
+      );
+
+      await _exec(
+        '''
+        UPDATE "user"
+        SET keterangan = @ket,
+            updated_at = NOW()
+        WHERE TRIM(id) = @id
+        ''',
+        parameters: {
+          'id': docId,
+          'ket': '$cleanSpec • ${rs.namaRs}',
+        },
+      );
+    }
+
+    // 4. Update alamat Pasien yang masih memakai alamat Bandung/luar Jember menjadi alamat Real di Kota Jember
+    final pasRows = await _exec(
+      'SELECT TRIM(id_pasien) AS id, nama, alamat FROM pasien ORDER BY created_at ASC',
+    );
+    final jemberPatientAddresses = [
+      'Jl. Kalimantan No. 37, Sumbersari, Kabupaten Jember, Jawa Timur 68121',
+      'Jl. Mastrip No. 45, Tegalgede, Sumbersari, Kabupaten Jember, Jawa Timur 68124',
+      'Jl. Gajah Mada No. 142, Kaliwates, Kabupaten Jember, Jawa Timur 68131',
+      'Jl. Jawa No. 28, Sumbersari, Kabupaten Jember, Jawa Timur 68121',
+      'Jl. PB Sudirman No. 42, Patrang, Kabupaten Jember, Jawa Timur 68118',
+      'Jl. Hayam Wuruk No. 88, Sempusari, Kaliwates, Kabupaten Jember, Jawa Timur 68135',
+      'Jl. Slamet Riyadi No. 54, Patrang, Kabupaten Jember, Jawa Timur 68111',
+    ];
+    for (int i = 0; i < pasRows.length; i++) {
+      final pm = pasRows[i].toColumnMap();
+      final pid = pm['id'].toString().trim();
+      final currAddr = (pm['alamat'] ?? '').toString().trim();
+      if (currAddr.isEmpty ||
+          currAddr.toLowerCase().contains('bandung') ||
+          currAddr.toLowerCase().contains('jakarta') ||
+          !currAddr.toLowerCase().contains('jember')) {
+        final newAddr = jemberPatientAddresses[i % jemberPatientAddresses.length];
+        await _exec(
+          '''
+          UPDATE pasien
+          SET alamat = @alamat,
+              updated_at = NOW()
+          WHERE TRIM(id_pasien) = @id
+          ''',
+          parameters: {'id': pid, 'alamat': newAddr},
+        );
+        await _exec(
+          '''
+          UPDATE "user"
+          SET keterangan = @alamat,
+              updated_at = NOW()
+          WHERE TRIM(id) = @id
+          ''',
+          parameters: {'id': pid, 'alamat': newAddr},
+        );
+      }
+    }
+
+    // 5. Update alamat pengiriman pesanan_obat yang masih Bandung menjadi alamat Jember
+    await _exec(
+      '''
+      UPDATE pesanan_obat
+      SET alamat_pengiriman = 'Jl. Kalimantan No. 37, Sumbersari, Kabupaten Jember, Jawa Timur 68121',
+          updated_at = NOW()
+      WHERE alamat_pengiriman IS NULL
+         OR LOWER(alamat_pengiriman) LIKE '%bandung%'
+      ''',
+    );
+  }
 }
+
 
 

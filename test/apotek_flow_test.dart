@@ -351,7 +351,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Area Layanan'), findsOneWidget);
-    expect(find.text('Kota Malang'), findsOneWidget);
+    expect(find.text('Kec. Sumbersari (Kota Jember)'), findsOneWidget);
     expect(find.text('Kembali'), findsOneWidget);
 
     // Open Riwayat Aktivitas screen directly

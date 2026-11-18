@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../../models/user_model.dart';
 import '../../../services/dokter_api_service.dart';
 import '../../../services/storage_service.dart';
+import '../../../services/jember_location_service.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 import '../../../config/api_config.dart';
 import '../models/dokter_models.dart';
 
@@ -649,85 +651,83 @@ class _DokterInformasiProfileScreenState extends State<DokterInformasiProfileScr
                       ),
                     ),
 
-                    // Map Preview Card (Screenshot 4)
+                    // Map Preview Card Real Rumah Sakit Kota Jember
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                      child: Container(
-                        height: 190,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDF2E8),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: _border),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Stack(
+                      child: Builder(
+                        builder: (ctx) {
+                          final hospital = JemberLocationService.instance
+                              .resolveDoctorHospitalInJember(
+                            institution: profileState.institution,
+                            address: profileState.practiceAddress,
+                            doctorName: profileState.doctorName,
+                          );
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Positioned.fill(
-                                child: CustomPaint(
-                                  painter: _DokterClinicMapPainter(),
-                                ),
-                              ),
-
-                              // Bottom left label chip
-                              Positioned(
-                                left: 12,
-                                bottom: 12,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.94),
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.08),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
+                              GiatRealMapWidget(
+                                centerLat: hospital.latitude,
+                                centerLng: hospital.longitude,
+                                initialZoom: 14.5,
+                                height: 195,
+                                markers: [
+                                  GiatMapMarker(
+                                    id: 'rs_dokter_jember',
+                                    title: profileState.institution,
+                                    subtitle: profileState.practiceAddress,
+                                    latitude: hospital.latitude,
+                                    longitude: hospital.longitude,
+                                    type: GiatMapMarkerType.dokter,
+                                    isSelected: true,
+                                    isPulsing: true,
                                   ),
-                                  child: Text(
-                                    profileState.institution.toUpperCase(),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF0F172A),
-                                      letterSpacing: 0.3,
+                                ],
+                                topBadgeText: 'Lokasi Praktik RS • Kota Jember',
+                                bottomBannerTitle: profileState.institution,
+                                bottomBannerSubtitle:
+                                    '${profileState.practiceAddress} (${hospital.latitude.toStringAsFixed(4)}, ${hospital.longitude.toStringAsFixed(4)})',
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () async {
+                                    final picked = await showJemberLocationPickerModal(
+                                      context,
+                                      title: 'Atur Lokasi Praktik RS di Kota Jember',
+                                      initialAddress: profileState.practiceAddress,
+                                      initialLat: hospital.latitude,
+                                      initialLng: hospital.longitude,
+                                    );
+                                    if (picked != null && mounted) {
+                                      profileState.updatePracticeCoordinates(
+                                        lat: picked.latitude,
+                                        lng: picked.longitude,
+                                        address: picked.address,
+                                      );
+                                    }
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: _darkGreen,
+                                    side: const BorderSide(color: _darkGreen, width: 1.2),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                ),
-                              ),
-
-                              // Scale indicator in bottom right
-                              Positioned(
-                                right: 12,
-                                bottom: 12,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.90),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    '500m',
+                                  icon: const Icon(Icons.my_location_rounded, size: 16),
+                                  label: Text(
+                                    'Atur Lokasi Praktik RS di Jember (GPS / Peta)',
                                     style: GoogleFonts.inter(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF64748B),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
                               ),
                             ],
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     ),
 

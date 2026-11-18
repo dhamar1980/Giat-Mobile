@@ -267,6 +267,37 @@ class AuthService {
         payload['alamat'] = alamat.trim();
       }
 
+      // 1. Prioritaskan penyimpanan langsung ke Supabase PostgreSQL (khusus non-test)
+      if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+        try {
+          final pgReg = await SupabaseAdminService.instance.registerPasienDirectInSupabase(
+            nama: nama.trim(),
+            email: email.trim().toLowerCase(),
+            password: password,
+            noHp: noHp.trim(),
+            jenisKelamin: jenisKelamin,
+            nik: nik,
+            alamat: alamat,
+          );
+          if (pgReg != null) {
+            final user = UserModel.fromJson(pgReg, defaultRole: role);
+            final token = 'supabase_${user.id}';
+            await _storage.saveToken(token);
+            await _storage.saveUser(user);
+            await _storage.saveRole(role);
+            return AuthResult(
+              success: true,
+              message: 'Pendaftaran akun GIAT berhasil.',
+              user: user,
+              token: token,
+              role: role,
+            );
+          }
+        } catch (pgErr) {
+          debugPrint('Supabase direct register notice: $pgErr');
+        }
+      }
+
       dynamic response;
       try {
         response = await _apiClient.dio.post(

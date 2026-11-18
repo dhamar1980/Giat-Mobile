@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/time_utils.dart';
+import '../../../services/jember_location_service.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EDIT INFORMASI PRIBADI & KESEHATAN SCREEN
@@ -18,7 +20,7 @@ class EditInformasiPribadiScreen extends StatefulWidget {
     this.currentName = 'Sarah Amelia',
     this.currentBirthDate = '12 Mei 1985',
     this.currentGender = 'Perempuan',
-    this.currentAddress = 'Jl. Merdeka No. 123, Jakarta Selatan',
+    this.currentAddress = 'Jl. Kalimantan No. 37, Sumbersari, Jember',
     this.currentBloodType = 'O Positif (O+)',
   });
 
@@ -444,18 +446,61 @@ class _EditInformasiPribadiScreenState
           const SizedBox(height: 14),
 
           // Alamat Domisili
-          Text(
-            'Alamat Domisili',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF475569),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Alamat Domisili',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF475569),
+                ),
+              ),
+              GestureDetector(
+                onTap: () async {
+                  final picked = await showJemberLocationPickerModal(
+                    context,
+                    title: 'Pilih Titik Domisili Pasien (Jember)',
+                    initialAddress: _addressCtrl.text,
+                  );
+                  if (picked != null && mounted) {
+                    setState(() {
+                      _addressCtrl.text = picked.address;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.my_location_rounded, size: 13, color: _darkGreen),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Hidupkan GPS / Peta Jember',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _darkGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 6),
           TextField(
             controller: _addressCtrl,
             maxLines: 3,
+            onChanged: (_) => setState(() {}),
             style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: const Color(0xFF0F172A), height: 1.35),
             decoration: InputDecoration(
               filled: true,
@@ -474,6 +519,43 @@ class _EditInformasiPribadiScreenState
                 borderSide: const BorderSide(color: _primaryGreen, width: 1.6),
               ),
             ),
+          ),
+          const SizedBox(height: 10),
+          Builder(
+            builder: (ctx) {
+              final coord = JemberLocationService.instance
+                  .resolveAddressToJemberCoordinate(_addressCtrl.text);
+              return GiatRealMapWidget(
+                centerLat: coord.latitude,
+                centerLng: coord.longitude,
+                initialZoom: 14.5,
+                height: 170,
+                markers: [
+                  GiatMapMarker(
+                    id: 'domisili_pasien',
+                    title: _nameCtrl.text.isNotEmpty ? _nameCtrl.text : 'Lokasi Pasien',
+                    subtitle: coord.address,
+                    latitude: coord.latitude,
+                    longitude: coord.longitude,
+                    type: GiatMapMarkerType.pasien,
+                    isSelected: true,
+                    isPulsing: true,
+                  ),
+                ],
+                topBadgeText: 'Titik Koordinat Real • Kota Jember',
+                bottomBannerTitle: coord.areaName,
+                bottomBannerSubtitle: 'Koordinat: ${coord.formattedLatLng}',
+                onTapLocation: (lat, lng) async {
+                  final pin = await JemberLocationService.instance
+                      .setManualPinLocation(lat, lng);
+                  if (mounted) {
+                    setState(() {
+                      _addressCtrl.text = pin.address;
+                    });
+                  }
+                },
+              );
+            },
           ),
         ],
       ),

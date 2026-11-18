@@ -588,9 +588,31 @@ class DokterProfileState extends ChangeNotifier {
   String _specialty = '';
   String _strNumber = '1234567890123456';
   String _sipNumber = 'SIP/123/456/2023';
-  String _institution = 'RS Medika Utama';
-  String _practiceAddress = 'Jl. Sehat No. 12, Jember';
+  String _institution = 'RSD dr. Soebandi Jember';
+  String _practiceAddress = 'Jl. Dr. Soebandi No. 124, Patrang, Jember';
   String _practiceSchedule = 'Senin - Jumat, 09:00 - 17:00';
+  double _latitude = -8.1518;
+  double _longitude = 113.7153;
+
+  double get latitude => _latitude;
+  double get longitude => _longitude;
+
+  void updatePracticeCoordinates({
+    required double lat,
+    required double lng,
+    String? address,
+    String? institutionName,
+  }) {
+    _latitude = lat;
+    _longitude = lng;
+    if (address != null && address.trim().isNotEmpty) {
+      _practiceAddress = address.trim();
+    }
+    if (institutionName != null && institutionName.trim().isNotEmpty) {
+      _institution = institutionName.trim();
+    }
+    notifyListeners();
+  }
 
   String avatarType = 'default'; // 'asset', 'network', 'default'
   String avatarPath = '';

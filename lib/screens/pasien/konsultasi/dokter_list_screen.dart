@@ -64,7 +64,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
     final rawFoto = (raw['foto_profile'] ?? raw['foto_profil'] ?? raw['avatarUrl'] ?? '').toString();
     final foto = ApiConfig.resolveImageUrl(rawFoto);
     final tarif = raw['tarif_konsultasi'] ?? raw['biaya_konsultasi'] ?? raw['price'];
-    final institusi = (raw['institusi'] ?? raw['instansi'] ?? raw['hospital'] ?? 'Klinik Layanan GIAT').toString();
+    final institusi = (raw['institusi'] ?? raw['instansi'] ?? raw['hospital'] ?? 'RSD dr. Soebandi Jember').toString();
 
     // Normalisasi kategori spesialisasi dokter
     final specLower = spesialisasi.toLowerCase();
@@ -124,17 +124,17 @@ class _DokterListScreenState extends State<DokterListScreen> {
     };
   }
 
-  /// Data dokter default dengan spesialisasi otentik masing-masing
+  /// Data dokter default dengan Rumah Sakit Real di Kota Jember
   static final List<Map<String, dynamic>> _defaultDoctors = [
     // 1. Dokter Umum
     _normalizeDoctor({
       'id': 'anisa_putri',
       'id_dokter': 'anisa_putri',
-      'name': 'dr. Anisa Putri',
-      'nama': 'dr. Anisa Putri',
+      'name': 'dr. Citra Dewi, Sp.PD',
+      'nama': 'dr. Citra Dewi, Sp.PD',
       'specialty': 'Dokter Umum',
       'spesialisasi': 'Dokter Umum',
-      'hospital': 'Klinik Layanan GIAT',
+      'hospital': 'RS Bina Sehat Jember',
       'price': 'Rp 75.000',
       'avatarUrl': 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
       'experience': '7 tahun',
@@ -147,7 +147,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
       'nama': 'dr. Dedi Pratama',
       'specialty': 'Dokter Umum',
       'spesialisasi': 'Dokter Umum',
-      'hospital': 'Klinik Pratama Sehat Ginjal',
+      'hospital': 'RS Citra Husada Jember',
       'price': 'Rp 50.000',
       'avatarUrl': 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&q=80&w=300',
       'experience': '5 tahun',
@@ -161,7 +161,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
       'nama': 'dr. Budi Santoso, Sp.PD',
       'specialty': 'Dokter Spesialis Penyakit Dalam',
       'spesialisasi': 'Dokter Spesialis Penyakit Dalam',
-      'hospital': 'RS Santo Borromeus Bandung',
+      'hospital': 'RS Perkebunan Jember Klinik',
       'price': 'Rp 120.000',
       'avatarUrl': 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=300',
       'experience': '12 tahun',
@@ -174,7 +174,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
       'nama': 'dr. Eka Rahmawati, Sp.PD',
       'specialty': 'Dokter Spesialis Penyakit Dalam',
       'spesialisasi': 'Dokter Spesialis Penyakit Dalam',
-      'hospital': 'RS Hermina Pasteur Bandung',
+      'hospital': 'RS Siloam Jember',
       'price': 'Rp 130.000',
       'avatarUrl': 'https://images.unsplash.com/photo-1594824813629-87a70197d19a?auto=format&fit=crop&q=80&w=300',
       'experience': '8 tahun',
@@ -188,7 +188,7 @@ class _DokterListScreenState extends State<DokterListScreen> {
       'nama': 'dr. Andi Wijaya, Sp.PD-KGH',
       'specialty': 'Dokter Ginjal',
       'spesialisasi': 'Dokter Ginjal',
-      'hospital': 'RSUP Dr. Hasan Sadikin Bandung',
+      'hospital': 'RSD dr. Soebandi Jember',
       'price': 'Rp 150.000',
       'avatarUrl': 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
       'experience': '12 tahun',
@@ -197,11 +197,11 @@ class _DokterListScreenState extends State<DokterListScreen> {
     _normalizeDoctor({
       'id': 'hendra_setiawan',
       'id_dokter': 'hendra_setiawan',
-      'name': 'dr. Hendra Setiawan, Sp.PD-KGH',
-      'nama': 'dr. Hendra Setiawan, Sp.PD-KGH',
+      'name': 'dr. Rina Kusuma, Sp.PD-KGH',
+      'nama': 'dr. Rina Kusuma, Sp.PD-KGH',
       'specialty': 'Dokter Ginjal',
       'spesialisasi': 'Dokter Ginjal',
-      'hospital': 'Pusat Nutrisi & Ginjal Sehat',
+      'hospital': 'RSD Balung Jember',
       'price': 'Rp 150.000',
       'avatarUrl': 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=300',
       'experience': '9 tahun',

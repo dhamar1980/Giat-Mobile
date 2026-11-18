@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/apotek_models.dart';
 import '../../../widgets/app_top_action_pill.dart';
+import '../../../widgets/giat_real_map_widget.dart';
 import '../../../services/apotek_api_service.dart';
+import '../../../services/jember_location_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DETAIL PESANAN APOTEK (Revisi Sesuai 4 Screenshot Desain GIAT)
@@ -37,12 +39,43 @@ class _ApotekDetailPesananScreenState extends State<ApotekDetailPesananScreen> {
     });
     widget.onStatusChanged?.call();
 
-    // Sync to Backend / Supabase
-    ApotekApiService().prosesPesanan(widget.order.dbId ?? widget.order.id);
+    // Sync to Backend / Supabase & Broadcast Live GPS Kurir ke Firebase RTDB
+    final trackId = widget.order.dbId ?? widget.order.id;
+    ApotekApiService().prosesPesanan(trackId);
+    final patCoord = JemberLocationService.instance
+        .resolveAddressToJemberCoordinate(widget.order.patientAddress);
+    final aptLat = ApotekProfileState.instance.latitude;
+    final aptLng = ApotekProfileState.instance.longitude;
+    final route = JemberLocationService.instance.buildJemberArterialRoadPoints(
+      startLat: aptLat,
+      startLng: aptLng,
+      endLat: patCoord.latitude,
+      endLng: patCoord.longitude,
+    );
+    final courier = JemberLocationService.instance.interpolateCourierOnRoute(route, 0.55);
+    final dist = JemberLocationService.calculateDistanceKm(
+      aptLat,
+      aptLng,
+      patCoord.latitude,
+      patCoord.longitude,
+    );
+    JemberLocationService.instance.pushCourierTrackingToFirebase(
+      orderId: trackId,
+      courierLat: courier.latitude,
+      courierLng: courier.longitude,
+      progressRatio: 0.55,
+      statusPesanan: 'dikirim',
+      currentStreet: JemberLocationService.instance.resolveStreetNameOnRoute(
+        courier.latitude,
+        courier.longitude,
+      ),
+      remainingKm: double.parse((dist * 0.45).toStringAsFixed(2)),
+      etaMinutes: 7,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Pesanan ${widget.order.id} mulai diproses.'),
+        content: Text('Pesanan ${widget.order.id} mulai diproses & Live GPS Kurir Jember diaktifkan.'),
         backgroundColor: _darkGreen,
         behavior: SnackBarBehavior.floating,
       ),
@@ -56,8 +89,21 @@ class _ApotekDetailPesananScreenState extends State<ApotekDetailPesananScreen> {
     });
     widget.onStatusChanged?.call();
 
-    // Sync to Backend / Supabase
-    ApotekApiService().selesaikanPesanan(widget.order.dbId ?? widget.order.id);
+    // Sync to Backend / Supabase & Tandai Tiba di Rumah Pasien Jember
+    final trackId = widget.order.dbId ?? widget.order.id;
+    ApotekApiService().selesaikanPesanan(trackId);
+    final patCoord = JemberLocationService.instance
+        .resolveAddressToJemberCoordinate(widget.order.patientAddress);
+    JemberLocationService.instance.pushCourierTrackingToFirebase(
+      orderId: trackId,
+      courierLat: patCoord.latitude,
+      courierLng: patCoord.longitude,
+      progressRatio: 1.0,
+      statusPesanan: 'selesai',
+      currentStreet: patCoord.areaName,
+      remainingKm: 0.0,
+      etaMinutes: 0,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -106,12 +152,16 @@ class _ApotekDetailPesananScreenState extends State<ApotekDetailPesananScreen> {
                           const SizedBox(height: 18),
                           _buildPatientInfoSection(ord),
                           const SizedBox(height: 18),
+                          _buildJemberRouteMapSection(ord, false),
+                          const SizedBox(height: 18),
                           _buildRecipeInfoSection(ord),
                           const SizedBox(height: 18),
                           _buildMenungguMedicinesSection(ord),
                         ] else ...[
                           // ── STATE 2 & 3: DIPROSES / SELESAI (Screenshot 3 & 4) ──
                           _buildDiprosesHeaderCard(ord, isSelesai),
+                          const SizedBox(height: 18),
+                          _buildJemberRouteMapSection(ord, isSelesai),
                           const SizedBox(height: 18),
                           _buildOrderInfoSection(ord),
                           const SizedBox(height: 18),
@@ -131,6 +181,113 @@ class _ApotekDetailPesananScreenState extends State<ApotekDetailPesananScreen> {
                   _buildBottomActionBar(isMenunggu, isDiproses),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJemberRouteMapSection(ApotekOrder ord, bool isSelesai) {
+    final patCoord = JemberLocationService.instance
+        .resolveAddressToJemberCoordinate(ord.patientAddress);
+    final aptLat = ApotekProfileState.instance.latitude;
+    final aptLng = ApotekProfileState.instance.longitude;
+    final aptName = ApotekProfileState.instance.apotekName;
+    final aptAddr = ApotekProfileState.instance.apotekAddress;
+    final route = JemberLocationService.instance.buildJemberArterialRoadPoints(
+      startLat: aptLat,
+      startLng: aptLng,
+      endLat: patCoord.latitude,
+      endLng: patCoord.longitude,
+    );
+    final progress = isSelesai
+        ? 1.0
+        : (ord.status == ApotekOrderStatus.diproses ? 0.55 : 0.10);
+    final courier = JemberLocationService.instance.interpolateCourierOnRoute(
+      route,
+      progress,
+    );
+    final distKm = JemberLocationService.calculateDistanceKm(
+      aptLat,
+      aptLng,
+      patCoord.latitude,
+      patCoord.longitude,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.map_outlined, size: 18, color: _darkGreen),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Peta Rute Pengantaran Obat (Kota Jember)',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              Text(
+                '${distKm.toStringAsFixed(1)} km',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _darkGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          GiatRealMapWidget(
+            centerLat: (aptLat + patCoord.latitude) / 2.0,
+            centerLng: (aptLng + patCoord.longitude) / 2.0,
+            initialZoom: 14.2,
+            height: 185,
+            routePoints: route,
+            routeProgress: progress,
+            markers: [
+              GiatMapMarker(
+                id: 'apt_origin',
+                title: aptName,
+                subtitle: aptAddr,
+                latitude: aptLat,
+                longitude: aptLng,
+                type: GiatMapMarkerType.apotek,
+              ),
+              GiatMapMarker(
+                id: 'pat_dest',
+                title: ord.patientName,
+                subtitle: patCoord.address,
+                latitude: patCoord.latitude,
+                longitude: patCoord.longitude,
+                type: GiatMapMarkerType.pasien,
+              ),
+              if (ord.status != ApotekOrderStatus.menunggu)
+                GiatMapMarker(
+                  id: 'courier_live',
+                  title: 'Kurir GIAT Express',
+                  subtitle: isSelesai ? 'Tiba di Tujuan' : 'Dalam Perjalanan',
+                  latitude: courier.latitude,
+                  longitude: courier.longitude,
+                  type: GiatMapMarkerType.kurir,
+                  isSelected: true,
+                  isPulsing: !isSelesai,
+                ),
+            ],
+            topBadgeText: 'Rute Pengiriman Real • Kota Jember',
+            bottomBannerTitle: 'Tujuan: ${ord.patientName} (${patCoord.areaName})',
+            bottomBannerSubtitle: patCoord.address,
           ),
         ],
       ),

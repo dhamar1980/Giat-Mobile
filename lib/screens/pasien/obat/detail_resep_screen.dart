@@ -651,6 +651,7 @@ class _DetailResepScreenState extends State<DetailResepScreen> {
             child: Column(
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
@@ -661,18 +662,23 @@ class _DetailResepScreenState extends State<DetailResepScreen> {
                         color: const Color(0xFF475569),
                       ),
                     ),
-                    Text(
-                      item.aturanPakai,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        item.aturanPakai,
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
@@ -683,12 +689,16 @@ class _DetailResepScreenState extends State<DetailResepScreen> {
                         color: const Color(0xFF475569),
                       ),
                     ),
-                    Text(
-                      item.jumlahObat,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        item.jumlahObat,
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                        ),
                       ),
                     ),
                   ],
