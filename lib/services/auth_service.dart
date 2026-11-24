@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 import 'api_client.dart';
+import 'satusehat_service.dart';
 import 'storage_service.dart';
 import 'supabase_admin_service.dart';
 
@@ -85,6 +86,7 @@ class AuthService {
         await _storage.saveToken(token);
         await _storage.saveUser(user);
         await _storage.saveRole(resolvedRole);
+        SatuSehatService.instance.triggerBackgroundUserSync(user);
 
         return AuthResult(
           success: true,
@@ -176,6 +178,7 @@ class AuthService {
         }
         await _storage.saveUser(user);
         await _storage.saveRole(finalRole);
+        SatuSehatService.instance.triggerBackgroundUserSync(user);
 
         // Opsional: sinkronkan sesi FirebaseAuth lokal jika ada
         if (!Platform.environment.containsKey('FLUTTER_TEST')) {
@@ -216,6 +219,7 @@ class AuthService {
             await _storage.saveToken(token);
             await _storage.saveUser(user);
             await _storage.saveRole(user.role);
+            SatuSehatService.instance.triggerBackgroundUserSync(user);
             return AuthResult(
               success: true,
               message: 'Login berhasil (Supabase).',
@@ -267,6 +271,23 @@ class AuthService {
         payload['alamat'] = alamat.trim();
       }
 
+      // Jika NIK diisi saat pendaftaran & data alamat belum lengkap, cek ke SATUSEHAT terlebih dahulu
+      String? enrichedAlamat = alamat;
+      if (!Platform.environment.containsKey('FLUTTER_TEST') &&
+          nik != null &&
+          nik.trim().length == 16 &&
+          (enrichedAlamat == null || enrichedAlamat.trim().isEmpty)) {
+        try {
+          final ssPat = await SatuSehatService.instance
+              .lookupPatientByNik(nik.trim())
+              .timeout(const Duration(seconds: 4));
+          if (ssPat?.alamat != null && ssPat!.alamat!.trim().isNotEmpty) {
+            enrichedAlamat = ssPat.alamat!.trim();
+            payload['alamat'] = enrichedAlamat;
+          }
+        } catch (_) {}
+      }
+
       // 1. Prioritaskan penyimpanan langsung ke Supabase PostgreSQL (khusus non-test)
       if (!Platform.environment.containsKey('FLUTTER_TEST')) {
         try {
@@ -277,7 +298,7 @@ class AuthService {
             noHp: noHp.trim(),
             jenisKelamin: jenisKelamin,
             nik: nik,
-            alamat: alamat,
+            alamat: enrichedAlamat,
           );
           if (pgReg != null) {
             final user = UserModel.fromJson(pgReg, defaultRole: role);
@@ -285,6 +306,7 @@ class AuthService {
             await _storage.saveToken(token);
             await _storage.saveUser(user);
             await _storage.saveRole(role);
+            SatuSehatService.instance.triggerBackgroundUserSync(user);
             return AuthResult(
               success: true,
               message: 'Pendaftaran akun GIAT berhasil.',
@@ -340,6 +362,7 @@ class AuthService {
           await _storage.saveUser(user);
           await _storage.saveRole(resolvedRole);
         }
+        SatuSehatService.instance.triggerBackgroundUserSync(user);
 
         return AuthResult(
           success: true,
@@ -426,6 +449,7 @@ class AuthService {
         final user = UserModel.fromJson(userData, defaultRole: role);
         await _storage.saveUser(user);
         await _storage.saveRole(user.role);
+        SatuSehatService.instance.triggerBackgroundUserSync(user);
         return user;
       }
     } catch (e) {
@@ -534,6 +558,7 @@ class AuthService {
           await _storage.saveUser(user);
           await _storage.saveRole('dokter');
         }
+        SatuSehatService.instance.triggerBackgroundUserSync(user);
 
         return AuthResult(
           success: true,
@@ -589,6 +614,7 @@ class AuthService {
           await _storage.saveUser(user);
           await _storage.saveRole('apotek');
         }
+        SatuSehatService.instance.triggerBackgroundUserSync(user);
 
         return AuthResult(
           success: true,

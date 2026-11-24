@@ -40,6 +40,25 @@ class ApiConstants {
   static const String midtransRedirectionBaseUrl =
       'https://app.sandbox.midtrans.com/snap/v4/redirection/';
 
+  /// Konfigurasi Integrasi SATUSEHAT Kemenkes RI (HL7 FHIR R4)
+  static const String satusehatOrganizationId =
+      '8130f30d-7d7e-48c0-abb3-ba551d939e29';
+  static const String satusehatClientId =
+      'japGnEs9ff25iuos0QEPI1EqLyqs6z5c3nQ6CEQrYuAkHwIZ';
+  static const String satusehatClientSecret =
+      '13OZt6gpbT6F9AQgEKwhMW9xqnzqsXBtXN0iayAXD9RVDgDAAnD1oZGGR3fjx6YK';
+  static const String satusehatEnvironment = 'sandbox';
+  static const bool satusehatIsProduction = false;
+
+  static String get satusehatHost => satusehatIsProduction
+      ? 'https://api-satusehat.kemkes.go.id'
+      : 'https://api-satusehat-stg.dto.kemkes.go.id';
+
+  static String get satusehatAuthBaseUrl => '$satusehatHost/oauth2/v1';
+  static String get satusehatFhirBaseUrl => '$satusehatHost/fhir-r4/v1';
+  static String get satusehatConsentBaseUrl => '$satusehatHost/consent/v1';
+  static String get satusehatKfaBaseUrl => '$satusehatHost/kfa-v2';
+
   /// Helper untuk membangun Redirect URL Midtrans Snap dari redirect_url atau snap_token
   static String? resolveMidtransRedirectUrl({
     String? redirectUrl,

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'api_response.dart';
+import 'satusehat_service.dart';
 import 'storage_service.dart';
 import 'supabase_admin_service.dart';
 
@@ -137,6 +139,16 @@ class KonsultasiApiService {
       final data = raw is Map && raw['data'] is Map
           ? Map<String, dynamic>.from(raw['data'] as Map)
           : (raw is Map ? Map<String, dynamic>.from(raw) : null);
+      final bookedId = (data?['id'] ?? data?['id_konsultasi'])?.toString();
+      if (bookedId != null && bookedId.isNotEmpty) {
+        unawaited(
+          SatuSehatService.instance.syncKonsultasiToSatuSehat(
+            idKonsultasi: bookedId,
+            idDokter: payload['id_dokter']?.toString(),
+            keluhanAtauDiagnosis: (payload['isi_konsultasi'] ?? payload['keluhan'])?.toString(),
+          ),
+        );
+      }
       return ApiResponse.success(
         message: raw?['message'] ?? 'Booking jadwal konsultasi berhasil dibuat.',
         data: data,
@@ -515,6 +527,12 @@ class KonsultasiApiService {
       try {
         final res = await SupabaseAdminService.instance.completeConsultation(id.toString());
         if (res != null) {
+          unawaited(
+            SatuSehatService.instance.syncKonsultasiToSatuSehat(
+              idKonsultasi: id.toString(),
+              statusKonsultasi: 'selesai',
+            ),
+          );
           return ApiResponse.success(
             message: 'Sesi konsultasi telah diselesaikan di Supabase.',
             data: res,
@@ -526,6 +544,14 @@ class KonsultasiApiService {
 
     try {
       final response = await _client.dio.post('/konsultasi/$id/selesai');
+      if (id != null) {
+        unawaited(
+          SatuSehatService.instance.syncKonsultasiToSatuSehat(
+            idKonsultasi: id.toString(),
+            statusKonsultasi: 'selesai',
+          ),
+        );
+      }
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Sesi konsultasi telah diselesaikan.',
         data: response.data?['data'] as Map<String, dynamic>?,

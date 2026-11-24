@@ -16,5 +16,6 @@ export 'pasien_api_service.dart';
 export 'konsultasi_api_service.dart';
 export 'dokter_api_service.dart';
 export 'apotek_api_service.dart';
+export 'satusehat_service.dart';
 export 'storage_service.dart';
 export 'navigation_service.dart';

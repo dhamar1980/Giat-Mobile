@@ -20,6 +20,7 @@ class UserModel {
   final String? noSip;
   final String? tanggalLahir;
   final String? golonganDarah;
+  final String? satusehatIhsNumber;
 
   String get formattedTanggalLahir => TimeUtils.formatBirthDate(tanggalLahir);
 
@@ -41,6 +42,7 @@ class UserModel {
     this.noSip,
     this.tanggalLahir,
     this.golonganDarah,
+    this.satusehatIhsNumber,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, {String defaultRole = 'pasien'}) {
@@ -88,6 +90,7 @@ class UserModel {
       noSip: json['no_sip'] as String? ?? json['no_sipa_sia'] as String?,
       tanggalLahir: json['tanggal_lahir'] as String?,
       golonganDarah: json['golongan_darah'] as String?,
+      satusehatIhsNumber: (json['satusehat_ihs_number'] ?? json['ihs_number'])?.toString(),
     );
   }
 
@@ -110,6 +113,7 @@ class UserModel {
       'no_sip': noSip,
       'tanggal_lahir': tanggalLahir,
       'golongan_darah': golonganDarah,
+      'satusehat_ihs_number': satusehatIhsNumber,
     };
   }
 
@@ -136,6 +140,7 @@ class UserModel {
     String? noSip,
     String? tanggalLahir,
     String? golonganDarah,
+    String? satusehatIhsNumber,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -155,6 +160,7 @@ class UserModel {
       noSip: noSip ?? this.noSip,
       tanggalLahir: tanggalLahir ?? this.tanggalLahir,
       golonganDarah: golonganDarah ?? this.golonganDarah,
+      satusehatIhsNumber: satusehatIhsNumber ?? this.satusehatIhsNumber,
     );
   }
 }

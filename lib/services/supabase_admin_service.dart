@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import '../constants/api_constants.dart';
+import '../models/user_model.dart';
 import '../utils/time_utils.dart';
 import 'jember_location_service.dart';
+import 'satusehat_service.dart';
 import 'storage_service.dart';
 
 /// Service koneksi langsung ke Database PostgreSQL Supabase GIAT (`auaejgogiyfrefsurahd`)
@@ -93,8 +96,13 @@ class SupabaseAdminService {
         Sql.named(sql),
         parameters: parameters ?? const {},
       );
+    } on ServerException {
+      rethrow;
     } catch (e) {
       // Reconnect once if connection was dropped
+      try {
+        await _connection?.close();
+      } catch (_) {}
       _connection = null;
       final conn = await _getConnection();
       return await conn.execute(
@@ -404,16 +412,21 @@ class SupabaseAdminService {
       );
     }
 
-    return {
+    final createdMap = {
       'id': newId,
       'nama': nama,
       'email': email.trim().toLowerCase(),
       'no_hp': noHp,
+      'alamat': keterangan,
       'role': role,
       'is_active': true,
       'keterangan': keterangan,
       'created_at': DateTime.now().toIso8601String(),
     };
+    SatuSehatService.instance.triggerBackgroundUserSync(
+      UserModel.fromJson(createdMap, defaultRole: role),
+    );
+    return createdMap;
   }
 
   /// Mengubah hak akses (role) akun di Supabase
@@ -3171,6 +3184,7 @@ class SupabaseAdminService {
         d.tarif_konsultasi,
         d.foto_profile,
         d.bio,
+        d.satusehat_ihs_number,
         u.email,
         u.keterangan
       FROM dokter d
@@ -6206,6 +6220,7 @@ class SupabaseAdminService {
         p.tanggal_lahir::text AS tanggal_lahir,
         p.golongan_darah,
         p.foto_profile,
+        p.satusehat_ihs_number,
         u.email
       FROM pasien p
       LEFT JOIN "user" u ON TRIM(u.id) = TRIM(p.id_pasien)
@@ -6238,6 +6253,8 @@ class SupabaseAdminService {
     final noHp = (data['no_hp'] ?? current['no_hp'] ?? '').toString().trim();
     final jk = (data['jenis_kelamin'] ?? current['jenis_kelamin'] ?? 'L').toString().trim();
     final golDarah = (data['golongan_darah'] ?? data['gol_darah'] ?? current['golongan_darah'] ?? 'O+').toString().trim();
+    final nikVal = (data['nik'] ?? data['NIK'] ?? current['nik'] ?? '').toString().trim();
+    final tglLahirVal = (data['tanggal_lahir'] ?? current['tanggal_lahir'] ?? '').toString().trim();
 
     await _exec(
       '''
@@ -6247,6 +6264,8 @@ class SupabaseAdminService {
           no_hp = CASE WHEN @noHp = '' THEN no_hp ELSE @noHp END,
           jenis_kelamin = CASE WHEN @jk = '' THEN jenis_kelamin ELSE @jk END,
           golongan_darah = CASE WHEN @gol = '' THEN golongan_darah ELSE @gol END,
+          nik = CASE WHEN @nik = '' THEN nik ELSE @nik END,
+          tanggal_lahir = CASE WHEN @dob = '' THEN tanggal_lahir ELSE CAST(@dob AS date) END,
           updated_at = NOW()
       WHERE TRIM(id_pasien) = @pid
       ''',
@@ -6257,6 +6276,10 @@ class SupabaseAdminService {
         'noHp': noHp,
         'jk': jk,
         'gol': golDarah,
+        'nik': nikVal,
+        'dob': RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(tglLahirVal)
+            ? tglLahirVal.substring(0, 10)
+            : '',
       },
     );
 

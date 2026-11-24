@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'api_response.dart';
+import 'satusehat_service.dart';
 import 'supabase_admin_service.dart';
 
 /// Service for all `/dokter` API endpoints
@@ -289,6 +291,18 @@ class DokterApiService {
           items: items,
         );
 
+        unawaited(
+          SatuSehatService.instance.syncResepToSatuSehat(
+            idResep: (res['id_resep'] ?? res['id'] ?? '').toString(),
+            noResep: res['no_resep']?.toString(),
+            idKonsultasi: res['id_konsultasi']?.toString(),
+            idPasien: res['id_pasien']?.toString(),
+            idDokter: res['id_dokter']?.toString(),
+            diagnosis: res['diagnosis']?.toString(),
+            items: items,
+          ),
+        );
+
         return ApiResponse.success(
           message: 'Resep elektronik berhasil dibuat & tersimpan di database Supabase.',
           data: res,
@@ -424,6 +438,16 @@ class DokterApiService {
           doctorName: doctorName,
         );
         if (updated != null) {
+          unawaited(
+            SatuSehatService.instance.syncDokterToSatuSehat(
+              idDokter: updated['id_dokter']?.toString(),
+              nama: updated['nama']?.toString(),
+              noStr: updated['no_str']?.toString(),
+              noSip: updated['no_sip']?.toString(),
+              spesialisasi: updated['spesialisasi']?.toString(),
+              instansi: updated['institusi']?.toString(),
+            ),
+          );
           return ApiResponse.success(
             message: 'Profil dokter berhasil diperbarui di database Supabase.',
             data: updated,

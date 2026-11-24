@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
@@ -5,6 +6,7 @@ import '../models/pragi_model.dart';
 import 'api_client.dart';
 import 'api_response.dart';
 import 'reminder_notification_service.dart';
+import 'satusehat_service.dart';
 import 'storage_service.dart';
 import 'supabase_admin_service.dart';
 
@@ -428,6 +430,20 @@ class PasienApiService {
       try {
         final pgProfile = await SupabaseAdminService.instance.fetchPasienProfile();
         if (pgProfile != null) {
+          unawaited(
+            SatuSehatService.instance.syncPasienToSatuSehat(
+              idPasien: pgProfile['id_pasien']?.toString(),
+              nama: pgProfile['nama']?.toString(),
+              nik: pgProfile['nik']?.toString(),
+              alamat: pgProfile['alamat']?.toString(),
+              noHp: pgProfile['no_hp']?.toString(),
+              email: pgProfile['email']?.toString(),
+              jenisKelamin: pgProfile['jenis_kelamin']?.toString(),
+              tanggalLahir: pgProfile['tanggal_lahir']?.toString(),
+              golonganDarah: pgProfile['golongan_darah']?.toString(),
+              existingIhsNumber: pgProfile['satusehat_ihs_number']?.toString(),
+            ),
+          );
           return ApiResponse.success(
             message: 'Berhasil memuat profil pasien dari Supabase.',
             data: pgProfile,
@@ -438,9 +454,25 @@ class PasienApiService {
     }
     try {
       final response = await _client.dio.get('/pasien/profile');
+      final resData = response.data?['data'] as Map<String, dynamic>?;
+      if (resData != null) {
+        unawaited(
+          SatuSehatService.instance.syncPasienToSatuSehat(
+            idPasien: (resData['id_pasien'] ?? resData['id'])?.toString(),
+            nama: resData['nama']?.toString(),
+            nik: (resData['nik'] ?? resData['NIK'])?.toString(),
+            alamat: resData['alamat']?.toString(),
+            noHp: resData['no_hp']?.toString(),
+            email: resData['email']?.toString(),
+            jenisKelamin: resData['jenis_kelamin']?.toString(),
+            tanggalLahir: resData['tanggal_lahir']?.toString(),
+            golonganDarah: resData['golongan_darah']?.toString(),
+          ),
+        );
+      }
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Berhasil memuat profil pasien.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {
@@ -454,6 +486,21 @@ class PasienApiService {
       try {
         final pgUpdated = await SupabaseAdminService.instance.updatePasienProfile(data);
         if (pgUpdated != null) {
+          unawaited(
+            SatuSehatService.instance.syncPasienToSatuSehat(
+              idPasien: pgUpdated['id_pasien']?.toString(),
+              nama: pgUpdated['nama']?.toString(),
+              nik: pgUpdated['nik']?.toString(),
+              alamat: pgUpdated['alamat']?.toString(),
+              noHp: pgUpdated['no_hp']?.toString(),
+              email: pgUpdated['email']?.toString(),
+              jenisKelamin: pgUpdated['jenis_kelamin']?.toString(),
+              tanggalLahir: pgUpdated['tanggal_lahir']?.toString(),
+              golonganDarah: pgUpdated['golongan_darah']?.toString(),
+              existingIhsNumber: pgUpdated['satusehat_ihs_number']?.toString(),
+              forcePushUpdate: true,
+            ),
+          );
           return ApiResponse.success(
             message: 'Profil & lokasi berhasil diperbarui di database Supabase.',
             data: pgUpdated,
@@ -464,9 +511,24 @@ class PasienApiService {
     }
     try {
       final response = await _client.dio.put('/pasien/profile', data: data);
+      final resData = response.data?['data'] as Map<String, dynamic>?;
+      unawaited(
+        SatuSehatService.instance.syncPasienToSatuSehat(
+          idPasien: (resData?['id_pasien'] ?? resData?['id'])?.toString(),
+          nama: (resData?['nama'] ?? data['nama'])?.toString(),
+          nik: (resData?['nik'] ?? data['nik'] ?? data['NIK'])?.toString(),
+          alamat: (resData?['alamat'] ?? data['alamat'])?.toString(),
+          noHp: (resData?['no_hp'] ?? data['no_hp'])?.toString(),
+          email: (resData?['email'] ?? data['email'])?.toString(),
+          jenisKelamin: (resData?['jenis_kelamin'] ?? data['jenis_kelamin'])?.toString(),
+          tanggalLahir: (resData?['tanggal_lahir'] ?? data['tanggal_lahir'])?.toString(),
+          golonganDarah: (resData?['golongan_darah'] ?? data['golongan_darah'])?.toString(),
+          forcePushUpdate: true,
+        ),
+      );
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Profil berhasil diperbarui.',
-        data: response.data?['data'] as Map<String, dynamic>?,
+        data: resData,
         statusCode: response.statusCode,
       );
     } catch (e) {
@@ -495,6 +557,12 @@ class PasienApiService {
         '/pasien/profile/nohp',
         data: {'no_hp': noHp.trim()},
       );
+      unawaited(
+        SatuSehatService.instance.syncPasienToSatuSehat(
+          noHp: noHp.trim(),
+          forcePushUpdate: true,
+        ),
+      );
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Nomor HP berhasil diperbarui.',
         data: response.data?['data'] as Map<String, dynamic>?,
@@ -511,6 +579,12 @@ class PasienApiService {
       final response = await _client.dio.put(
         '/pasien/profile/email',
         data: {'email': email.trim().toLowerCase()},
+      );
+      unawaited(
+        SatuSehatService.instance.syncPasienToSatuSehat(
+          email: email.trim().toLowerCase(),
+          forcePushUpdate: true,
+        ),
       );
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Email berhasil diperbarui.',
@@ -645,12 +719,25 @@ class PasienApiService {
 
   /// POST /pasien/pantau
   Future<ApiResponse<Map<String, dynamic>>> storePantau(Map<String, dynamic> data) async {
+    final parsedBb = double.tryParse((data['bb'] ?? data['berat_badan'] ?? '0').toString()) ?? 0.0;
+    final parsedTb = double.tryParse((data['tb'] ?? data['tinggi_badan'] ?? '0').toString()) ?? 0.0;
     try {
       final response = await _client.dio.post('/pasien/pantau', data: data);
       final resData = response.data?['data'] as Map<String, dynamic>?;
       if (resData != null) {
         await StorageService().addPantauRecordToCache(resData);
       }
+      unawaited(
+        SatuSehatService.instance.syncPantauToSatuSehat(
+          idPantau: resData?['id']?.toString(),
+          beratBadan: parsedBb,
+          tinggiBadan: parsedTb,
+          imt: double.tryParse((resData?['imt'] ?? resData?['bmi'] ?? '0').toString()),
+          kondisi: (data['kondisi'] ?? data['kondisi_tubuh'])?.toString(),
+          keluhan: data['keluhan']?.toString(),
+          detailKeluhan: data['detail_keluhan']?.toString(),
+        ),
+      );
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Catatan kondisi berhasil disimpan ke server.',
         data: resData,
@@ -659,8 +746,8 @@ class PasienApiService {
     } catch (e) {
       // Fallback: simpan ke cache lokal agar data pasien tidak hilang saat restart / offline
       final now = DateTime.now();
-      final bb = double.tryParse((data['bb'] ?? data['berat_badan'] ?? '0').toString()) ?? 0.0;
-      final tb = double.tryParse((data['tb'] ?? data['tinggi_badan'] ?? '0').toString()) ?? 0.0;
+      final bb = parsedBb;
+      final tb = parsedTb;
       final tbMeter = tb > 0 ? tb / 100.0 : 1.7;
       final imt = tbMeter > 0 ? double.parse((bb / (tbMeter * tbMeter)).toStringAsFixed(1)) : 22.5;
 
@@ -683,6 +770,17 @@ class PasienApiService {
       };
 
       await StorageService().addPantauRecordToCache(localRecord);
+      unawaited(
+        SatuSehatService.instance.syncPantauToSatuSehat(
+          idPantau: localRecord['id']?.toString(),
+          beratBadan: bb,
+          tinggiBadan: tb,
+          imt: imt,
+          kondisi: localRecord['kondisi']?.toString(),
+          keluhan: localRecord['keluhan']?.toString(),
+          detailKeluhan: localRecord['detail_keluhan']?.toString(),
+        ),
+      );
 
       return ApiResponse.success(
         message: 'Catatan kondisi berhasil disimpan di perangkat.',
@@ -695,6 +793,16 @@ class PasienApiService {
   Future<ApiResponse<Map<String, dynamic>>> updatePantau(dynamic id, Map<String, dynamic> data) async {
     try {
       final response = await _client.dio.put('/pasien/pantau/$id', data: data);
+      unawaited(
+        SatuSehatService.instance.syncPantauToSatuSehat(
+          idPantau: id?.toString(),
+          beratBadan: double.tryParse((data['bb'] ?? data['berat_badan'] ?? '0').toString()) ?? 0.0,
+          tinggiBadan: double.tryParse((data['tb'] ?? data['tinggi_badan'] ?? '0').toString()) ?? 0.0,
+          kondisi: (data['kondisi'] ?? data['kondisi_tubuh'])?.toString(),
+          keluhan: data['keluhan']?.toString(),
+          detailKeluhan: data['detail_keluhan']?.toString(),
+        ),
+      );
       return ApiResponse.success(
         message: response.data?['message'] ?? 'Catatan kondisi berhasil diperbarui.',
         data: response.data?['data'] as Map<String, dynamic>?,
@@ -856,6 +964,15 @@ class PasienApiService {
           : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
 
       final hasil = PragiHasilSkrining.fromJson(dataMap);
+      unawaited(
+        SatuSehatService.instance.syncPragiSkriningToSatuSehat(
+          idPragi: hasil.idPragi,
+          kategoriRisiko: hasil.kategoriRisiko,
+          probabilitasPersen: hasil.displayCkdPercentage,
+          skor: hasil.skor,
+          rekomendasi: hasil.rekomendasi,
+        ),
+      );
 
       return ApiResponse.success(
         message: raw?['message'] ?? 'Skrining AI PRAGI berhasil diproses dan diprediksi.',
@@ -1335,6 +1452,13 @@ class PasienApiService {
 
   /// POST /pasien/obat/pesanan/{id}/selesai
   Future<ApiResponse<Map<String, dynamic>>> konfirmasiTerimaPesanan(dynamic id) async {
+    if (id != null) {
+      unawaited(
+        SatuSehatService.instance.syncPesananDispenseToSatuSehat(
+          idPesananOrNo: id.toString(),
+        ),
+      );
+    }
     try {
       final response = await _client.dio.post('/pasien/obat/pesanan/$id/selesai');
       return ApiResponse.success(

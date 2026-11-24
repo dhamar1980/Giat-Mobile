@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'api_response.dart';
+import 'satusehat_service.dart';
 import 'supabase_admin_service.dart';
 
 /// Service for all `/apotek` API endpoints (Terintegrasi 100% Real Data Supabase PostgreSQL)
@@ -312,6 +314,11 @@ class ApotekApiService {
           newStatus: 'selesai',
           progressStep: 5,
         );
+        unawaited(
+          SatuSehatService.instance.syncPesananDispenseToSatuSehat(
+            idPesananOrNo: id.toString(),
+          ),
+        );
         return ApiResponse.success(
           message: 'Pesanan obat telah diselesaikan.',
           data: sbRes ?? {},
@@ -423,6 +430,14 @@ class ApotekApiService {
           apotekId: apotekId,
           apotekName: apotekName,
         );
+        final ordId = sbRes?['id_pesanan']?.toString();
+        if (ordId != null && ordId.isNotEmpty) {
+          unawaited(
+            SatuSehatService.instance.syncPesananDispenseToSatuSehat(
+              idPesananOrNo: ordId,
+            ),
+          );
+        }
         return ApiResponse.success(
           message: 'Resep berhasil divalidasi dan diterima.',
           data: sbRes ?? {},
@@ -543,6 +558,12 @@ class ApotekApiService {
           apotekName: apotekName,
         );
         if (sbRes != null) {
+          unawaited(
+            SatuSehatService.instance.syncObatToSatuSehat(
+              idObat: sbRes['id_obat']?.toString(),
+              namaObat: (sbRes['nama_obat'] ?? data['nama_obat'] ?? 'Obat Ginjal').toString(),
+            ),
+          );
           return ApiResponse.success(
             message: 'Obat baru berhasil didaftarkan ke Supabase.',
             data: sbRes,
@@ -650,6 +671,18 @@ class ApotekApiService {
     if (!_isTest) {
       try {
         final sbUpdated = await SupabaseAdminService.instance.updateApotekProfileFull(data);
+        unawaited(
+          SatuSehatService.instance.syncApotekToSatuSehat(
+            idApotek: sbUpdated?['id_apotek']?.toString(),
+            namaApotek: (sbUpdated?['nama_apotek'] ?? data['nama_apotek'])?.toString(),
+            alamat: (sbUpdated?['alamat'] ?? data['alamat'])?.toString(),
+            noHp: (sbUpdated?['no_hp'] ?? data['no_hp'])?.toString(),
+            email: (sbUpdated?['email'] ?? data['email'])?.toString(),
+            noSipaSia: (sbUpdated?['no_sipa_sia'] ?? data['no_sipa_sia'])?.toString(),
+            lokasiLatLong: sbUpdated?['lokasi_lat_long']?.toString(),
+            forceUpdate: true,
+          ),
+        );
         return ApiResponse.success(
           message: 'Profil apotek berhasil diperbarui di Supabase.',
           data: sbUpdated ?? data,

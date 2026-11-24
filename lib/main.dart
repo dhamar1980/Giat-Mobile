@@ -13,6 +13,7 @@ import 'screens/apotek/apoteker_home_screen.dart';
 import 'screens/apotek/models/apotek_models.dart';
 import 'services/navigation_service.dart';
 import 'services/auth_service.dart';
+import 'services/satusehat_service.dart';
 import 'services/storage_service.dart';
 import 'utils/time_utils.dart';
 
@@ -83,6 +84,7 @@ void main() async {
         avatar: savedUser.fotoProfile,
       );
     }
+    SatuSehatService.instance.triggerBackgroundUserSync(savedUser);
   }
 
   runApp(GiatApp(initialUser: savedUser));
